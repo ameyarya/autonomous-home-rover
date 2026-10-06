@@ -83,7 +83,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 | --- | --- |
 | Primary mission | Confirmed: home patrol; one-room roaming is the first autonomy milestone |
 | Compute location | Confirmed: home computer over Wi-Fi for the current build; onboard compute deferred due to cost, with self-contained operation retained as a future goal |
-| Exact ESP32-S3 board and camera | Not selected |
+| Exact ESP32-S3 board and camera | Purchase needed. Proposed: Seeed Studio XIAO ESP32S3 Sense; pending user selection and original-controller interface/pin verification |
 | Existing electronics command interface | Must verify |
 | Firmware framework and command transport | Select after interface verification |
 | Floors, thresholds, stairs, pets, and lighting | Environment details needed |
@@ -106,3 +106,9 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 3. Define the first patrol route and the home-computer software/transport interface.
 4. Choose the ESP32-S3 camera board and create a pin/power budget.
 5. Build the drive-and-see prototype before committing to a navigation stack.
+
+## Camera board shortlist
+
+- Proposed budget candidate: [Seeed Studio XIAO ESP32S3 Sense](https://www.seeedstudio.com/XIAO-ESP32S3-Sense-p-5639.html), manufacturer listing approximately US$13.99 before shipping/tax as checked 2026-10-06. Buy the Sense camera bundle, not the bare XIAO ESP32S3.
+- Manufacturer documentation specifies 8 MB PSRAM and exposes UART and I2C pins: https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/
+- This is a recommendation, not a confirmed purchase. Verify controller interface requirements, remaining pins, power, and the camera supplied by the seller before final selection.
