@@ -6,7 +6,7 @@ Status: Initial scope, 2026-10-06. This is a living plan; update it as hardware 
 
 ## Goal
 
-Build an autonomous indoor rover using the CyberBrick OpenFrame One RC car as the base, with an ESP32-S3 and camera mounted on top. The long-term goal is autonomous operation at home. The exact mission and navigation capability remain to be selected.
+Build an autonomous indoor rover using the CyberBrick OpenFrame One RC car as the base, with an ESP32-S3 and camera mounted on top. The long-term goal is autonomous operation at home. The primary mission is home patrol: visit designated locations and capture camera observations. The navigation method, patrol schedule, and reporting behavior remain to be selected.
 
 Base project: https://makerworld.com/en/models/2243313-cyberbrick-openframe-one-rc-car#profileId-2442179
 
@@ -19,7 +19,7 @@ Base project: https://makerworld.com/en/models/2243313-cyberbrick-openframe-one-
 
 ## Proposed first release
 
-Start with slow autonomous roaming and obstacle avoidance in one controlled indoor room, with manual charging. This is a proposed baseline, pending selection of the rover's primary job.
+Start with slow autonomous roaming and obstacle avoidance in one controlled indoor room, with manual charging. This is the initial milestone toward home patrol; detailed acceptance targets remain to be set.
 
 The first release should support manual commissioning, camera capture, autonomous start/stop, obstacle stopping, and a safe stopped state on faults. Room-to-room navigation, person following, scheduled patrols, mapping, and automatic docking are later candidates rather than committed first-release features.
 
@@ -80,7 +80,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 
 | Decision | Status |
 | --- | --- |
-| Primary mission: roam, patrol, follow, or visit rooms | User input needed |
+| Primary mission | Confirmed: home patrol; one-room roaming is the first autonomy milestone |
 | All compute onboard versus home computer assistance | User input needed |
 | Exact ESP32-S3 board and camera | Not selected |
 | Existing electronics command interface | Must verify |
@@ -102,6 +102,6 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 
 1. Obtain and inspect the MakerWorld electronics list and wiring instructions.
 2. Confirm the autonomous command interface while preserving the original drive electronics.
-3. Select the first autonomous mission and compute-location preference.
+3. Select the compute-location preference and define the first patrol route.
 4. Choose the ESP32-S3 camera board and create a pin/power budget.
 5. Build the drive-and-see prototype before committing to a navigation stack.
