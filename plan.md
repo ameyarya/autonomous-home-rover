@@ -25,7 +25,7 @@ The first release should support manual commissioning, camera capture, autonomou
 
 ## Integration gate
 
-The MakerWorld parts list, controller documentation, and wiring have not yet been verified. Before selecting an integration method:
+The OpenFrame One assembly guide V1.0 has been reviewed (materials page 3 and electronics pages 25-27). Its photographs show two drive motors labeled M1/M2, a steering servo, battery, controller assembly, and lighting connections labeled LED1/LED2. Exact component models, electrical ratings, and an autonomous command interface are not established by this guide. Before selecting an integration method:
 
 1. Record the exact controller, motors, steering actuator, battery, connectors, and original wiring.
 2. Identify a documented or experimentally validated interface for throttle, steering, reverse, and stop.
@@ -112,3 +112,11 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 - Proposed budget candidate: [Seeed Studio XIAO ESP32S3 Sense](https://www.seeedstudio.com/XIAO-ESP32S3-Sense-p-5639.html), manufacturer listing approximately US$13.99 before shipping/tax as checked 2026-10-06. Buy the Sense camera bundle, not the bare XIAO ESP32S3.
 - Manufacturer documentation specifies 8 MB PSRAM and exposes UART and I2C pins: https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/
 - This is a recommendation, not a confirmed purchase. Verify controller interface requirements, remaining pins, power, and the camera supplied by the seller before final selection.
+
+## Assembly guide findings
+
+- Source: user-provided OpenFrame One assembly guide V1.0, 35 pages. The source PDF is retained locally and is not copied into the repository.
+- Pages 25-27 establish physical assembly and connector placement; they do not specify a UART pinout, external command protocol, voltage ratings, or motion feedback.
+- Page 34 directs the builder to the official Bambu Lab remote, and page 35 shows throttle, steering, and lighting controls. These describe the original manual-control setup, not autonomous integration.
+- CyberBrick publishes an official MicroPython controller application repository: https://github.com/CyberBrick-Official/CyberBrick_Controller_Core . Investigate whether a software command adapter on the original controller can preserve the driving hardware. This is a candidate approach, not a verified capability for this assembled model.
+- Continue to treat the XIAO ESP32S3 Sense as a camera-board candidate; the guide alone does not confirm electrical compatibility or a suitable power connection.
