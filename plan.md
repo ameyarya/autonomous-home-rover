@@ -40,8 +40,8 @@ If the existing electronics cannot accept autonomous commands, resolve that bloc
 - **Original drive system:** executes throttle and steering commands through the verified interface.
 - **ESP32-S3 + camera:** captures images, reads added sensors, coordinates rover states, and sends drive commands. Exact board, camera, pin allocation, and firmware framework are undecided.
 - **Safety behavior:** bounded command lifetime, fault stop, explicit autonomous enable, and an accessible stop mechanism. Verify whether the original controller itself enforces command expiry; ESP32 software alone cannot cover an ESP32 failure.
-- **Navigation compute:** phase 1 uses a home computer over Wi-Fi for perception and navigation. Later, move those functions onboard so patrol does not require a home computer or Wi-Fi connection. Keep the ESP32 responsible for local sensor handling and bounded drive commands through the verified original-controller interface. The onboard computer is not selected; benchmark the phase 1 workload before choosing it.
-- **Migration requirements:** define a command/telemetry interface that can move from Wi-Fi to a wired onboard link. Reserve mounting space and assess power, cooling, storage, and sensor needs before selecting companion hardware. Raspberry Pi 5 or Compute Module 5 are candidates, not committed purchases; a heavier AI computer is only warranted by measured workloads.
+- **Navigation compute:** phase 1 uses a home computer over Wi-Fi for perception and navigation. Later, move those functions onboard so patrol does not require a home computer or Wi-Fi connection. Keep the ESP32 responsible for local sensor handling and bounded drive commands through the verified original-controller interface. Onboard compute is deferred because of cost; no Raspberry Pi, Jetson, or other companion computer purchase is in the current scope. Benchmark the home-computer workload before revisiting a future migration.
+- **Future migration:** keep the command/telemetry interface modular so onboard compute can be revisited later. Do not add cost or hardware solely to accommodate that upgrade now.
 - **Additional sensors:** select after defining the mission. Distance sensing is proposed for obstacle detection; cliff sensing is required before operation near accessible stairs. Encoders and an IMU are candidates for navigation, subject to compatibility with the original base.
 
 The camera alone should not be assumed to provide reliable obstacle distance, localization, or stair detection. Full home mapping and robust navigation on the S3 alone are unproven for this project.
@@ -82,7 +82,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 | Decision | Status |
 | --- | --- |
 | Primary mission | Confirmed: home patrol; one-room roaming is the first autonomy milestone |
-| Compute location | Confirmed: home computer over Wi-Fi in phase 1; self-contained onboard compute later |
+| Compute location | Confirmed: home computer over Wi-Fi for the current build; onboard compute deferred due to cost, with self-contained operation retained as a future goal |
 | Exact ESP32-S3 board and camera | Not selected |
 | Existing electronics command interface | Must verify |
 | Firmware framework and command transport | Select after interface verification |
