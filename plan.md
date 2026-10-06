@@ -40,7 +40,8 @@ If the existing electronics cannot accept autonomous commands, resolve that bloc
 - **Original drive system:** executes throttle and steering commands through the verified interface.
 - **ESP32-S3 + camera:** captures images, reads added sensors, coordinates rover states, and sends drive commands. Exact board, camera, pin allocation, and firmware framework are undecided.
 - **Safety behavior:** bounded command lifetime, fault stop, explicit autonomous enable, and an accessible stop mechanism. Verify whether the original controller itself enforces command expiry; ESP32 software alone cannot cover an ESP32 failure.
-- **Navigation compute:** evaluate ESP32-only autonomy first against the selected mission. A home computer over Wi-Fi or an onboard companion computer remains an option, subject to the user's preference and measured performance.
+- **Navigation compute:** phase 1 uses a home computer over Wi-Fi for perception and navigation. Later, move those functions onboard so patrol does not require a home computer or Wi-Fi connection. Keep the ESP32 responsible for local sensor handling and bounded drive commands through the verified original-controller interface. The onboard computer is not selected; benchmark the phase 1 workload before choosing it.
+- **Migration requirements:** define a command/telemetry interface that can move from Wi-Fi to a wired onboard link. Reserve mounting space and assess power, cooling, storage, and sensor needs before selecting companion hardware. Raspberry Pi 5 or Compute Module 5 are candidates, not committed purchases; a heavier AI computer is only warranted by measured workloads.
 - **Additional sensors:** select after defining the mission. Distance sensing is proposed for obstacle detection; cliff sensing is required before operation near accessible stairs. Encoders and an IMU are candidates for navigation, subject to compatibility with the original base.
 
 The camera alone should not be assumed to provide reliable obstacle distance, localization, or stair detection. Full home mapping and robust navigation on the S3 alone are unproven for this project.
@@ -81,7 +82,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 | Decision | Status |
 | --- | --- |
 | Primary mission | Confirmed: home patrol; one-room roaming is the first autonomy milestone |
-| All compute onboard versus home computer assistance | User input needed |
+| Compute location | Confirmed: home computer over Wi-Fi in phase 1; self-contained onboard compute later |
 | Exact ESP32-S3 board and camera | Not selected |
 | Existing electronics command interface | Must verify |
 | Firmware framework and command transport | Select after interface verification |
@@ -102,6 +103,6 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 
 1. Obtain and inspect the MakerWorld electronics list and wiring instructions.
 2. Confirm the autonomous command interface while preserving the original drive electronics.
-3. Select the compute-location preference and define the first patrol route.
+3. Define the first patrol route and the home-computer software/transport interface.
 4. Choose the ESP32-S3 camera board and create a pin/power budget.
 5. Build the drive-and-see prototype before committing to a navigation stack.
