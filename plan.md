@@ -14,7 +14,9 @@ Base project: https://makerworld.com/en/models/2243313-cyberbrick-openframe-one-
 
 - Use the frame, drivetrain, and driving electronics exactly as specified by the MakerWorld project.
 - Add an ESP32-S3 with a camera on top of the frame.
-- Integrate the ESP32 with the existing driving electronics; do not assume replacement motor drivers or a different drive platform.
+- The user already owns a CyberBrick kit with receiver and transmitter. Keep these as the driving command path.
+- Run navigation on the Mac, connected by USB to the CyberBrick transmitter; the transmitter sends drive commands wirelessly to the rover receiver. This is the selected architecture; USB command injection still needs verification.
+- Use the added ESP32 only for camera capture and sensor acquisition, with telemetry sent to the Mac over Wi-Fi. It does not run navigation or send drive commands.
 - Maintain this repository throughout the project, including this plan, hardware decisions, firmware, wiring, build notes, and validation results.
 
 ## Proposed first release
@@ -25,26 +27,28 @@ The first release should support manual commissioning, camera capture, autonomou
 
 ## Integration gate
 
-The OpenFrame One assembly guide V1.0 has been reviewed (materials page 3 and electronics pages 25-27). Its photographs show two drive motors labeled M1/M2, a steering servo, battery, controller assembly, and lighting connections labeled LED1/LED2. Exact component models, electrical ratings, and an autonomous command interface are not established by this guide. Before selecting an integration method:
+The OpenFrame One assembly guide V1.0 has been reviewed (materials page 3 and electronics pages 25-27). Its photographs show two drive motors labeled M1/M2, a steering servo, battery, controller assembly, and lighting connections labeled LED1/LED2. Exact component models, electrical ratings, and an autonomous command interface are not established by this guide. Before implementing the selected Mac-to-transmitter integration:
 
 1. Record the exact controller, motors, steering actuator, battery, connectors, and original wiring.
-2. Identify a documented or experimentally validated interface for throttle, steering, reverse, and stop.
+2. Verify how Mac software can send throttle, steering, reverse, and stop commands to the transmitter over USB. USB connection alone does not establish a driving-command API.
 3. Establish whether the interface requires changes to the original firmware. Any departure from the agreed original electronics must be discussed before proceeding.
 4. Identify available feedback: battery voltage, wheel speed, steering position, and controller status. Do not assume any of these exist.
-5. Verify that a lost ESP32 command or controller connection can bring the vehicle to a stop. Stop latency must be measured.
+5. Verify stopping on Mac process failure, USB disconnection, transmitter/receiver link loss, and stale camera/sensor telemetry. Determine which timeouts the CyberBrick system enforces independently of the Mac. Measure stop latency.
 
 If the existing electronics cannot accept autonomous commands, resolve that blocker before proceeding with navigation development.
 
 ## Architecture
 
-- **Original drive system:** executes throttle and steering commands through the verified interface.
-- **ESP32-S3 + camera:** captures images, reads added sensors, coordinates rover states, and sends drive commands. Exact board, camera, pin allocation, and firmware framework are undecided.
-- **Safety behavior:** bounded command lifetime, fault stop, explicit autonomous enable, and an accessible stop mechanism. Verify whether the original controller itself enforces command expiry; ESP32 software alone cannot cover an ESP32 failure.
-- **Navigation compute:** phase 1 uses a home computer over Wi-Fi for perception and navigation. Later, move those functions onboard so patrol does not require a home computer or Wi-Fi connection. Keep the ESP32 responsible for local sensor handling and bounded drive commands through the verified original-controller interface. Onboard compute is deferred because of cost; no Raspberry Pi, Jetson, or other companion computer purchase is in the current scope. Benchmark the home-computer workload before revisiting a future migration.
+- **Drive command path:** Mac navigation/control software -> USB -> CyberBrick transmitter -> existing wireless link -> CyberBrick receiver -> original motors and steering.
+- **Perception path:** ESP32-S3 camera and added sensors -> Wi-Fi -> Mac perception/navigation software. Timestamp telemetry so the Mac can detect stale observations.
+- **ESP32 role:** camera and sensor board only. Exact board, camera, pin allocation, power supply, and firmware framework remain undecided. No ESP32-to-drive-controller connection is required by the current architecture.
+- **Mac role:** perception, localization, patrol planning, rover operating states, and generation of drive commands.
+- **Safety behavior:** bounded command lifetime, fault stop, explicit autonomous enable, and an accessible stop mechanism. The Mac should stop issuing motion when observations are stale; an independent CyberBrick command/link timeout must handle loss of the Mac or USB connection. These behaviors require verification.
+- **Navigation compute:** the existing Mac runs navigation for the current build. Onboard compute is deferred because of cost; no companion computer purchase is in scope. Self-contained onboard operation remains a future goal.
 - **Future migration:** keep the command/telemetry interface modular so onboard compute can be revisited later. Do not add cost or hardware solely to accommodate that upgrade now.
 - **Additional sensors:** select after defining the mission. Distance sensing is proposed for obstacle detection; cliff sensing is required before operation near accessible stairs. Encoders and an IMU are candidates for navigation, subject to compatibility with the original base.
 
-The camera alone should not be assumed to provide reliable obstacle distance, localization, or stair detection. Full home mapping and robust navigation on the S3 alone are unproven for this project.
+The camera alone should not be assumed to provide reliable obstacle distance, localization, or stair detection. Navigation runs on the Mac; ESP32 navigation is outside the current scope.
 
 ## Mechanical and electrical work
 
@@ -63,7 +67,7 @@ Deliver a confirmed parts list, wiring reference, control-interface decision, an
 
 ### 1. Drive and see
 
-Integrate the ESP32, mount the camera, and implement manual commissioning controls and telemetry. Complete when steering, forward/reverse, and stop work repeatably while camera capture is active, without supply-related resets. Test initially with wheels lifted, then on the floor at low speed.
+Implement Mac-to-transmitter USB driving, mount the ESP32 camera/sensor board, and implement Wi-Fi telemetry and manual commissioning controls. Complete when steering, forward/reverse, and stop work repeatably while camera capture is active, without supply-related resets. Test initially with wheels lifted, then on the floor at low speed.
 
 ### 2. Safe autonomous roaming
 
@@ -82,12 +86,12 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 | Decision | Status |
 | --- | --- |
 | Primary mission | Confirmed: home patrol; one-room roaming is the first autonomy milestone |
-| Compute location | Confirmed: home computer over Wi-Fi for the current build; onboard compute deferred due to cost, with self-contained operation retained as a future goal |
-| Exact ESP32-S3 board and camera | Purchase needed. Proposed: Seeed Studio XIAO ESP32S3 Sense; pending user selection and original-controller interface/pin verification |
-| Existing electronics command interface | Must verify |
+| Compute location | Confirmed: Mac runs navigation; Wi-Fi carries ESP32 camera/sensor telemetry; USB connects Mac to transmitter |
+| Exact ESP32-S3 board and camera | Purchase needed. Proposed: Seeed Studio XIAO ESP32S3 Sense; pending user selection and sensor pin/power verification |
+| Existing electronics command interface | Selected: Mac USB -> owned CyberBrick transmitter -> wireless receiver. Verify USB command API and timeout behavior |
 | Firmware framework and command transport | Select after interface verification |
 | Floors, thresholds, stairs, pets, and lighting | Environment details needed |
-| Budget and hardware already owned | User input needed |
+| Budget and hardware already owned | CyberBrick receiver/transmitter kit already owned; ESP32 camera board needs purchase; overall budget open |
 | Obstacle sensors and motion feedback | Select after base verification |
 | Speed limit, runtime, stop distance, and mission success targets | Set during commissioning |
 
@@ -111,12 +115,12 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 
 - Proposed budget candidate: [Seeed Studio XIAO ESP32S3 Sense](https://www.seeedstudio.com/XIAO-ESP32S3-Sense-p-5639.html), manufacturer listing approximately US$13.99 before shipping/tax as checked 2026-10-06. Buy the Sense camera bundle, not the bare XIAO ESP32S3.
 - Manufacturer documentation specifies 8 MB PSRAM and exposes UART and I2C pins: https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/
-- This is a recommendation, not a confirmed purchase. Verify controller interface requirements, remaining pins, power, and the camera supplied by the seller before final selection.
+- This is a recommendation, not a confirmed purchase. Verify sensor pin requirements, power, and the camera supplied by the seller before final selection.
 
 ## Assembly guide findings
 
 - Source: user-provided OpenFrame One assembly guide V1.0, 35 pages. The source PDF is retained locally and is not copied into the repository.
 - Pages 25-27 establish physical assembly and connector placement; they do not specify a UART pinout, external command protocol, voltage ratings, or motion feedback.
 - Page 34 directs the builder to the official Bambu Lab remote, and page 35 shows throttle, steering, and lighting controls. These describe the original manual-control setup, not autonomous integration.
-- CyberBrick publishes an official MicroPython controller application repository: https://github.com/CyberBrick-Official/CyberBrick_Controller_Core . Investigate whether a software command adapter on the original controller can preserve the driving hardware. This is a candidate approach, not a verified capability for this assembled model.
+- CyberBrick publishes an official MicroPython controller application repository: https://github.com/CyberBrick-Official/CyberBrick_Controller_Core . Investigate a Mac USB command adapter on the transmitter while preserving the existing receiver/motor wiring. This is a candidate approach, not a verified capability for this assembled model.
 - Continue to treat the XIAO ESP32S3 Sense as a camera-board candidate; the guide alone does not confirm electrical compatibility or a suitable power connection.
