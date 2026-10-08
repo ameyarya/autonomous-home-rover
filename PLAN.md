@@ -2,7 +2,7 @@
 
 Repository: https://github.com/ameyarya/autonomous-home-rover
 
-Status: Initial scope, 2026-10-06. This is a living plan; update it as hardware is verified and decisions are made.
+Status: Chassis not yet printed — print and assembly scheduled next week (as of 2026-10-07). XIAO Sense ordered; autonomy software to be ported from the Mini-T project. This is a living plan; update it as hardware is verified and decisions are made.
 
 ## Goal
 
@@ -50,6 +50,15 @@ If the existing electronics cannot accept autonomous commands, resolve that bloc
 
 The camera alone should not be assumed to provide reliable obstacle distance, localization, or stair detection. Navigation runs on the Mac; ESP32 navigation is outside the current scope.
 
+## Reuse from Mini-T (verified 2026-10-07)
+
+Proven in https://github.com/ameyarya/ai-driven-mini-t — adapt, don't rebuild:
+- Mac → USB CyberBrick transmitter drive commands (hold-to-drive, release-to-stop, per-side compensation). Transfers to the rover's USB/transmitter side; stock receiver + link timeout behavior still needs rover-side verification.
+- Python move → stop → observe autonomy loop with adaptive timing, stale-frame checks, bounded commands, target-loss recovery, and step caps.
+- Detector + dashboard pattern (labeled exact-planner-view image, frame age, decision status) and calibration files from day one.
+- Receiver-side watchdog + bounded commands (adopt the pattern for rover safety states; the signed OTA mechanism itself is Mini-T-specific).
+- Not transferable: DJI/Mimo/MediaMTX camera pipeline (rover uses XIAO MJPEG/WebSocket), tracked-motion calibration (rover is wheeled), perfect-map simulation avoidance (real sensing is pending on both projects).
+
 ## Mechanical and electrical work
 
 - Measure mounting space, payload allowance, steering clearance, turning radius, and ground clearance.
@@ -86,14 +95,15 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 | Decision | Status |
 | --- | --- |
 | Primary mission | Confirmed: home patrol; one-room roaming is the first autonomy milestone |
-| Compute location | Confirmed: Mac runs navigation; Wi-Fi carries ESP32 camera/sensor telemetry; USB connects Mac to transmitter |
-| Exact ESP32-S3 board and camera | Purchase needed. Proposed: Seeed Studio XIAO ESP32S3 Sense; pending user selection and sensor pin/power verification |
+| Compute location | Locked (2026-10-06): Mac is the Phase 1 brain — no new purchases yet. Offboard architecture stands (rover only needs drive instructions), so a desk Pi 5 stays an approved later migration. Local LLM is out of Phase 1 scope for the same reason |
+| Exact ESP32-S3 board and camera | Ordered (2026-10-07): Seeed Studio XIAO ESP32S3 Sense bundle (camera + mic). On arrival: verify sensor pin requirements, power, and supplied camera before final selection; create pin/power budget |
 | Existing electronics command interface | Selected: Mac USB -> owned CyberBrick transmitter -> wireless receiver. Verify USB command API and timeout behavior |
-| Firmware framework and command transport | Select after interface verification |
+| Firmware framework and command transport | Transport selected (2026-10-06): WebSocket JSON telemetry + MJPEG video, timestamped for stale detection. Framework pending: user rejected Arduino/ESP-IDF/MicroPython; awaiting clarification |
 | Floors, thresholds, stairs, pets, and lighting | Environment details needed |
-| Budget and hardware already owned | CyberBrick receiver/transmitter kit already owned; ESP32 camera board needs purchase; overall budget open |
-| Obstacle sensors and motion feedback | Select after base verification |
+| Budget and hardware already owned | Locked (2026-10-06): no $100+ spend yet — Phase 1 uses owned hardware only (Mac + CyberBrick kit). ESP32 camera board and desk Pi purchases deferred to later milestones |
+| Obstacle sensors and motion feedback | Proposal (2026-10-07, from tank lesson): camera-only positioning forces stop-observe speeds (~4-5 s/step on the tank), so shortlist wheel encoders + IMU for when spending resumes. Select after base verification + environment details |
 | Speed limit, runtime, stop distance, and mission success targets | Set during commissioning |
+| Drive-electronics sharing with tank | Open (2026-10-07): the owned CyberBrick kit currently serves the working Mini-T — decide whether the rover build reuses it or a second set is bought when spending resumes |
 
 ## Repository maintenance
 
@@ -105,17 +115,18 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 
 ## Next actions
 
-1. Obtain and inspect the MakerWorld electronics list and wiring instructions.
-2. Confirm the autonomous command interface while preserving the original drive electronics.
-3. Define the first patrol route and the home-computer software/transport interface.
-4. Choose the ESP32-S3 camera board and create a pin/power budget.
-5. Build the drive-and-see prototype before committing to a navigation stack.
+1. Print and assemble the OpenFrame One chassis (scheduled next week as of 2026-10-07). Pull the MakerWorld electronics list first so missing fasteners, bearings, or drive components are ordered before assembly day.
+2. Obtain and inspect the MakerWorld electronics list and wiring instructions.
+3. Confirm the autonomous command interface while preserving the original drive electronics.
+4. Define the first patrol route and the home-computer software/transport interface.
+5. On XIAO arrival: verify camera/mic/pins/power and create the pin/power budget (board already ordered).
+6. Build the drive-and-see prototype before committing to a navigation stack.
 
 ## Camera board shortlist
 
 - Proposed budget candidate: [Seeed Studio XIAO ESP32S3 Sense](https://www.seeedstudio.com/XIAO-ESP32S3-Sense-p-5639.html), manufacturer listing approximately US$13.99 before shipping/tax as checked 2026-10-06. Buy the Sense camera bundle, not the bare XIAO ESP32S3.
 - Manufacturer documentation specifies 8 MB PSRAM and exposes UART and I2C pins: https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/
-- This is a recommendation, not a confirmed purchase. Verify sensor pin requirements, power, and the camera supplied by the seller before final selection.
+- Ordered 2026-10-07 (camera + mic bundle). On arrival, verify sensor pin requirements, power, and the camera supplied by the seller before final selection.
 
 ## Assembly guide findings
 
