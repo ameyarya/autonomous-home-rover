@@ -2,7 +2,7 @@
 
 Repository: https://github.com/ameyarya/autonomous-home-rover
 
-Status: Chassis not yet printed — print and assembly scheduled next week (as of 2026-10-07). XIAO Sense ordered; autonomy software to be ported from the Mini-T project. This is a living plan; update it as hardware is verified and decisions are made.
+Status: Phase 1 in progress — chassis print scheduled next week (as of 2026-10-07), XIAO Sense ordered. Phase 2 (hardware/software upgrades) is study-only until Phase 1 is done. This is a living plan; update it as hardware is verified and decisions are made.
 
 ## Goal
 
@@ -24,6 +24,12 @@ Base project: https://makerworld.com/en/models/2243313-cyberbrick-openframe-one-
 Start with slow autonomous roaming and obstacle avoidance in one controlled indoor room, with manual charging. This is the initial milestone toward home patrol; detailed acceptance targets remain to be set.
 
 The first release should support manual commissioning, camera capture, autonomous start/stop, obstacle stopping, and a safe stopped state on faults. Room-to-room navigation, person following, scheduled patrols, mapping, and automatic docking are later candidates rather than committed first-release features.
+
+## Phases (locked 2026-10-08)
+
+**Phase 1 — Mini-T parity on the rover.** Mac brain, Mac transmission, XIAO camera onboard. Print and assemble the chassis, verify manual control, build a printed housing for the XIAO Sense, bench-bring-up the camera stream, and port the Mini-T stack (server/command path, autonomy loop, detector + dashboard, calibration files) to the wheeled chassis and XIAO pipeline. Done when the rover behaves like the Mini-T: manual drive, live camera, bounded autonomous find/align/approach with safety stops.
+
+**Phase 2 — upgrades (study only for now).** Hardware, in order: encoders + IMU → single-point ranging → 2D LiDAR → onboard compute (desk Pi first, then onboard) → split power rails. Software: ROS 2 transports, SLAM (default candidate slam_toolbox), Nav2 + docking. Study the options while executing Phase 1; no purchases and no rewrites until Phase 1 is done.
 
 ## Integration gate
 
@@ -63,6 +69,7 @@ Proven in https://github.com/ameyarya/ai-driven-mini-t — adapt, don't rebuild:
 
 - Measure mounting space, payload allowance, steering clearance, turning radius, and ground clearance.
 - Design a removable top mount with a useful camera view, antenna clearance, cable strain relief, and access to the original electronics.
+- Design a printed housing for the XIAO Sense with a clear camera view, Wi-Fi antenna clearance, and USB access for bench flashing.
 - Verify supply voltages and spare current capacity before powering the ESP32 from the original battery system.
 - Select regulation and wiring based on measured loads and motor transients; do not assume spare power outputs are suitable.
 - Test for resets and image/control failures during motor startup, steering, and reversing.
