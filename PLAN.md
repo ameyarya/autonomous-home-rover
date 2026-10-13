@@ -2,7 +2,7 @@
 
 Repository: https://github.com/ameyarya/autonomous-home-rover
 
-Status: Phase 1 in progress — chassis print scheduled next week (as of 2026-10-07), XIAO Sense ordered. Phase 2 (hardware/software upgrades) is study-only until Phase 1 is done. This is a living plan; update it as hardware is verified and decisions are made.
+Status: Phase 1 in progress — chassis print scheduled next week (as of 2026-10-07), XIAO Sense received 2026-10-08 (bench verification pending). Phase 2 (hardware/software upgrades) is study-only until Phase 1 is done. This is a living plan; update it as hardware is verified and decisions are made.
 
 ## Goal
 
@@ -103,7 +103,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 | --- | --- |
 | Primary mission | Confirmed: home patrol; one-room roaming is the first autonomy milestone |
 | Compute location | Locked (2026-10-06): Mac is the Phase 1 brain — no new purchases yet. Offboard architecture stands (rover only needs drive instructions), so a desk Pi 5 stays an approved later migration. Local LLM is out of Phase 1 scope for the same reason |
-| Exact ESP32-S3 board and camera | Ordered (2026-10-07): Seeed Studio XIAO ESP32S3 Sense bundle (camera + mic). On arrival: verify sensor pin requirements, power, and supplied camera before final selection; create pin/power budget |
+| Exact ESP32-S3 board and camera | Received 2026-10-08: Seeed Studio XIAO ESP32S3 Sense bundle (camera + mic). Bench-verify supplied camera, mic, sensor pins, and power next; then create pin/power budget |
 | Existing electronics command interface | Selected: Mac USB -> owned CyberBrick transmitter -> wireless receiver. Verify USB command API and timeout behavior |
 | Firmware framework and command transport | Transport selected (2026-10-06): WebSocket JSON telemetry + MJPEG video, timestamped for stale detection. Framework pending: user rejected Arduino/ESP-IDF/MicroPython; awaiting clarification |
 | Floors, thresholds, stairs, pets, and lighting | Environment details needed |
@@ -126,7 +126,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 2. Obtain and inspect the MakerWorld electronics list and wiring instructions.
 3. Confirm the autonomous command interface while preserving the original drive electronics.
 4. Define the first patrol route and the home-computer software/transport interface.
-5. On XIAO arrival: verify camera/mic/pins/power and create the pin/power budget (board already ordered).
+5. XIAO received 2026-10-08: bench-verify camera/mic/pins/power, then create the pin/power budget.
 6. Build the drive-and-see prototype before committing to a navigation stack.
 
 ## Camera board shortlist
