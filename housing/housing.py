@@ -163,7 +163,12 @@ if __name__ == '__main__':
     lid_flat = Rot(180, 0, 0) * lid_print
     export_stl(lid_flat, str(OUT / 'housing-lid.stl'))
     # Quick test-fit print: the pod on a short stub of plate (no screws needed).
-    stub = base & (Pos(CX, FRAME_FRONT_Y + 10, FRAME_TOP_Z + 25) * Box(40, 24, 50))   # ends before the relief pocket
+    # Covers both rails and the first screw row behind the pod, so it screws onto the frame
+    # like the real plate (and keeps the relief pocket over the steering gear).
+    screw_y = report['screw_rows_y'][0]
+    stub_len = screw_y + 5.5 - FRAME_FRONT_Y
+    stub_w = GRID_X[1] - GRID_X[0] + 10
+    stub = base & (Pos(CX, FRAME_FRONT_Y + stub_len / 2, FRAME_TOP_Z + 25) * Box(stub_w, stub_len, 50))
     export_stl(stub, str(OUT / 'housing-pod-testfit.stl'))
     for k, v in report.items():
         print(f'{k}: {v}')
