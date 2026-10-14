@@ -6,7 +6,7 @@
 //           /config       GET shows settings; GET /config?key=val&... changes and persists them
 //           /ota          POST firmware image (X-OTA-Token header), reboots into it
 //           /reboot       POST (X-OTA-Token header)
-// Port 81:  /stream       MJPEG (multipart/x-mixed-replace); each part carries
+// Port 81:  /stream       MJPEG (multipart/x-mixed-replace), up to MAX_STREAM_CLIENTS at once; each part carries
 //                         X-Timestamp-Us (capture time, uptime clock) and X-Frame-Seq
 //
 // All timestamps are microseconds of device uptime (esp_timer), the same clock as
@@ -36,6 +36,7 @@
 #include "nvs_flash.h"
 #include "cam.h"
 #include "mic.h"
+#include "frames.h"
 
 #if __has_include("secrets.h")
 #include "secrets.h"
@@ -52,6 +53,7 @@
 #define LED_GPIO             GPIO_NUM_21  // user LED, active low
 #define STREAMING_WINDOW_US  1000000
 #define OTA_VERIFY_TIMEOUT_S 60
+#define MAX_STREAM_CLIENTS   4
 
 static const char *TAG = "xiao-cam";
 
@@ -218,35 +220,66 @@ static void services_init(void)
 }
 
 // ---------- HTTP: stream server (port 81) ----------
+//
+// Each MJPEG client gets its own task (async request), all fed from the shared
+// capture task, so several viewers can watch at once without starving each other.
 
-static esp_err_t stream_handler(httpd_req_t *req)
+static volatile int s_stream_clients = 0;
+
+static void stream_client_task(void *arg)
 {
+    httpd_req_t *req = arg;
     httpd_resp_set_type(req, "multipart/x-mixed-replace;boundary=" STREAM_BOUNDARY);
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    frames_viewer_add();
 
     char part[192];
+    uint32_t last_seq = rcam_frame_seq();
     esp_err_t res = ESP_OK;
     while (res == ESP_OK) {
-        uint32_t seq;
-        camera_fb_t *fb = rcam_grab(&seq);
-        if (!fb) {
-            ESP_LOGE(TAG, "frame capture failed");
-            return ESP_FAIL;
+        shared_frame_t *frame = frames_acquire(last_seq, pdMS_TO_TICKS(3000));
+        if (!frame) {
+            ESP_LOGW(TAG, "stream: no frame for 3 s, closing client");
+            break;
         }
+        last_seq = frame->seq;
         int n = snprintf(part, sizeof(part),
                          "\r\n--" STREAM_BOUNDARY "\r\n"
                          "Content-Type: image/jpeg\r\n"
                          "Content-Length: %u\r\n"
                          "X-Timestamp-Us: %lld\r\n"
                          "X-Frame-Seq: %lu\r\n\r\n",
-                         (unsigned)fb->len, (long long)rcam_fb_timestamp_us(fb), (unsigned long)seq);
+                         (unsigned)frame->len, (long long)frame->timestamp_us, (unsigned long)frame->seq);
         res = httpd_resp_send_chunk(req, part, n);
         if (res == ESP_OK) {
-            res = httpd_resp_send_chunk(req, (const char *)fb->buf, fb->len);
+            res = httpd_resp_send_chunk(req, (const char *)frame->buf, frame->len);
         }
-        esp_camera_fb_return(fb);
+        frames_release(frame);
     }
-    return res;
+
+    frames_viewer_remove();
+    __atomic_sub_fetch(&s_stream_clients, 1, __ATOMIC_SEQ_CST);
+    httpd_req_async_handler_complete(req);
+    vTaskDelete(NULL);
+}
+
+static esp_err_t stream_handler(httpd_req_t *req)
+{
+    if (__atomic_add_fetch(&s_stream_clients, 1, __ATOMIC_SEQ_CST) > MAX_STREAM_CLIENTS) {
+        __atomic_sub_fetch(&s_stream_clients, 1, __ATOMIC_SEQ_CST);
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        return httpd_resp_sendstr(req, "too many stream clients\n");
+    }
+    httpd_req_t *async_req;
+    esp_err_t err = httpd_req_async_handler_begin(req, &async_req);
+    if (err == ESP_OK && xTaskCreate(stream_client_task, "stream_client", 4096, async_req, 5, NULL) != pdPASS) {
+        httpd_req_async_handler_complete(async_req);
+        err = ESP_ERR_NO_MEM;
+    }
+    if (err != ESP_OK) {
+        __atomic_sub_fetch(&s_stream_clients, 1, __ATOMIC_SEQ_CST);
+    }
+    return err;
 }
 
 // ---------- HTTP: control server (port 80) ----------
@@ -272,22 +305,25 @@ static esp_err_t index_handler(httpd_req_t *req)
 
 static esp_err_t capture_handler(httpd_req_t *req)
 {
-    uint32_t seq;
-    camera_fb_t *fb = rcam_grab(&seq);
-    if (!fb) {
+    // Wait for a frame captured after this request arrived.
+    uint32_t after = rcam_frame_seq();
+    frames_viewer_add();
+    shared_frame_t *frame = frames_acquire(after, pdMS_TO_TICKS(2000));
+    frames_viewer_remove();
+    if (!frame) {
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
     char ts[24], seq_str[12];
-    snprintf(ts, sizeof(ts), "%lld", (long long)rcam_fb_timestamp_us(fb));
-    snprintf(seq_str, sizeof(seq_str), "%lu", (unsigned long)seq);
+    snprintf(ts, sizeof(ts), "%lld", (long long)frame->timestamp_us);
+    snprintf(seq_str, sizeof(seq_str), "%lu", (unsigned long)frame->seq);
 
     httpd_resp_set_type(req, "image/jpeg");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_hdr(req, "X-Timestamp-Us", ts);
     httpd_resp_set_hdr(req, "X-Frame-Seq", seq_str);
-    esp_err_t res = httpd_resp_send(req, (const char *)fb->buf, fb->len);
-    esp_camera_fb_return(fb);
+    esp_err_t res = httpd_resp_send(req, (const char *)frame->buf, frame->len);
+    frames_release(frame);
     return res;
 }
 
@@ -501,7 +537,7 @@ static void http_init(void)
     httpd_config_t scfg = HTTPD_DEFAULT_CONFIG();
     scfg.server_port = 81;
     scfg.ctrl_port = 32769;
-    scfg.max_open_sockets = 3;
+    scfg.max_open_sockets = MAX_STREAM_CLIENTS + 1;
     ESP_ERROR_CHECK(httpd_start(&stream, &scfg));
     const httpd_uri_t stream_uri = { .uri = "/stream", .method = HTTP_GET, .handler = stream_handler };
     httpd_register_uri_handler(stream, &stream_uri);
@@ -524,6 +560,7 @@ void app_main(void)
     if (rcam_init() != ESP_OK) {
         ESP_LOGE(TAG, "camera init failed - check the Sense camera board and ribbon");
     }
+    frames_start();
     if (mic_init() != ESP_OK) {
         ESP_LOGE(TAG, "mic init failed");
     }

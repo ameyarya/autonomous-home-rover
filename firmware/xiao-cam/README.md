@@ -8,7 +8,7 @@ The board only streams video and telemetry to the Mac over Wi-Fi; it never drive
 | URL | What |
 | --- | --- |
 | `http://rover-cam.local/` | Bench page: live view + telemetry |
-| `http://rover-cam.local:81/stream` | MJPEG (`multipart/x-mixed-replace`). Each part has `X-Timestamp-Us` (capture time) and `X-Frame-Seq` headers |
+| `http://rover-cam.local:81/stream` | MJPEG (`multipart/x-mixed-replace`), up to 4 clients at once (5th gets 503). Each part has `X-Timestamp-Us` (capture time) and `X-Frame-Seq` headers |
 | `http://rover-cam.local/capture.jpg` | Single JPEG, same headers |
 | `ws://rover-cam.local/ws` | JSON telemetry pushed every 200 ms |
 | `http://rover-cam.local/config` | Current settings as JSON; add `?key=value&...` to change them (saved across reboots) |
@@ -77,7 +77,7 @@ If USB flashing fails to connect, hold BOOT while plugging in USB.
 - Camera detected as OV3660 at 0x3c; 8 MB octal PSRAM passes memory test.
 - Wi-Fi STA RSSI -42 to -47 dBm; mDNS `rover-cam.local` resolves. On boot it usually needs two
   retries (~9 s) before getting an IP.
-- VGA MJPEG: 60 frames in 4 s (~15 fps), ~8.5 KB/frame at quality 12. Telemetry interval 200.0 ms.
+- VGA MJPEG: 60 frames in 4 s (~15 fps) measured with curl on the first build; the Mac link measures 26.5–28 fps, ~8.5 KB/frame at quality 12. Telemetry interval 200.0 ms.
 - Mic: quiet room -62 to -70 dBFS RMS; Mac speaker playback raised it to about -54 dBFS RMS,
   peaks -44 dBFS.
 - Settings persisted across 3 consecutive reboots (back online in 4–5 s each).
@@ -85,5 +85,6 @@ If USB flashing fails to connect, hold BOOT while plugging in USB.
   passed self-check and stayed on `ota_1` after a hard reset.
 - Fixed during bring-up: a 2 KB LED task stack overflowed into NVS memory and boot-looped the
   board once settings existed; stacks are now 4 KB.
+- Multi-client (shared capture task): three simultaneous streams each ~28 fps plus a 68 ms `/capture.jpg`; added after a browser on the bench page starved the Mac link of frames.
 
 Not yet verified: running on the rover chassis and behaviour while the motors run.
