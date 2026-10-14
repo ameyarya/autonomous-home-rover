@@ -106,6 +106,25 @@ class BehaviorTest(unittest.TestCase):
         self.assertEqual(d.action, 'back')
         self.assertIn('closing fast', d.reason)
 
+    def test_borderline_pixels_do_not_flicker(self):
+        sim = Sim()
+        flips, last = 0, None
+        for i in range(50):  # 10 s of readings hovering around the 12-level threshold
+            sim.t += 0.2
+            sim.b.update(sim.t, still_dog(pixels=13 if i % 2 else 11))
+            moving = sim.b.motion.moving
+            flips += last is not None and moving != last
+            last = moving
+        self.assertLessEqual(flips, 1)
+
+    def test_still_needs_confirmation(self):
+        sim = Sim(still_confirm_s=2.0)
+        sim.run(1, walking)
+        sim.run(1, still_dog())
+        self.assertTrue(sim.b.motion.moving, 'one quiet second is not yet still')
+        sim.run(3, still_dog())
+        self.assertFalse(sim.b.motion.moving)
+
     def test_stale_camera_stops(self):
         sim = Sim()
         sim.run(1, walking)

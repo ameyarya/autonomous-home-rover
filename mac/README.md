@@ -55,6 +55,13 @@ Log: `mac/dog-log/YYYY-MM-DD.jsonl` (events `seen`, `lost`, `moving`, `still`, `
 Limits: motion is judged only while the rover is stopped (camera motion would look like dog
 motion); stillness thresholds are first guesses to tune on the real dog; no drive path yet.
 
+First run on the real dog (2026-10-14, dim living room, camera at desk height): detected
+walking down the hall, close up, and with only his face visible (confidence 0.44–0.63); the model
+described him as "walking toward the door" and "walking toward the camera", matching the
+snapshots. Fixed after that run: moving/still flickered 4× in a second with in-box pixel change
+hovering at the threshold (now hysteresis, 2 s to confirm still), and the model's input image could
+pick up the status overlay (now its own copy).
+
 Checked 2026-10-14: ~5 frames/s processed live; YOLO11s ~20 ms/frame on MPS (4 s first call);
 test dog photo detected at 0.88; Qwen described it as "standing alert on grass" / active in 8 s
 (25 s on a cold model load).

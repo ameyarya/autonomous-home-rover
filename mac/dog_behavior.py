@@ -27,6 +27,7 @@ class Settings:
     move_speed: float = 0.3            # box centre speed, box-heights per second
     move_pixels: float = 12.0          # mean abs pixel change inside the box, 0-255
     motion_window_s: float = 2.0
+    still_confirm_s: float = 2.0       # no movement evidence this long before calling him still
 
 
 @dataclass
@@ -46,12 +47,17 @@ class Decision:
 
 
 class MotionTracker:
-    """Moving/still from box displacement and in-box pixel change over a short window."""
+    """Moving/still from box displacement and in-box pixel change over a short window.
+
+    Hysteresis: movement evidence switches to moving at once; switching back to still
+    needs still_confirm_s without evidence, so readings near a threshold don't flicker.
+    """
 
     def __init__(self, settings):
         self.settings = settings
         self.samples = collections.deque()
         self.still_since = None
+        self.last_motion = None
         self.moving = False
         self.speed = 0.0
         self.approach_rate = 0.0
@@ -59,6 +65,7 @@ class MotionTracker:
     def reset(self, now):
         self.samples.clear()
         self.still_since = now
+        self.last_motion = None
         self.moving = False
 
     def update(self, now, dog):
@@ -77,11 +84,15 @@ class MotionTracker:
             self.speed = self.approach_rate = 0.0
         recent_pixels = [d.pixel_change for _, d in self.samples if d.pixel_change is not None]
         busy = sum(p > s.move_pixels for p in recent_pixels)
-        self.moving = self.speed > s.move_speed or busy >= 2
-        if self.moving:
+        if self.speed > s.move_speed or busy >= 2:
+            self.last_motion = now
+        if self.last_motion is not None and now - self.last_motion < s.still_confirm_s:
+            self.moving = True
             self.still_since = None
-        elif self.still_since is None:
-            self.still_since = now
+        else:
+            self.moving = False
+            if self.still_since is None:
+                self.still_since = self.last_motion if self.last_motion is not None else now
         return self.moving
 
     def still_for(self, now):

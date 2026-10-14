@@ -130,6 +130,7 @@ class Describer:
         return None
 
     def maybe_start(self, now, image, why):
+        # image must be the caller's own copy: it is encoded later on another thread
         if self.busy.is_set() or now - self.last_started < DESCRIBE_MIN_GAP_S:
             return False
         self.busy.set()
@@ -241,7 +242,7 @@ class Watcher:
             ok, jpeg = cv2.imencode('.jpg', boxed)
             self.timeline.log('seen', jpeg=jpeg.tobytes(), confidence=dog.confidence,
                               x=round(dog.x, 1), height=round(dog.height, 1))
-            self.describer.maybe_start(now, boxed, 'seen')
+            self.describer.maybe_start(now, boxed.copy(), 'seen')
         elif not dog and self.visible and now - (self.last_detection_at or now) > self.behavior.settings.lost_after_s:
             self.visible = False
             self.timeline.log('lost', visible_for_s=round(self.last_detection_at - self.visible_since, 1))
@@ -251,10 +252,10 @@ class Watcher:
             if self.moving is not None and moving != self.moving:
                 self.timeline.log('moving' if moving else 'still',
                                   speed=round(self.behavior.motion.speed, 2), pixel_change=dog.pixel_change)
-                self.describer.maybe_start(now, boxed, 'moving' if moving else 'still')
+                self.describer.maybe_start(now, boxed.copy(), 'moving' if moving else 'still')
             self.moving = moving
             if now - self.describer.last_started >= DESCRIBE_EVERY_S:
-                self.describer.maybe_start(now, boxed, 'periodic')
+                self.describer.maybe_start(now, boxed.copy(), 'periodic')
 
     def _decide(self, now, dog, camera_ok):
         previous = self.decision
