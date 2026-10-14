@@ -31,6 +31,12 @@ The first release should support manual commissioning, camera capture, autonomou
 
 **Phase 2 — upgrades (study only for now).** Hardware, in order: encoders + IMU → single-point ranging → 2D LiDAR → onboard compute (desk Pi first, then onboard) → split power rails. Software: ROS 2 transports, SLAM (default candidate slam_toolbox), Nav2 + docking. Study the options while executing Phase 1; no purchases and no rewrites until Phase 1 is done.
 
+**Phase 2 study item — collar tracker (added 2026-10-14).** Goal: know where the dog is without searching by camera. Options, cheapest first:
+1. Owned AirTag on his collar (free): the rover hears its BLE advertisements (XIAO ESP32-S3 or Mac Bluetooth) and uses RSSI for near/far, which room, and hotter/colder search. Limits: no UWB direction (Apple restricts precision finding to iPhone), rotating address/keys so identity is "the only/strongest AirTag", unknown advertising behaviour while near the owner's iPhone, noisy indoor RSSI with body shadowing, and possible separation beeping if the owner is away for long.
+2. Plain BLE beacon tag (~US$10–15): same RSSI information but a fixed ID and a configurable advertising rate.
+3. UWB tag + rover UWB module (e.g. Qorvo DWM3000, ~US$50–100): ~10 cm ranging, and bearing with a two-antenna angle-of-arrival module, so the rover can head straight to him.
+First step (free, no firmware change): log AirTag RSSI from the Mac with the tag on his collar, with him at the desk, across the room, and in another room, to check it advertises reliably at home and whether RSSI separates rooms. Use any tracker as a coarse hint that hands over to the camera once he is in view.
+
 ## Integration gate
 
 The OpenFrame One assembly guide V1.0 has been reviewed (materials page 3 and electronics pages 25-27). Its photographs show two drive motors labeled M1/M2, a steering servo, battery, controller assembly, and lighting connections labeled LED1/LED2. Exact component models, electrical ratings, and an autonomous command interface are not established by this guide. Before implementing the selected Mac-to-transmitter integration:
