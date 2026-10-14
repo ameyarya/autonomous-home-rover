@@ -73,6 +73,8 @@ Proven in https://github.com/ameyarya/ai-driven-mini-t — adapt, don't rebuild:
 
 ## Mechanical and electrical work
 
+- Chassis hardware for the OpenFrame Two 4WD (checked 2026-10-14; not in the CyberBrick kit unless noted): 4 × 608 bearings (8 × 22 × 7 mm) for the wheel hub carriers and 4 × 625 bearings (5 × 16 × 5 mm) for the front knuckles and rear uprights. Sizes from the designer's MakerWorld hardware list (its "8 × 2 × 7" is a typo; the CAD bearing seats are 22 mm), counts from the guide's parts layout. Screws: M2.5 button-head machine screws into plain 2.5 mm holes (CyberBrick convention per a Bambu forum report; the top-frame holes measure 2.5 mm). Housing mounts with M2.5 × 8–10 mm.
+
 - Measure mounting space, payload allowance, steering clearance, turning radius, and ground clearance.
 - Design a removable top mount with a useful camera view, antenna clearance, cable strain relief, and access to the original electronics.
 - Design a printed housing for the XIAO Sense with a clear camera view and USB access for recovery flashing (normal updates are over Wi-Fi). The external u.FL antenna is required (the XIAO ESP32S3 has no onboard antenna): mount it high on a plastic wall, away from motors, batteries, and metal, without folding it; strain-relieve the cable because u.FL connectors tolerate few mating cycles. Check telemetry `rssi` across rooms after mounting.
