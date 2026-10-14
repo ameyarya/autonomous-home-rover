@@ -6,6 +6,7 @@ camera looking forward. Parametric: edit the numbers at the top of `housing.py` 
 
 | File | Print |
 | --- | --- |
+| `out/housing-pod-testfit.stl` | **Print first** (~30 min): the pod on a 60 × 30 mm plate section that screws onto the frame with the first 2 screws. Check the XIAO fit, lens window, USB-C opening, lid, and camera height/angle on the car. |
 | `out/housing-base.stl` | Plate + battery cradle + pod, 76 × 178 × 26 mm (fits the A1 mini bed). Print flat, no supports. |
 | `out/housing-lid.stl` | Pod lid, printed roof-down. Stick the antenna on top of the roof inside the rim. |
 
@@ -33,7 +34,7 @@ camera looking forward. Parametric: edit the numbers at the top of `housing.py` 
 `check.py` (needs the local chassis STEP and Seeed's XIAO model, both kept out of git) verifies
 zero overlap between the XIAO, battery, lid and base, and collisions with the chassis.
 
-## Assumptions to confirm on the first print
+## Assumptions to confirm on the test-fit print
 
 - Battery size 122.2 × 70.8 × 7.7 mm is from a teardown measurement, not Apple.
 - The lens window position comes from Seeed's model; the OV3660 module on your board may sit
