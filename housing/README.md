@@ -6,11 +6,8 @@ camera looking forward. Parametric: edit the numbers at the top of `housing.py` 
 
 | File | Print |
 | --- | --- |
-| `out/housing-pod-testfit.stl` | **Print first** (~30 min): pod on a plate stub. Check the XIAO slides in, the lens lines up with the window, USB-C reaches through, the lid seats. |
 | `out/housing-base.stl` | Plate + battery cradle + pod, 76 × 178 × 26 mm (fits the A1 mini bed). Print flat, no supports. |
 | `out/housing-lid.stl` | Pod lid, printed roof-down. Stick the antenna on top of the roof inside the rim. |
-
-![housing v1](out/housing-v1.png)
 
 ## Design
 
@@ -34,10 +31,9 @@ camera looking forward. Parametric: edit the numbers at the top of `housing.py` 
 ## Checks
 
 `check.py` (needs the local chassis STEP and Seeed's XIAO model, both kept out of git) verifies
-zero overlap between the XIAO, battery, lid and base, collisions with the chassis, and writes the
-renders.
+zero overlap between the XIAO, battery, lid and base, and collisions with the chassis.
 
-## Assumptions to confirm on the test-fit print
+## Assumptions to confirm on the first print
 
 - Battery size 122.2 × 70.8 × 7.7 mm is from a teardown measurement, not Apple.
 - The lens window position comes from Seeed's model; the OV3660 module on your board may sit

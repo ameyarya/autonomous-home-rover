@@ -1,8 +1,8 @@
 """Rover top housing v1: base plate + battery cradle + XIAO camera pod, and a pod lid.
 
 Run: cad/.venv/bin/python housing/housing.py
-Writes housing/out/*.stl and, if the local chassis STEP is present, checks for collisions
-with it and renders the assembly into cad/source/renders/ (local only).
+Writes housing/out/housing-base.stl and housing-lid.stl. housing/check.py checks fit and
+collisions against the local chassis STEP.
 
 World coordinates are the chassis STEP's: X across the car, Y along it (front = -Y),
 Z up. All dimensions in mm. Edit the parameters below and re-run.
@@ -163,13 +163,6 @@ if __name__ == '__main__':
     lid_flat = Rot(180, 0, 0) * lid_print
     export_stl(lid_flat, str(OUT / 'housing-lid.stl'))
     # Quick test-fit print: the pod on a short stub of plate (no screws needed).
-    # Covers both rails and the first screw row behind the pod, so it screws onto the frame
-    # like the real plate (and keeps the relief pocket over the steering gear).
-    screw_y = report['screw_rows_y'][0]
-    stub_len = screw_y + 5.5 - FRAME_FRONT_Y
-    stub_w = GRID_X[1] - GRID_X[0] + 10
-    stub = base & (Pos(CX, FRAME_FRONT_Y + stub_len / 2, FRAME_TOP_Z + 25) * Box(stub_w, stub_len, 50))
-    export_stl(stub, str(OUT / 'housing-pod-testfit.stl'))
     for k, v in report.items():
         print(f'{k}: {v}')
     bb = base.bounding_box()
