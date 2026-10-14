@@ -8,3 +8,9 @@ firmware/*/sdkconfig.old
 firmware/*/main/secrets.h
 
 .DS_Store
+
+# Mac runtime output
+mac/vision-output/
+mac/detector-server.log
+__pycache__/
+mac/weights/

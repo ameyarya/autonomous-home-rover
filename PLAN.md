@@ -61,7 +61,7 @@ The camera alone should not be assumed to provide reliable obstacle distance, lo
 Proven in https://github.com/ameyarya/ai-driven-mini-t — adapt, don't rebuild:
 - Mac → USB CyberBrick transmitter drive commands (hold-to-drive, release-to-stop, per-side compensation). Transfers to the rover's USB/transmitter side; stock receiver + link timeout behavior still needs rover-side verification.
 - Python move → stop → observe autonomy loop with adaptive timing, stale-frame checks, bounded commands, target-loss recovery, and step caps.
-- Detector + dashboard pattern (labeled exact-planner-view image, frame age, decision status) and calibration files from day one.
+- Detector + dashboard pattern (labeled exact-planner-view image, frame age, decision status) and calibration files from day one. Ported 2026-10-14: `mac/` has the XIAO link (frame-age measurement, 500 ms stale gate), the Mini-T detector, and a dashboard with the exact planner view; see `mac/README.md`.
 - Receiver-side watchdog + bounded commands (adopt the pattern for rover safety states; the signed OTA mechanism itself is Mini-T-specific).
 - Not transferable: DJI/Mimo/MediaMTX camera pipeline (rover uses XIAO MJPEG/WebSocket), tracked-motion calibration (rover is wheeled), perfect-map simulation avoidance (real sensing is pending on both projects).
 
@@ -127,7 +127,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 1. Print and assemble the OpenFrame One chassis (slipped; not yet rescheduled as of 2026-10-13). Pull the MakerWorld electronics list first so missing fasteners, bearings, or drive components are ordered before assembly day.
 2. Obtain and inspect the MakerWorld electronics list and wiring instructions.
 3. Confirm the autonomous command interface while preserving the original drive electronics.
-4. Define the first patrol route and the home-computer software/transport interface.
+4. Define the first patrol route. The camera half of the home-computer interface is done (`mac/xiao_link.py`, 2026-10-14: frames ~55 ms old p50 at ~27 fps, stale gate 500 ms); the drive half waits on the integration gate.
 5. XIAO firmware complete for Phase 1 bench work 2026-10-14 (see `firmware/xiao-cam/README.md`): OTA, runtime camera settings, health telemetry, mic level. Next: printed housing for XIAO + battery pack, then set `vflip`/`hmirror` once mounted.
 6. Build the drive-and-see prototype before committing to a navigation stack.
 
