@@ -6,15 +6,17 @@ camera looking forward. Parametric: edit the numbers at the top of `housing.py` 
 
 | File | Print |
 | --- | --- |
-| `out/housing-pod-testfit.stl` | **Print first** (~30 min): the pod on a 60 × 30 mm plate section that screws onto the frame with the first 2 screws. Check the XIAO fit, lens window, USB-C opening, lid, and camera height/angle on the car. |
+| `out/housing-pod-testfit.stl` | **Print first** (~30 min): the pod on a 60 × 32.5 mm plate section that screws onto the frame with 4 screws (the two front rows). Check the XIAO fit, lens window, USB-C opening, lid, and camera height/angle on the car. |
 | `out/housing-base.stl` | Plate + battery cradle + pod, 76 × 178 × 26 mm (fits the A1 mini bed). Print flat, no supports. |
 | `out/housing-lid.stl` | Pod lid, printed roof-down. Stick the antenna on top of the roof inside the rim. |
 
 ## Design
 
-- **Mounting:** 6 × M2.5 × 8–10 mm button-head screws into the frame's 2.5 mm hole grid (rows 50 mm
-  apart, 22.5 mm pitch). The front pair is just behind the pod; the others sit under the battery
-  in counterbores.
+- **Mounting:** 8 × M2.5 × 8–10 mm button-head screws into the frame's 2.5 mm hole grid (rows 50 mm
+  apart, 22.5 mm pitch): the front row beside the pod (the pod is 28.8 mm wide, the rows 50 mm apart),
+  the row just behind the pod, and two rows under the battery in counterbores. The plate overhangs
+  the frame front by 2.5 mm so the front holes have 3 mm of material to the edge. Fit the front
+  screws before the lid (they sit 3 mm outside the lid's roof).
 - **Camera:** lens window in the pod front, camera tilted 5° up (`TILT_UP_DEG`). At ~10 cm off the
   floor, level-to-slightly-up covers a dog from paws to head at 1–2 m.
 - **XIAO:** stack (24.4 × 17.8 × 14 mm from Seeed's STEP) stands upright, camera forward, 0.4 mm
@@ -22,7 +24,7 @@ camera looking forward. Parametric: edit the numbers at the top of `housing.py` 
 - **Antenna:** cable goes up through a slot in the lid; the 39 × 19 mm antenna sticks on the roof,
   the highest point, with only plastic around it.
 - **Battery:** lies flat along the car in a 6 mm-walled cradle, USB-C edge forward with an opening in
-  the front wall, 30 mm cable gap to the pod (use a short USB-C to USB-C cable, right-angle ideal).
+  the front wall, 27.5 mm cable gap to the pod (use a short right-angle USB-C to USB-C cable).
   Two pairs of strap slots in the overhang for a Velcro strap or rubber band. Finger notch at the rear.
 - **Vents** on the right wall and the lid (also let sound reach the mic).
 - **Chassis clearance:** checked against the OpenFrame Two STEP: no collisions. A steering-gear part

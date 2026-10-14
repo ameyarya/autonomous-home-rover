@@ -36,7 +36,8 @@ WALL = 1.8
 CLEAR = 0.4                            # per side around the XIAO stack
 BAT_CLEAR = 0.6                        # per side around the battery
 CRADLE_WALL_H = 6.0
-CABLE_GAP = 30.0                       # between pod back and battery front edge (USB-C plugs)
+CABLE_GAP = 27.5                       # between pod back and battery front edge (USB-C plugs; right-angle cable)
+PLATE_FRONT_EXTEND = 2.5               # plate overhangs the frame front so the front screw row has ~3 mm of material
 POD_FLOOR = 3.0                        # solid pedestal under the XIAO
 TILT_UP_DEG = 5.0                      # camera tilt above horizontal
 SCREW_CLEAR_D = 2.9                    # M2.5 clearance
@@ -117,8 +118,9 @@ def build():
     bw, bl, bt = BATTERY
     cradle_in = (bw + 2 * BAT_CLEAR, bl + 2 * BAT_CLEAR)
     cradle_out = (cradle_in[0] + 2 * 2.0, cradle_in[1] + 2 * 2.0)
-    plate_len = (bat_front + cradle_out[1]) - FRAME_FRONT_Y
-    plate = Pos(CX, FRAME_FRONT_Y + plate_len / 2, FRAME_TOP_Z + PLATE_T / 2) * Box(cradle_out[0], plate_len, PLATE_T)
+    plate_front = FRAME_FRONT_Y - PLATE_FRONT_EXTEND
+    plate_len = (bat_front + cradle_out[1]) - plate_front
+    plate = Pos(CX, plate_front + plate_len / 2, FRAME_TOP_Z + PLATE_T / 2) * Box(cradle_out[0], plate_len, PLATE_T)
 
     cradle_cy = bat_front + cradle_out[1] / 2
     cradle = Pos(CX, cradle_cy, PLATE_TOP + CRADLE_WALL_H / 2) * Box(cradle_out[0], cradle_out[1], CRADLE_WALL_H)
@@ -136,10 +138,13 @@ def build():
         for x in (CX - cradle_out[0] / 2 + 3.5, CX + cradle_out[0] / 2 - 3.5):
             base -= Pos(x, y, FRAME_TOP_Z + PLATE_T / 2) * Box(STRAP_SLOT[0], STRAP_SLOT[1], PLATE_T * 3)
 
-    # Screws: one row behind the pod (accessible), and the grid rows under the battery (counterbored).
-    plate_end = FRAME_FRONT_Y + plate_len
+    # Screws: the front row (beside the pod, which is narrower than the 50 mm row spacing), the row
+    # behind the pod, and the middle and last rows under the battery (counterbored).
+    plate_end = plate_front + plate_len
+    pod_half_w = pod_outer[0] / 2
+    assert all(abs(x - CX) > pod_half_w + HEAD_D / 2 for x in GRID_X), 'front screws would hit the pod'
     ys = [y for y in GRID_Y if pod_back + 3 < y < plate_end - 3]
-    chosen = [ys[0]] + ([ys[len(ys) // 2], ys[-1]] if len(ys) > 2 else ys[1:])
+    chosen = [GRID_Y[0], ys[0]] + ([ys[len(ys) // 2], ys[-1]] if len(ys) > 2 else ys[1:])
     for y in chosen:
         for x in GRID_X:
             base -= Pos(x, y, FRAME_TOP_Z + PLATE_T / 2) * Cylinder(SCREW_CLEAR_D / 2, PLATE_T * 3)
@@ -162,12 +167,12 @@ if __name__ == '__main__':
     # Lid printed roof-down: flip it.
     lid_flat = Rot(180, 0, 0) * lid_print
     export_stl(lid_flat, str(OUT / 'housing-lid.stl'))
-    # Test-fit piece: the pod on a plate section that covers both rails and the first screw row
-    # behind the pod, so it screws onto the frame like the real plate (relief pocket included).
-    screw_y = report['screw_rows_y'][0]
-    stub_len = screw_y + 5.5 - FRAME_FRONT_Y
+    # Test-fit piece: the pod on a plate section covering both rails and the first two screw rows
+    # (4 screws), so it mounts exactly like the front of the real plate (relief pocket included).
+    stub_front = FRAME_FRONT_Y - PLATE_FRONT_EXTEND
+    stub_len = report['screw_rows_y'][1] + 5.5 - stub_front
     stub_w = GRID_X[1] - GRID_X[0] + 10
-    stub = base & (Pos(CX, FRAME_FRONT_Y + stub_len / 2, FRAME_TOP_Z + 25) * Box(stub_w, stub_len, 50))
+    stub = base & (Pos(CX, stub_front + stub_len / 2, FRAME_TOP_Z + 25) * Box(stub_w, stub_len, 50))
     export_stl(stub, str(OUT / 'housing-pod-testfit.stl'))
     # Quick test-fit print: the pod on a short stub of plate (no screws needed).
     for k, v in report.items():
