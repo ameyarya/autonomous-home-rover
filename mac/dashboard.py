@@ -141,7 +141,7 @@ pre{font:11px ui-monospace,monospace;white-space:pre-wrap;color:var(--dim);margi
 <section><h2>Live · <span id=state>connecting</span></h2><img id=live alt="live view">
 <dl id=health></dl></section>
 <section><h2>Planner view (exact detector input)</h2>
-<form id=f><input id=goal value="cup" aria-label="goal"><button>Observe</button></form>
+<form id=f><input id=goal placeholder="detector prompt (optional; no Phase 1 target)" aria-label="detector prompt"><button>Observe</button></form>
 <img id=planner alt="planner view"><dl id=obs></dl><pre id=raw></pre></section>
 </main>
 <script>

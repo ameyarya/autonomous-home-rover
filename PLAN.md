@@ -61,7 +61,7 @@ The camera alone should not be assumed to provide reliable obstacle distance, lo
 Proven in https://github.com/ameyarya/ai-driven-mini-t — adapt, don't rebuild:
 - Mac → USB CyberBrick transmitter drive commands (hold-to-drive, release-to-stop, per-side compensation). Transfers to the rover's USB/transmitter side; stock receiver + link timeout behavior still needs rover-side verification.
 - Python move → stop → observe autonomy loop with adaptive timing, stale-frame checks, bounded commands, target-loss recovery, and step caps.
-- Detector + dashboard pattern (labeled exact-planner-view image, frame age, decision status) and calibration files from day one. Ported 2026-10-14: `mac/` has the XIAO link (frame-age measurement, 500 ms stale gate), the Mini-T detector, and a dashboard with the exact planner view; see `mac/README.md`.
+- Detector + dashboard pattern (labeled exact-planner-view image, frame age, decision status) and calibration files from day one. Ported 2026-10-14 as infrastructure: `mac/` has the XIAO link (frame-age measurement, 500 ms stale gate), the detector service slot, and a dashboard with the exact planner view; see `mac/README.md`. The Mini-T targets (can, bullseye) are not rover goals.
 - Receiver-side watchdog + bounded commands (adopt the pattern for rover safety states; the signed OTA mechanism itself is Mini-T-specific).
 - Not transferable: DJI/Mimo/MediaMTX camera pipeline (rover uses XIAO MJPEG/WebSocket), tracked-motion calibration (rover is wheeled), perfect-map simulation avoidance (real sensing is pending on both projects).
 
@@ -113,6 +113,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 | Obstacle sensors and motion feedback | Proposal (2026-10-07, from tank lesson): camera-only positioning forces stop-observe speeds (~4-5 s/step on the tank), so shortlist wheel encoders + IMU for when spending resumes. Select after base verification + environment details |
 | Speed limit, runtime, stop distance, and mission success targets | Set during commissioning |
 | Drive-electronics sharing with tank | Resolved (2026-10-13): a second owned CyberBrick receiver/transmitter set is dedicated to the rover; the Mini-T keeps its own kit |
+| Phase 1 vision target | Decided (2026-10-14): none yet. In Phase 1 the camera is for viewing and recording frames; effort goes to the drive path. Mini-T reuse is infrastructure only (camera link + stale gate, observe → detector service → planner view, dashboard, drive path, move-stop-observe loop), not its can/bullseye targets. The ported detector stays as an optional slot. Phase 1 "find/align/approach" done-criterion needs restating for the rover |
 
 ## Repository maintenance
 
@@ -130,6 +131,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 4. Define the first patrol route. The camera half of the home-computer interface is done (`mac/xiao_link.py`, 2026-10-14: frames ~55 ms old p50 at ~27 fps, stale gate 500 ms); the drive half waits on the integration gate.
 5. XIAO firmware complete for Phase 1 bench work 2026-10-14 (see `firmware/xiao-cam/README.md`): OTA, runtime camera settings, health telemetry, mic level. Next: printed housing for XIAO + battery pack, then set `vflip`/`hmirror` once mounted.
 6. Build the drive-and-see prototype before committing to a navigation stack.
+7. Restate the Phase 1 done-criterion: "find/align/approach" came from the Mini-T mission; decide what bounded autonomy means for the rover.
 
 ## Camera board shortlist
 

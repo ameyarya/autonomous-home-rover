@@ -21,7 +21,7 @@ python3 mac/xiao_link.py --seconds 10       # link stats only
 cd mac && python3 -m unittest test_xiao_link
 ```
 
-In the dashboard, type a target ("cup", "person", "bullseye target") and click **Observe**: it waits
+The **Observe** button is optional plumbing (Phase 1 has no vision target): give it a detector prompt and it waits
 for a frame captured after the click, saves it to `mac/vision-output/` (gitignored), runs the
 detector, and shows the labeled result with the frame's age.
 
