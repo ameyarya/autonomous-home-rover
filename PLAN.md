@@ -103,17 +103,17 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 
 | Decision | Status |
 | --- | --- |
-| Primary mission | Confirmed: home patrol; one-room roaming is the first autonomy milestone |
+| Primary mission | Confirmed: home patrol; one-room roaming is the first autonomy milestone. Phase 1 mission (2026-10-14): dog companion, see "Phase 1 vision target" |
 | Compute location | Locked (2026-10-06): Mac is the Phase 1 brain — no new purchases yet. Offboard architecture stands (rover only needs drive instructions), so a desk Pi 5 stays an approved later migration. Local LLM is out of Phase 1 scope for the same reason |
 | Exact ESP32-S3 board and camera | Bench-verified 2026-10-14 (USB power): Seeed Studio XIAO ESP32S3 Sense, camera is an OV3660 (not OV2640; its native output is mirrored left-right, corrected by the firmware default `hmirror=1` since 2026-10-14), 8 MB octal PSRAM OK, Wi-Fi STA OK (RSSI -43 dBm at the desk). Mic verified (quiet room about -65 dBFS, responds to sound). Runs from the iPhone Air battery pack. Spare sensor pins still to budget |
 | Existing electronics command interface | Selected: Mac USB -> owned CyberBrick transmitter -> wireless receiver. Verify USB command API and timeout behavior |
 | Firmware framework and command transport | Transport selected (2026-10-06): WebSocket JSON telemetry + MJPEG video, timestamped for stale detection. Framework locked (2026-10-14): ESP-IDF v5.4.4 with esp32-camera, already proven on this Mac by a separate ESP32-S3 POC. Implemented in `firmware/xiao-cam/`: MJPEG on :81/stream (VGA, ~15 fps measured) with per-frame X-Timestamp-Us/X-Frame-Seq, JSON telemetry on ws://:80/ws at 5 Hz, SNTP epoch time, mDNS rover-cam.local |
-| Floors, thresholds, stairs, pets, and lighting | Environment details needed |
+| Floors, thresholds, stairs, pets, and lighting | Environment details needed. One dog lives here and is the Phase 1 subject: slow speeds, standoff distance, back off if he charges the rover |
 | Budget and hardware already owned | Locked (2026-10-06): no $100+ spend yet — Phase 1 uses owned hardware (Mac + a dedicated second CyberBrick set) plus the XIAO ESP32S3 Sense (~US$14, bought 2026-10-07 as a small exception). Desk Pi and other Phase 2 purchases deferred |
 | Obstacle sensors and motion feedback | Proposal (2026-10-07, from tank lesson): camera-only positioning forces stop-observe speeds (~4-5 s/step on the tank), so shortlist wheel encoders + IMU for when spending resumes. Select after base verification + environment details |
 | Speed limit, runtime, stop distance, and mission success targets | Set during commissioning |
 | Drive-electronics sharing with tank | Resolved (2026-10-13): a second owned CyberBrick receiver/transmitter set is dedicated to the rover; the Mini-T keeps its own kit |
-| Phase 1 vision target | Decided (2026-10-14): none yet. In Phase 1 the camera is for viewing and recording frames; effort goes to the drive path. Mini-T reuse is infrastructure only (camera link + stale gate, observe → detector service → planner view, dashboard, drive path, move-stop-observe loop), not its can/bullseye targets. The ported detector stays as an optional slot. Phase 1 "find/align/approach" done-criterion needs restating for the rover |
+| Phase 1 vision target | Decided (2026-10-14, replacing "none" from earlier the same day): the dog (only dog in the house). Detection: Ultralytics YOLO11s COCO `dog` class. Activity: local Qwen3-VL-4B via Ollama describes what he is doing. Mini-T reuse stays infrastructure only, not its can/bullseye targets. Implemented camera-only in `mac/dog_watcher.py` + `mac/dog_behavior.py`; decisions are logged as intent until the drive path exists |
 
 ## Repository maintenance
 
@@ -131,7 +131,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 4. Define the first patrol route. The camera half of the home-computer interface is done (`mac/xiao_link.py`, 2026-10-14: frames ~55 ms old p50 at ~27 fps, stale gate 500 ms); the drive half waits on the integration gate.
 5. XIAO firmware complete for Phase 1 bench work 2026-10-14 (see `firmware/xiao-cam/README.md`): OTA, runtime camera settings, health telemetry, mic level. Next: printed housing for XIAO + battery pack, then set `vflip`/`hmirror` once mounted.
 6. Build the drive-and-see prototype before committing to a navigation stack.
-7. Restate the Phase 1 done-criterion: "find/align/approach" came from the Mini-T mission; decide what bounded autonomy means for the rover.
+7. Phase 1 done-criterion (restated 2026-10-14): dog companion. Parked and watching; follows when the dog moves (keeps him centred at a 30–55%-of-frame standoff, backs off if he closes fast); parks once he is still for 5 min and the vision model says he is asleep; if he leaves view, scans for up to 60 s then parks; logs a timeline of what he does. Camera side done and tested; motion needs the drive path (integration gate).
 
 ## Camera board shortlist
 

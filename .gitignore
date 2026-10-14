@@ -14,3 +14,4 @@ mac/vision-output/
 mac/detector-server.log
 __pycache__/
 mac/weights/
+mac/dog-log/

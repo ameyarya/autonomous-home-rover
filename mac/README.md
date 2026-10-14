@@ -9,6 +9,9 @@ age, refuses stale frames, and feeds the detector ported from
 | `xiao_link.py` | `XiaoLink`: background MJPEG + WebSocket readers, XIAO→Mac clock mapping, `fresh_frame()` stale gate, `save()` in Mini-T frame naming. `python3 xiao_link.py` prints live link stats. |
 | `dashboard.py` | http://localhost:8010/: live view, link health, and the planner view (exact labeled frame the detector saw). |
 | `rover_detector.py` | Mini-T detector (YOLO-World / bullseye matcher), ported with only paths and port (8767) changed. |
+| `dog_watcher.py` | Phase 1 dog companion (camera side): YOLO11s finds the dog, motion/stillness, Qwen3-VL describes what he is doing, timeline log, rover intent. Status on :8768, shown in the dashboard. **Sends no drive commands.** |
+| `dog_behavior.py` | The companion state machine (parked → following → searching), pure logic. |
+| `test_dog_behavior.py` | State machine tests: follow on movement, tail-wag counts, park after sleep, search then park, back off when charged, stale camera stops. |
 | `test_xiao_link.py` | Tests against a fake XIAO: clock mapping, frame age, stale detection, telemetry loss, camera fault, captured-after waits. |
 
 Python 3 standard library only; the detector runs in its own environment (below).
@@ -24,6 +27,37 @@ cd mac && python3 -m unittest test_xiao_link
 The **Observe** button is optional plumbing (Phase 1 has no vision target): give it a detector prompt and it waits
 for a frame captured after the click, saves it to `mac/vision-output/` (gitignored), runs the
 detector, and shows the labeled result with the frame's age.
+
+## Dog watcher
+
+```sh
+python3 mac/dog_watcher.py                  # add --sleep-after 60 to test parking faster
+python3 mac/dashboard.py                    # Dog watcher pane at http://localhost:8010/
+cd mac && python3 -m unittest test_dog_behavior
+```
+
+It re-runs itself under the detector Python and starts Ollama if needed. Needs
+`mac/weights/yolo11s.pt` (downloaded on first run, gitignored) and the Ollama model
+`qwen3-vl:4b-instruct`.
+
+| Rover state | Does | Leaves when |
+| --- | --- | --- |
+| parked | holds still, watches | dog moves (box moves ≥0.3 box-heights/s, or pixels inside his box change: wagging, head up) → following |
+| following | turn to centre him (±10%), forward/back to keep him 30–55% of frame height; back off if his box grows >25%/s | still ≥ `--sleep-after` (300 s) and the model says sleeping (or 2× that and resting) → parked; out of view 3 s → searching |
+| searching | scan in place | dog found → following; 60 s → parked |
+
+The vision model describes him when he appears, when he starts/stops moving, and every 60 s while
+visible (at most every 15 s). Its state (`sleeping` / `resting` / `active` / `unclear`) gates parking.
+
+Log: `mac/dog-log/YYYY-MM-DD.jsonl` (events `seen`, `lost`, `moving`, `still`, `activity`,
+`state`, `camera_stale`) with snapshots in `mac/dog-log/snapshots/` (gitignored, stays on the Mac).
+
+Limits: motion is judged only while the rover is stopped (camera motion would look like dog
+motion); stillness thresholds are first guesses to tune on the real dog; no drive path yet.
+
+Checked 2026-10-14: ~5 frames/s processed live; YOLO11s ~20 ms/frame on MPS (4 s first call);
+test dog photo detected at 0.88; Qwen described it as "standing alert on grass" / active in 8 s
+(25 s on a cold model load).
 
 ## How frame age is measured
 

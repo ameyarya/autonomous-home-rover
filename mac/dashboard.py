@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parent
 FRAMES = ROOT / 'vision-output'
 MINI_T = Path.home() / 'Documents/Projects/ai-driven-mini-t'
 DETECTOR_URL = 'http://127.0.0.1:8767'
+DOG_WATCHER_URL = 'http://127.0.0.1:8768'
 
 _detector_lock = threading.Lock()
 
@@ -140,6 +141,8 @@ pre{font:11px ui-monospace,monospace;white-space:pre-wrap;color:var(--dim);margi
 <main>
 <section><h2>Live · <span id=state>connecting</span></h2><img id=live alt="live view">
 <dl id=health></dl></section>
+<section><h2>Dog watcher · <span id=dogstate>offline</span></h2><img id=dog alt="dog watcher view">
+<dl id=dogfacts></dl><ol id=events style="font:12px ui-monospace,monospace;color:var(--dim);padding-left:18px;max-height:220px;overflow:auto"></ol></section>
 <section><h2>Planner view (exact detector input)</h2>
 <form id=f><input id=goal placeholder="detector prompt (optional; no Phase 1 target)" aria-label="detector prompt"><button>Observe</button></form>
 <img id=planner alt="planner view"><dl id=obs></dl><pre id=raw></pre></section>
@@ -156,6 +159,13 @@ row('telemetry age',h.telemetry_age_ms+' ms')+row('rssi',t.rssi+' dBm')+row('mic
 row('fw',t.fw)+row('reset reason',t.reset_reason)+row('device restarts seen',h.device_restarts_seen)+
 row('errors',JSON.stringify(h.errors))+row('last error',h.last_error);}catch(e){$('state').textContent='dashboard offline';$('state').className='stale'}
 setTimeout(poll,250)}poll();
+async function dogPoll(){try{const d=await (await fetch('/dog/status')).json();
+$('dogstate').textContent=d.state+' · intent '+d.intent+' (no drive commands sent)';$('dogstate').className=d.camera_ok?'ok':'stale';
+$('dog').src='/dog/frame.jpg?'+Date.now();
+$('dogfacts').innerHTML=row('reason',d.reason)+row('dog visible',d.dog_visible)+row('moving',d.moving)+row('still for',d.still_for_s!=null?d.still_for_s+' s':null)+
+row('doing',d.activity?d.activity+' ('+d.dog_state+', '+d.activity_age_s+' s ago)':null)+row('park after asleep',d.sleep_after_s+' s')+row('model error',d.describe_error);
+$('events').innerHTML=d.events.slice().reverse().map(e=>`<li>${e.t.slice(11,19)} ${e.event} ${e.activity||e.reason||e.state||''}</li>`).join('')}
+catch(e){$('dogstate').textContent='offline — run python3 mac/dog_watcher.py';$('dogstate').className='stale'}setTimeout(dogPoll,1000)}dogPoll();
 $('f').onsubmit=async e=>{e.preventDefault();$('obs').innerHTML=row('status','observing…');
 const r=await fetch('/observe',{method:'POST',body:JSON.stringify({goal:$('goal').value})});const o=await r.json();
 if(!r.ok){$('obs').innerHTML=row('refused',o.error);return}
@@ -196,6 +206,12 @@ def make_handler(dashboard):
                 return self.reply(200, frame.jpeg, 'image/jpeg',
                                   {'X-Frame-Seq': str(frame.seq),
                                    'X-Frame-Age-Ms': 'unknown' if age is None else str(round(age * 1000))})
+            if path in ('/dog/status', '/dog/frame.jpg'):
+                try:
+                    with urllib.request.urlopen(DOG_WATCHER_URL + path[4:], timeout=2) as response:
+                        return self.reply(200, response.read(), response.headers.get('Content-Type'))
+                except OSError:
+                    return self.reply(503, {'error': 'dog watcher not running'})
             if path == '/planner.jpg':
                 if dashboard.planner_image is None:
                     return self.reply(404, {'error': 'no observation yet'})
