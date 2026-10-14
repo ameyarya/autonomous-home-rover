@@ -30,6 +30,7 @@ static const cam_settings_t DEFAULTS = {
     .version = SETTINGS_VERSION,
     .framesize = FRAMESIZE_VGA,
     .quality = 12,
+    .hmirror = 1,  // the XIAO Sense OV3660 outputs a mirrored image by default
 };
 
 static const struct {

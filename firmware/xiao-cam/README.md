@@ -38,7 +38,8 @@ Telemetry message:
 | --- | --- | --- |
 | `framesize` | `qvga` 320×240, `vga` 640×480, `svga` 800×600, `xga` 1024×768, `hd` 1280×720 | `vga` |
 | `quality` | 4–63 (lower = better, bigger frames) | 12 |
-| `vflip`, `hmirror` | 0 / 1 (set once the camera is mounted) | 0 |
+| `hmirror` | 0 / 1. The OV3660 is mirrored natively; 1 gives a true (non-mirrored) image | 1 |
+| `vflip` | 0 / 1. Upside-down mounting needs `vflip=1` and `hmirror=0` (a 180° rotation) | 0 |
 | `brightness`, `contrast`, `saturation`, `ae_level` | -2 … 2 | 0 |
 | `led` | 0 / 1 (turn off if it glares into the lens) | 1 |
 
