@@ -1,0 +1,10 @@
+# ESP-IDF build output
+firmware/*/build/
+firmware/*/managed_components/
+firmware/*/sdkconfig
+firmware/*/sdkconfig.old
+
+# Local Wi-Fi credentials
+firmware/*/main/secrets.h
+
+.DS_Store

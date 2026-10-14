@@ -14,10 +14,11 @@ wirelessly to the stock receiver and drive electronics.
 ## Status
 
 - Chassis not yet printed — print and assembly slipped, not yet rescheduled (as of 2026-10-13).
-- XIAO ESP32S3 Sense (camera + mic) received 2026-10-08 — bench verification of camera, mic, pins, and power pending.
+- XIAO ESP32S3 Sense camera firmware flashed and bench-verified 2026-10-14: OV3660 camera, VGA MJPEG ~15 fps + 5 Hz WebSocket telemetry over Wi-Fi ([firmware/xiao-cam](firmware/xiao-cam/README.md)). Mic and rover power pending.
 - Autonomy software will be ported from the working Mini-T stack (command path, autonomy loop, detector + dashboard, calibration discipline) — see [PLAN.md](PLAN.md) for the reuse mapping.
 
 ## Docs
 
 - [PLAN.md](PLAN.md) — goals, architecture, milestones, open decisions, next actions.
+- [firmware/xiao-cam](firmware/xiao-cam/README.md) — XIAO camera/telemetry firmware (ESP-IDF): endpoints, build, flash.
 - Related: [ai-driven-mini-t](https://github.com/ameyarya/ai-driven-mini-t) — the proven tank project this rover builds on.

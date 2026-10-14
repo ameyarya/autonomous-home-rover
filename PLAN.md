@@ -2,7 +2,7 @@
 
 Repository: https://github.com/ameyarya/autonomous-home-rover
 
-Status: Phase 1 in progress — chassis print slipped and not yet rescheduled (as of 2026-10-13), XIAO Sense received 2026-10-08 (bench verification pending). Phase 2 (hardware/software upgrades) is study-only until Phase 1 is done. This is a living plan; update it as hardware is verified and decisions are made.
+Status: Phase 1 in progress — chassis print slipped and not yet rescheduled (as of 2026-10-13), XIAO Sense camera firmware flashed and bench-verified on USB power 2026-10-14 (mic and rover power pending). Phase 2 (hardware/software upgrades) is study-only until Phase 1 is done. This is a living plan; update it as hardware is verified and decisions are made.
 
 ## Goal
 
@@ -47,7 +47,7 @@ If the existing electronics cannot accept autonomous commands, resolve that bloc
 
 - **Drive command path:** Mac navigation/control software -> USB -> CyberBrick transmitter -> existing wireless link -> CyberBrick receiver -> original motors and steering.
 - **Perception path:** ESP32-S3 camera and added sensors -> Wi-Fi -> Mac perception/navigation software. Timestamp telemetry so the Mac can detect stale observations.
-- **ESP32 role:** camera and sensor board only. Board is the XIAO ESP32S3 Sense (camera + mic); pin allocation, power supply, and firmware framework remain undecided. No ESP32-to-drive-controller connection is required by the current architecture.
+- **ESP32 role:** camera and sensor board only. Board is the XIAO ESP32S3 Sense (camera + mic); firmware is ESP-IDF (`firmware/xiao-cam/`); pin allocation for added sensors and the rover power supply remain undecided. No ESP32-to-drive-controller connection is required by the current architecture.
 - **Mac role:** perception, localization, patrol planning, rover operating states, and generation of drive commands.
 - **Safety behavior:** bounded command lifetime, fault stop, explicit autonomous enable, and an accessible stop mechanism. The Mac should stop issuing motion when observations are stale; an independent CyberBrick command/link timeout must handle loss of the Mac or USB connection. These behaviors require verification.
 - **Navigation compute:** the existing Mac runs navigation for the current build. Onboard compute is deferred because of cost; no companion computer purchase is in scope. Self-contained onboard operation remains a future goal.
@@ -105,9 +105,9 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 | --- | --- |
 | Primary mission | Confirmed: home patrol; one-room roaming is the first autonomy milestone |
 | Compute location | Locked (2026-10-06): Mac is the Phase 1 brain — no new purchases yet. Offboard architecture stands (rover only needs drive instructions), so a desk Pi 5 stays an approved later migration. Local LLM is out of Phase 1 scope for the same reason |
-| Exact ESP32-S3 board and camera | Received 2026-10-08: Seeed Studio XIAO ESP32S3 Sense bundle (camera + mic). Bench-verify supplied camera, mic, sensor pins, and power next; then create pin/power budget |
+| Exact ESP32-S3 board and camera | Bench-verified 2026-10-14 (USB power): Seeed Studio XIAO ESP32S3 Sense, camera is an OV3660 (not OV2640), 8 MB octal PSRAM OK, Wi-Fi STA OK (RSSI -43 dBm at the desk). Mic, spare sensor pins, and rover-side power still to verify; then create pin/power budget |
 | Existing electronics command interface | Selected: Mac USB -> owned CyberBrick transmitter -> wireless receiver. Verify USB command API and timeout behavior |
-| Firmware framework and command transport | Transport selected (2026-10-06): WebSocket JSON telemetry + MJPEG video, timestamped for stale detection. Framework not yet chosen (Arduino-ESP32, ESP-IDF, or MicroPython); the earlier "rejected" note was a misunderstanding — the decision made was the ESP32-S3 camera board itself |
+| Firmware framework and command transport | Transport selected (2026-10-06): WebSocket JSON telemetry + MJPEG video, timestamped for stale detection. Framework locked (2026-10-14): ESP-IDF v5.4.4 with esp32-camera, already proven on this Mac by a separate ESP32-S3 POC. Implemented in `firmware/xiao-cam/`: MJPEG on :81/stream (VGA, ~15 fps measured) with per-frame X-Timestamp-Us/X-Frame-Seq, JSON telemetry on ws://:80/ws at 5 Hz, SNTP epoch time, mDNS rover-cam.local |
 | Floors, thresholds, stairs, pets, and lighting | Environment details needed |
 | Budget and hardware already owned | Locked (2026-10-06): no $100+ spend yet — Phase 1 uses owned hardware (Mac + a dedicated second CyberBrick set) plus the XIAO ESP32S3 Sense (~US$14, bought 2026-10-07 as a small exception). Desk Pi and other Phase 2 purchases deferred |
 | Obstacle sensors and motion feedback | Proposal (2026-10-07, from tank lesson): camera-only positioning forces stop-observe speeds (~4-5 s/step on the tank), so shortlist wheel encoders + IMU for when spending resumes. Select after base verification + environment details |
@@ -128,7 +128,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 2. Obtain and inspect the MakerWorld electronics list and wiring instructions.
 3. Confirm the autonomous command interface while preserving the original drive electronics.
 4. Define the first patrol route and the home-computer software/transport interface.
-5. XIAO received 2026-10-08: bench-verify camera/mic/pins/power, then create the pin/power budget.
+5. XIAO camera firmware verified 2026-10-14 (see `firmware/xiao-cam/README.md`). Remaining: mic check, pin/power budget, printed housing, and powering from the rover.
 6. Build the drive-and-see prototype before committing to a navigation stack.
 
 ## Camera board shortlist
