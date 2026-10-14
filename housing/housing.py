@@ -163,7 +163,7 @@ if __name__ == '__main__':
     lid_flat = Rot(180, 0, 0) * lid_print
     export_stl(lid_flat, str(OUT / 'housing-lid.stl'))
     # Quick test-fit print: the pod on a short stub of plate (no screws needed).
-    stub = base & (Pos(CX, FRAME_FRONT_Y + 17, FRAME_TOP_Z + 25) * Box(40, 38, 50))
+    stub = base & (Pos(CX, FRAME_FRONT_Y + 10, FRAME_TOP_Z + 25) * Box(40, 24, 50))   # ends before the relief pocket
     export_stl(stub, str(OUT / 'housing-pod-testfit.stl'))
     for k, v in report.items():
         print(f'{k}: {v}')
