@@ -2,7 +2,7 @@
 
 Repository: https://github.com/ameyarya/autonomous-home-rover
 
-Status: Phase 1 in progress — chassis print slipped and not yet rescheduled (as of 2026-10-13), XIAO Sense camera firmware flashed and bench-verified on USB power 2026-10-14 (mic and rover power pending). Phase 2 (hardware/software upgrades) is study-only until Phase 1 is done. This is a living plan; update it as hardware is verified and decisions are made.
+Status: Phase 1 in progress — chassis print slipped and not yet rescheduled (as of 2026-10-13), XIAO Sense firmware fully configured and bench-verified 2026-10-14 (camera, mic, OTA updates, runtime settings, health), powered by an iPhone Air battery pack; next is the housing and mounting. Phase 2 (hardware/software upgrades) is study-only until Phase 1 is done. This is a living plan; update it as hardware is verified and decisions are made.
 
 ## Goal
 
@@ -47,7 +47,7 @@ If the existing electronics cannot accept autonomous commands, resolve that bloc
 
 - **Drive command path:** Mac navigation/control software -> USB -> CyberBrick transmitter -> existing wireless link -> CyberBrick receiver -> original motors and steering.
 - **Perception path:** ESP32-S3 camera and added sensors -> Wi-Fi -> Mac perception/navigation software. Timestamp telemetry so the Mac can detect stale observations.
-- **ESP32 role:** camera and sensor board only. Board is the XIAO ESP32S3 Sense (camera + mic); firmware is ESP-IDF (`firmware/xiao-cam/`); pin allocation for added sensors and the rover power supply remain undecided. No ESP32-to-drive-controller connection is required by the current architecture.
+- **ESP32 role:** camera and sensor board only. Board is the XIAO ESP32S3 Sense (camera + mic); firmware is ESP-IDF (`firmware/xiao-cam/`), updated over Wi-Fi after the first USB flash. Powered by its own iPhone Air battery pack over USB-C, separate from the drive battery (decided 2026-10-14), so motor transients cannot reset it. Pin allocation for added sensors remains undecided. No ESP32-to-drive-controller connection is required by the current architecture.
 - **Mac role:** perception, localization, patrol planning, rover operating states, and generation of drive commands.
 - **Safety behavior:** bounded command lifetime, fault stop, explicit autonomous enable, and an accessible stop mechanism. The Mac should stop issuing motion when observations are stale; an independent CyberBrick command/link timeout must handle loss of the Mac or USB connection. These behaviors require verification.
 - **Navigation compute:** the existing Mac runs navigation for the current build. Onboard compute is deferred because of cost; no companion computer purchase is in scope. Self-contained onboard operation remains a future goal.
@@ -70,7 +70,7 @@ Proven in https://github.com/ameyarya/ai-driven-mini-t — adapt, don't rebuild:
 - Measure mounting space, payload allowance, steering clearance, turning radius, and ground clearance.
 - Design a removable top mount with a useful camera view, antenna clearance, cable strain relief, and access to the original electronics.
 - Design a printed housing for the XIAO Sense with a clear camera view, Wi-Fi antenna clearance, and USB access for bench flashing.
-- Verify supply voltages and spare current capacity before powering the ESP32 from the original battery system.
+- XIAO power: own iPhone Air battery pack over USB-C, isolated from the drive battery (2026-10-14). Mount the pack so the USB-C cable has strain relief, and watch telemetry `reset_reason` for `brownout` during rover tests.
 - Select regulation and wiring based on measured loads and motor transients; do not assume spare power outputs are suitable.
 - Test for resets and image/control failures during motor startup, steering, and reversing.
 - Preserve room for selected sensors without obstructing motion or the camera.
@@ -105,7 +105,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 | --- | --- |
 | Primary mission | Confirmed: home patrol; one-room roaming is the first autonomy milestone |
 | Compute location | Locked (2026-10-06): Mac is the Phase 1 brain — no new purchases yet. Offboard architecture stands (rover only needs drive instructions), so a desk Pi 5 stays an approved later migration. Local LLM is out of Phase 1 scope for the same reason |
-| Exact ESP32-S3 board and camera | Bench-verified 2026-10-14 (USB power): Seeed Studio XIAO ESP32S3 Sense, camera is an OV3660 (not OV2640), 8 MB octal PSRAM OK, Wi-Fi STA OK (RSSI -43 dBm at the desk). Mic, spare sensor pins, and rover-side power still to verify; then create pin/power budget |
+| Exact ESP32-S3 board and camera | Bench-verified 2026-10-14 (USB power): Seeed Studio XIAO ESP32S3 Sense, camera is an OV3660 (not OV2640), 8 MB octal PSRAM OK, Wi-Fi STA OK (RSSI -43 dBm at the desk). Mic verified (quiet room about -65 dBFS, responds to sound). Runs from the iPhone Air battery pack. Spare sensor pins still to budget |
 | Existing electronics command interface | Selected: Mac USB -> owned CyberBrick transmitter -> wireless receiver. Verify USB command API and timeout behavior |
 | Firmware framework and command transport | Transport selected (2026-10-06): WebSocket JSON telemetry + MJPEG video, timestamped for stale detection. Framework locked (2026-10-14): ESP-IDF v5.4.4 with esp32-camera, already proven on this Mac by a separate ESP32-S3 POC. Implemented in `firmware/xiao-cam/`: MJPEG on :81/stream (VGA, ~15 fps measured) with per-frame X-Timestamp-Us/X-Frame-Seq, JSON telemetry on ws://:80/ws at 5 Hz, SNTP epoch time, mDNS rover-cam.local |
 | Floors, thresholds, stairs, pets, and lighting | Environment details needed |
@@ -128,7 +128,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 2. Obtain and inspect the MakerWorld electronics list and wiring instructions.
 3. Confirm the autonomous command interface while preserving the original drive electronics.
 4. Define the first patrol route and the home-computer software/transport interface.
-5. XIAO camera firmware verified 2026-10-14 (see `firmware/xiao-cam/README.md`). Remaining: mic check, pin/power budget, printed housing, and powering from the rover.
+5. XIAO firmware complete for Phase 1 bench work 2026-10-14 (see `firmware/xiao-cam/README.md`): OTA, runtime camera settings, health telemetry, mic level. Next: printed housing for XIAO + battery pack, then set `vflip`/`hmirror` once mounted.
 6. Build the drive-and-see prototype before committing to a navigation stack.
 
 ## Camera board shortlist

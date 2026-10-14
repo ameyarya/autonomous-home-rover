@@ -14,7 +14,7 @@ wirelessly to the stock receiver and drive electronics.
 ## Status
 
 - Chassis not yet printed — print and assembly slipped, not yet rescheduled (as of 2026-10-13).
-- XIAO ESP32S3 Sense camera firmware flashed and bench-verified 2026-10-14: OV3660 camera, VGA MJPEG ~15 fps + 5 Hz WebSocket telemetry over Wi-Fi ([firmware/xiao-cam](firmware/xiao-cam/README.md)). Mic and rover power pending.
+- XIAO ESP32S3 Sense firmware configured and bench-verified 2026-10-14: OV3660 camera (VGA MJPEG ~15 fps), 5 Hz telemetry with health and mic level, settings over HTTP, updates over Wi-Fi ([firmware/xiao-cam](firmware/xiao-cam/README.md)). Powered by an iPhone Air battery pack.
 - Autonomy software will be ported from the working Mini-T stack (command path, autonomy loop, detector + dashboard, calibration discipline) — see [PLAN.md](PLAN.md) for the reuse mapping.
 
 ## Docs
