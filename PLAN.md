@@ -69,7 +69,7 @@ Proven in https://github.com/ameyarya/ai-driven-mini-t — adapt, don't rebuild:
 
 - Measure mounting space, payload allowance, steering clearance, turning radius, and ground clearance.
 - Design a removable top mount with a useful camera view, antenna clearance, cable strain relief, and access to the original electronics.
-- Design a printed housing for the XIAO Sense with a clear camera view, Wi-Fi antenna clearance, and USB access for bench flashing.
+- Design a printed housing for the XIAO Sense with a clear camera view and USB access for recovery flashing (normal updates are over Wi-Fi). The external u.FL antenna is required (the XIAO ESP32S3 has no onboard antenna): mount it high on a plastic wall, away from motors, batteries, and metal, without folding it; strain-relieve the cable because u.FL connectors tolerate few mating cycles. Check telemetry `rssi` across rooms after mounting.
 - XIAO power: own iPhone Air battery pack over USB-C, isolated from the drive battery (2026-10-14). Mount the pack so the USB-C cable has strain relief, and watch telemetry `reset_reason` for `brownout` during rover tests.
 - Select regulation and wiring based on measured loads and motor transients; do not assume spare power outputs are suitable.
 - Test for resets and image/control failures during motor startup, steering, and reversing.
