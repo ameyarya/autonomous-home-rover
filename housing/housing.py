@@ -44,7 +44,7 @@ HEAD_D = 5.4                           # M2.5 button head, for clearance checks
 LENS_HOLE_D = (9.0, 14.0)              # inner, outer diameter of the conical lens window
 USB_OPENING = (14.0, 8.5)              # width x height, USB-C plug overmould
 LID_T, LID_LIP = 1.6, 2.0
-ROOF = (44.0, 26.0)                    # lid roof; the 39 x 19 mm antenna sticks on top
+ROOF = (44.0, 26.0)                    # lid roof; the 39 x 19 mm antenna sticks on top (flat: the lid prints roof-down)
 
 PLATE_TOP = FRAME_TOP_Z + PLATE_T
 
@@ -91,9 +91,6 @@ def pod_frame():
     lid -= Pos(inner[0] / 2 - 4, WALL + inner[1] - 3, top + LID_T / 2) * Box(5, 2.5, LID_T * 4)       # antenna cable
     for k in range(4):
         lid -= Pos(-inner[0] / 2 + 4 + 4 * k, WALL + 3, top + LID_T / 2) * Box(1.6, 5, LID_T * 4)     # vents
-    rim = Pos(0, outer[1] / 2, top + LID_T + 0.5) * Box(ROOF[0], ROOF[1], 1.0)
-    rim -= Pos(0, outer[1] / 2, top + LID_T + 0.5) * Box(ROOF[0] - 2.4, ROOF[1] - 2.4, 2.0)
-    lid += rim
     return body, lid, xiao_loc, outer
 
 

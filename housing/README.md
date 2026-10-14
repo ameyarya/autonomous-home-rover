@@ -6,8 +6,8 @@ Parametric: edit the numbers at the top of `housing.py` and re-run.
 
 | File | Print |
 | --- | --- |
-| `out/pod-mount.stl` | Pod + 60 × 32.5 × 3 mm plate, ~26 mm tall. Print flat, no supports. |
-| `out/pod-lid.stl` | Lid, printed roof-down. The antenna sticks on top of the roof inside the rim. |
+| `out/pod-mount.stl` | Pod + 60 × 32.5 × 3 mm plate, ~26 mm tall. Plate on the bed, no supports. 3 walls recommended (screw holes, lens window). |
+| `out/pod-lid.stl` | Lid, flat roof on the bed, lip up; no supports. The antenna sticks on the flat roof. |
 
 ## Design
 
