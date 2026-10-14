@@ -14,10 +14,10 @@ and travel. Start with small STEER_TRAVEL; a servo forced past the linkage's end
 import time
 import __main__ as receiver
 
-VERSION = 'rover-drive-0.1'
+VERSION = 'rover-drive-0.2'
 SPEED = 900                 # of 2048; indoor dog-following pace
 MOTOR_SIGNS = (1, 1)        # flip one if that axle drives backwards
-STEER_CHANNEL = 1           # receiver servo port (the truck setup used 1)
+STEER_CHANNEL = 2           # receiver servo port S2
 STEER_CENTER = 90
 STEER_TRAVEL = 20           # degrees each way; raise only after checking the linkage limits
 STEER_HOLD_MS = 500         # steering re-centres if no command arrives

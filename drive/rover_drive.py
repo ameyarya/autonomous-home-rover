@@ -59,8 +59,18 @@ def stop_ack():
    pass
   time.sleep_ms(20)
  return False
+def led(r, g, b):
+ try:
+  import neopixel, machine
+  n = neopixel.NeoPixel(machine.Pin(8, machine.Pin.OUT), 1)
+  n[0] = (r, g, b)
+  n.write()
+ except Exception:
+  pass
 if not stop_ack():
+ led(64, 0, 0)
  raise OSError("Receiver did not acknowledge stop")
+led(0, 64, 0)
 print("WIRELESS HOLD CONTROL READY")
 import ubinascii
 def ota(raw):
