@@ -6,9 +6,9 @@ Status: Phase 1 in progress — chassis print slipped and not yet rescheduled (a
 
 ## Goal
 
-Build an autonomous indoor rover using the CyberBrick OpenFrame One RC car as the base, with an ESP32-S3 and camera mounted on top. The long-term goal is autonomous operation at home. The primary mission is home patrol: visit designated locations and capture camera observations. The navigation method, patrol schedule, and reporting behavior remain to be selected.
+Build an autonomous indoor rover using the CyberBrick OpenFrame Two 4WD RC car as the base, with an ESP32-S3 and camera mounted on top. The long-term goal is autonomous operation at home. The primary mission is home patrol: visit designated locations and capture camera observations. The navigation method, patrol schedule, and reporting behavior remain to be selected.
 
-Base project: https://makerworld.com/en/models/2243313-cyberbrick-openframe-one-rc-car#profileId-2442179
+Base project: https://makerworld.com/en/models/2552360-cyberbrick-openframe-two-4wd-rc-car#profileId-2850510 (corrected 2026-10-14; earlier entries referenced the OpenFrame One, https://makerworld.com/en/models/2243313)
 
 ## Confirmed scope
 
@@ -39,7 +39,7 @@ First step (free, no firmware change): log AirTag RSSI from the Mac with the tag
 
 ## Integration gate
 
-The OpenFrame One assembly guide V1.0 has been reviewed (materials page 3 and electronics pages 25-27). Its photographs show two drive motors labeled M1/M2, a steering servo, battery, controller assembly, and lighting connections labeled LED1/LED2. Exact component models, electrical ratings, and an autonomous command interface are not established by this guide. Before implementing the selected Mac-to-transmitter integration:
+Note (2026-10-14): the build is the OpenFrame Two 4WD, so the guide findings below (OpenFrame One) must be re-checked against the Two's guide. The OpenFrame One assembly guide V1.0 has been reviewed (materials page 3 and electronics pages 25-27). Its photographs show two drive motors labeled M1/M2, a steering servo, battery, controller assembly, and lighting connections labeled LED1/LED2. Exact component models, electrical ratings, and an autonomous command interface are not established by this guide. Before implementing the selected Mac-to-transmitter integration:
 
 1. Record the exact controller, motors, steering actuator, battery, connectors, and original wiring.
 2. Verify how Mac software can send throttle, steering, reverse, and stop commands to the transmitter over USB. USB connection alone does not establish a driving-command API.
@@ -131,7 +131,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 
 ## Next actions
 
-1. Print and assemble the OpenFrame One chassis (slipped; not yet rescheduled as of 2026-10-13). Pull the MakerWorld electronics list first so missing fasteners, bearings, or drive components are ordered before assembly day.
+1. Print and assemble the OpenFrame Two 4WD chassis (printing started 2026-10-14: first tire in TPU). Pull the MakerWorld electronics list first so missing fasteners, bearings, or drive components are ordered before assembly day.
 2. Obtain and inspect the MakerWorld electronics list and wiring instructions.
 3. Confirm the autonomous command interface while preserving the original drive electronics.
 4. Define the first patrol route. The camera half of the home-computer interface is done (`mac/xiao_link.py`, 2026-10-14: frames ~55 ms old p50 at ~27 fps, stale gate 500 ms); the drive half waits on the integration gate.
@@ -147,7 +147,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 
 ## Assembly guide findings
 
-- Source: user-provided OpenFrame One assembly guide V1.0, 35 pages. The source PDF is retained locally and is not copied into the repository.
+- (OpenFrame One; superseded by the OpenFrame Two 4WD build, re-check against its guide.) Source: user-provided OpenFrame One assembly guide V1.0, 35 pages. The source PDF is retained locally and is not copied into the repository.
 - Pages 25-27 establish physical assembly and connector placement; they do not specify a UART pinout, external command protocol, voltage ratings, or motion feedback.
 - Page 34 directs the builder to the official Bambu Lab remote, and page 35 shows throttle, steering, and lighting controls. These describe the original manual-control setup, not autonomous integration.
 - CyberBrick publishes an official MicroPython controller application repository: https://github.com/CyberBrick-Official/CyberBrick_Controller_Core . Investigate a Mac USB command adapter on the transmitter while preserving the existing receiver/motor wiring. This is a candidate approach, not a verified capability for this assembled model.

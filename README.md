@@ -1,6 +1,6 @@
 # Autonomous Home Rover
 
-Autonomous indoor home-patrol rover built on the CyberBrick OpenFrame One RC car.
+Autonomous indoor home-patrol rover built on the CyberBrick OpenFrame Two 4WD RC car.
 An ESP32-S3 camera board handles vision/sensors over Wi-Fi; a Mac runs navigation
 and sends drive commands via USB to the CyberBrick transmitter, which relays them
 wirelessly to the stock receiver and drive electronics.
@@ -13,7 +13,7 @@ wirelessly to the stock receiver and drive electronics.
 
 ## Status
 
-- Chassis not yet printed — print and assembly slipped, not yet rescheduled (as of 2026-10-13).
+- Chassis (OpenFrame Two 4WD) printing started 2026-10-14, first tire in TPU.
 - XIAO ESP32S3 Sense firmware configured and bench-verified 2026-10-14: OV3660 camera (VGA MJPEG ~15 fps), 5 Hz telemetry with health and mic level, settings over HTTP, updates over Wi-Fi ([firmware/xiao-cam](firmware/xiao-cam/README.md)). Powered by an iPhone Air battery pack.
 - Autonomy software will be ported from the working Mini-T stack (command path, autonomy loop, detector + dashboard, calibration discipline) — see [PLAN.md](PLAN.md) for the reuse mapping.
 
