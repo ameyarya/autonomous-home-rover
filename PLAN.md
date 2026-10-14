@@ -2,7 +2,7 @@
 
 Repository: https://github.com/ameyarya/autonomous-home-rover
 
-Status: Phase 1 in progress — chassis print scheduled next week (as of 2026-10-07), XIAO Sense received 2026-10-08 (bench verification pending). Phase 2 (hardware/software upgrades) is study-only until Phase 1 is done. This is a living plan; update it as hardware is verified and decisions are made.
+Status: Phase 1 in progress — chassis print slipped and not yet rescheduled (as of 2026-10-13), XIAO Sense received 2026-10-08 (bench verification pending). Phase 2 (hardware/software upgrades) is study-only until Phase 1 is done. This is a living plan; update it as hardware is verified and decisions are made.
 
 ## Goal
 
@@ -47,7 +47,7 @@ If the existing electronics cannot accept autonomous commands, resolve that bloc
 
 - **Drive command path:** Mac navigation/control software -> USB -> CyberBrick transmitter -> existing wireless link -> CyberBrick receiver -> original motors and steering.
 - **Perception path:** ESP32-S3 camera and added sensors -> Wi-Fi -> Mac perception/navigation software. Timestamp telemetry so the Mac can detect stale observations.
-- **ESP32 role:** camera and sensor board only. Exact board, camera, pin allocation, power supply, and firmware framework remain undecided. No ESP32-to-drive-controller connection is required by the current architecture.
+- **ESP32 role:** camera and sensor board only. Board is the XIAO ESP32S3 Sense (camera + mic); pin allocation, power supply, and firmware framework remain undecided. No ESP32-to-drive-controller connection is required by the current architecture.
 - **Mac role:** perception, localization, patrol planning, rover operating states, and generation of drive commands.
 - **Safety behavior:** bounded command lifetime, fault stop, explicit autonomous enable, and an accessible stop mechanism. The Mac should stop issuing motion when observations are stale; an independent CyberBrick command/link timeout must handle loss of the Mac or USB connection. These behaviors require verification.
 - **Navigation compute:** the existing Mac runs navigation for the current build. Onboard compute is deferred because of cost; no companion computer purchase is in scope. Self-contained onboard operation remains a future goal.
@@ -77,23 +77,25 @@ Proven in https://github.com/ameyarya/ai-driven-mini-t — adapt, don't rebuild:
 
 ## Milestones and completion checks
 
-### 0. Verify the base and select the mission
+Milestones 0–2 make up Phase 1 (Mini-T parity); milestones 3–4 follow Phase 2 and are not yet scheduled.
+
+### 0. Verify the base and select the mission (Phase 1)
 
 Deliver a confirmed parts list, wiring reference, control-interface decision, and first-release mission. Complete when autonomous throttle/steering control is demonstrably feasible with the agreed electronics.
 
-### 1. Drive and see
+### 1. Drive and see (Phase 1)
 
 Implement Mac-to-transmitter USB driving, mount the ESP32 camera/sensor board, and implement Wi-Fi telemetry and manual commissioning controls. Complete when steering, forward/reverse, and stop work repeatably while camera capture is active, without supply-related resets. Test initially with wheels lifted, then on the floor at low speed.
 
-### 2. Safe autonomous roaming
+### 2. Safe autonomous roaming (Phase 1)
 
 Implement idle, manual, autonomous, and fault states; add the selected obstacle sensors and bounded motion commands. Complete when the rover can roam in the test room and reliably stop for representative obstacles, stale commands, and sensor faults. Validate reset and communication-loss behavior. Record observed failures and test conditions.
 
-### 3. Mission-specific navigation
+### 3. Mission-specific navigation (after Phase 2)
 
 Implement the selected behavior, such as visiting marked locations, following a person, or room-to-room patrol. Choose localization and compute architecture using prototype results. Complete when repeated runs meet agreed success criteria across the intended lighting, surfaces, and route conditions.
 
-### 4. Unattended operation
+### 4. Unattended operation (after Phase 2)
 
 Add recovery behavior, battery-aware stopping, and scheduling if required. Treat return-to-base and charging as separate development tasks. Complete only after endurance runs and fault tests demonstrate the selected operating envelope.
 
@@ -105,12 +107,12 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 | Compute location | Locked (2026-10-06): Mac is the Phase 1 brain — no new purchases yet. Offboard architecture stands (rover only needs drive instructions), so a desk Pi 5 stays an approved later migration. Local LLM is out of Phase 1 scope for the same reason |
 | Exact ESP32-S3 board and camera | Received 2026-10-08: Seeed Studio XIAO ESP32S3 Sense bundle (camera + mic). Bench-verify supplied camera, mic, sensor pins, and power next; then create pin/power budget |
 | Existing electronics command interface | Selected: Mac USB -> owned CyberBrick transmitter -> wireless receiver. Verify USB command API and timeout behavior |
-| Firmware framework and command transport | Transport selected (2026-10-06): WebSocket JSON telemetry + MJPEG video, timestamped for stale detection. Framework pending: user rejected Arduino/ESP-IDF/MicroPython; awaiting clarification |
+| Firmware framework and command transport | Transport selected (2026-10-06): WebSocket JSON telemetry + MJPEG video, timestamped for stale detection. Framework not yet chosen (Arduino-ESP32, ESP-IDF, or MicroPython); the earlier "rejected" note was a misunderstanding — the decision made was the ESP32-S3 camera board itself |
 | Floors, thresholds, stairs, pets, and lighting | Environment details needed |
-| Budget and hardware already owned | Locked (2026-10-06): no $100+ spend yet — Phase 1 uses owned hardware only (Mac + CyberBrick kit). ESP32 camera board and desk Pi purchases deferred to later milestones |
+| Budget and hardware already owned | Locked (2026-10-06): no $100+ spend yet — Phase 1 uses owned hardware (Mac + a dedicated second CyberBrick set) plus the XIAO ESP32S3 Sense (~US$14, bought 2026-10-07 as a small exception). Desk Pi and other Phase 2 purchases deferred |
 | Obstacle sensors and motion feedback | Proposal (2026-10-07, from tank lesson): camera-only positioning forces stop-observe speeds (~4-5 s/step on the tank), so shortlist wheel encoders + IMU for when spending resumes. Select after base verification + environment details |
 | Speed limit, runtime, stop distance, and mission success targets | Set during commissioning |
-| Drive-electronics sharing with tank | Open (2026-10-07): the owned CyberBrick kit currently serves the working Mini-T — decide whether the rover build reuses it or a second set is bought when spending resumes |
+| Drive-electronics sharing with tank | Resolved (2026-10-13): a second owned CyberBrick receiver/transmitter set is dedicated to the rover; the Mini-T keeps its own kit |
 
 ## Repository maintenance
 
@@ -122,7 +124,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 
 ## Next actions
 
-1. Print and assemble the OpenFrame One chassis (scheduled next week as of 2026-10-07). Pull the MakerWorld electronics list first so missing fasteners, bearings, or drive components are ordered before assembly day.
+1. Print and assemble the OpenFrame One chassis (slipped; not yet rescheduled as of 2026-10-13). Pull the MakerWorld electronics list first so missing fasteners, bearings, or drive components are ordered before assembly day.
 2. Obtain and inspect the MakerWorld electronics list and wiring instructions.
 3. Confirm the autonomous command interface while preserving the original drive electronics.
 4. Define the first patrol route and the home-computer software/transport interface.
