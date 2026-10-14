@@ -1,4 +1,4 @@
-"""Fit checks for housing.py (needs the local chassis STEP and Seeed XIAO model)."""
+"""Fit checks for housing.py (pod mount + lid) (needs the local chassis STEP and Seeed XIAO model)."""
 import sys
 from pathlib import Path
 
@@ -7,10 +7,8 @@ from build123d import Box, Pos, import_step
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import housing as H
 
-base, lid, _, xiao_loc, report = H.build()
+base, lid, _, xiao_loc, report = H.build()   # base = pod mount
 xiao = xiao_loc * import_step(str(H.XIAO_STEP))
-bw, bl, bt = H.BATTERY
-battery = Pos(H.CX, report['battery_front_y'] + 2 + bl / 2, H.PLATE_TOP + bt / 2) * Box(bw, bl, bt)
 
 def overlap(a, b):
     try:
@@ -19,7 +17,6 @@ def overlap(a, b):
         return float('nan')
 
 print(f'XIAO vs base: {overlap(xiao, base):.2f} mm3   XIAO vs lid: {overlap(xiao, lid):.2f} mm3')
-print(f'battery vs base: {overlap(battery, base):.2f} mm3')
 print(f'lid vs base: {overlap(lid, base):.2f} mm3')
 
 chassis = import_step(str(H.CHASSIS_STEP))

@@ -1,16 +1,15 @@
-"""Rover top housing v1: base plate + battery cradle + XIAO camera pod, and a pod lid.
+"""Rover camera pod mount: XIAO ESP32S3 Sense pod on a small plate that screws onto the
+OpenFrame Two top frame, plus a pod lid. The power bank is strapped to the chassis separately.
 
-Run: cad/.venv/bin/python housing/housing.py
-Writes housing/out/housing-base.stl and housing-lid.stl. housing/check.py checks fit and
-collisions against the local chassis STEP.
+Run: cad/.venv/bin/python housing/housing.py   -> housing/out/pod-mount.stl, pod-lid.stl
+housing/check.py checks fit and collisions against the local chassis STEP.
 
 World coordinates are the chassis STEP's: X across the car, Y along it (front = -Y),
 Z up. All dimensions in mm. Edit the parameters below and re-run.
 """
 from pathlib import Path
 
-from build123d import (Axis, Box, Compound, Cylinder, Location, Pos, Rot, Solid, export_stl,
-                       import_step)
+from build123d import Box, Cylinder, Location, Pos, Rot, Solid, export_stl
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / 'housing/out'
@@ -23,33 +22,29 @@ FRAME_FRONT_Y = -172.1
 GRID_X = (-28.7, 21.3)                 # two rows of 2.5 mm holes, 50 mm apart
 GRID_Y = [-170.1 + 22.5 * i for i in range(9)]
 CX = sum(GRID_X) / 2                   # centreline of the hole grid
+# Steering gear that rises 0.43 mm above the frame top: pocket in the plate underside.
+RELIEFS = [((-15.5, -10.5), (-147.3, -119.6), 1.5)]   # (x range, y range, depth)
+RELIEF_MARGIN = 1.5
 
 # ---- parts ----
 XIAO_STACK = (24.4, 14.0, 17.8)        # Seeed model: length (USB-C end) x thickness (camera side) x width
 LENS_IN_MODEL = (8.75, -6.75)          # lens centre (x, z) in the Seeed model frame
 XIAO_MODEL_MIN = (-9.0, -0.2, -15.0)   # Seeed model bounding-box minimum
-BATTERY = (70.8, 122.2, 7.7)           # iPhone Air MagSafe Battery (ChargerLAB): width x length x thickness
 
 # ---- design parameters ----
 PLATE_T = 3.0
+PLATE_FRONT_EXTEND = 2.5               # overhang past the frame front: ~3 mm of material at the front screws
+SCREW_ROWS = 2                         # front grid rows used (4 screws)
 WALL = 1.8
 CLEAR = 0.4                            # per side around the XIAO stack
-BAT_CLEAR = 0.6                        # per side around the battery
-CRADLE_WALL_H = 6.0
-CABLE_GAP = 27.5                       # between pod back and battery front edge (USB-C plugs; right-angle cable)
-PLATE_FRONT_EXTEND = 2.5               # plate overhangs the frame front so the front screw row has ~3 mm of material
 POD_FLOOR = 3.0                        # solid pedestal under the XIAO
 TILT_UP_DEG = 5.0                      # camera tilt above horizontal
 SCREW_CLEAR_D = 2.9                    # M2.5 clearance
-HEAD_D, HEAD_DEPTH = 5.4, 1.7          # M2.5 button head counterbore under the battery
+HEAD_D = 5.4                           # M2.5 button head, for clearance checks
 LENS_HOLE_D = (9.0, 14.0)              # inner, outer diameter of the conical lens window
 USB_OPENING = (14.0, 8.5)              # width x height, USB-C plug overmould
 LID_T, LID_LIP = 1.6, 2.0
 ROOF = (44.0, 26.0)                    # lid roof; the 39 x 19 mm antenna sticks on top
-STRAP_SLOT = (3.0, 22.0)
-# Chassis parts that rise just above the frame top get a pocket in the plate underside.
-RELIEFS = [((-15.5, -10.5), (-147.3, -119.6), 1.5)]   # (x range, y range, depth); front steering gear, +0.6 mm
-RELIEF_MARGIN = 1.5
 
 PLATE_TOP = FRAME_TOP_Z + PLATE_T
 
@@ -106,76 +101,45 @@ def build():
     pod, lid, xiao_loc, pod_outer = pod_frame()
 
     # Pedestal below the pod so the tilted pod still meets the plate.
-    pedestal = Pos(0, pod_outer[1] / 2, -4) * Box(pod_outer[0], pod_outer[1], 8)
-    pod = pod + pedestal
-
+    pod = pod + Pos(0, pod_outer[1] / 2, -4) * Box(pod_outer[0], pod_outer[1], 8)
     place = Pos(CX, FRAME_FRONT_Y, PLATE_TOP) * Rot(-TILT_UP_DEG, 0, 0)
     pod_w, lid_w = place * pod, place * lid
     pod_w = pod_w - Pos(CX, FRAME_FRONT_Y, PLATE_TOP - 50) * Box(200, 400, 100)   # trim below plate top
 
-    pod_back = FRAME_FRONT_Y + pod_outer[1] + 2
-    bat_front = pod_back + CABLE_GAP
-    bw, bl, bt = BATTERY
-    cradle_in = (bw + 2 * BAT_CLEAR, bl + 2 * BAT_CLEAR)
-    cradle_out = (cradle_in[0] + 2 * 2.0, cradle_in[1] + 2 * 2.0)
+    rows = GRID_Y[:SCREW_ROWS]
     plate_front = FRAME_FRONT_Y - PLATE_FRONT_EXTEND
-    plate_len = (bat_front + cradle_out[1]) - plate_front
-    plate = Pos(CX, plate_front + plate_len / 2, FRAME_TOP_Z + PLATE_T / 2) * Box(cradle_out[0], plate_len, PLATE_T)
+    plate_len = rows[-1] + 5.5 - plate_front
+    plate_w = GRID_X[1] - GRID_X[0] + 10
+    plate = Pos(CX, plate_front + plate_len / 2, FRAME_TOP_Z + PLATE_T / 2) * Box(plate_w, plate_len, PLATE_T)
+    mount = plate + pod_w
 
-    cradle_cy = bat_front + cradle_out[1] / 2
-    cradle = Pos(CX, cradle_cy, PLATE_TOP + CRADLE_WALL_H / 2) * Box(cradle_out[0], cradle_out[1], CRADLE_WALL_H)
-    cradle -= Pos(CX, cradle_cy, PLATE_TOP + CRADLE_WALL_H / 2) * Box(cradle_in[0], cradle_in[1], CRADLE_WALL_H + 1)
-    cradle -= Pos(CX, bat_front + 1, PLATE_TOP + CRADLE_WALL_H / 2 + 1) * Box(24, 6, CRADLE_WALL_H)  # USB-C opening, front edge
-    cradle -= Pos(CX, bat_front + cradle_out[1] - 1, PLATE_TOP + CRADLE_WALL_H) * Box(30, 6, CRADLE_WALL_H)  # finger notch, rear
-
-    base = plate + cradle + pod_w
     for (x0, x1), (y0, y1), depth in RELIEFS:
-        base -= Pos((x0 + x1) / 2, (y0 + y1) / 2, FRAME_TOP_Z + depth / 2 - 0.01) * Box(
+        mount -= Pos((x0 + x1) / 2, (y0 + y1) / 2, FRAME_TOP_Z + depth / 2 - 0.01) * Box(
             x1 - x0 + 2 * RELIEF_MARGIN, y1 - y0 + 2 * RELIEF_MARGIN, depth)
 
-    # Strap slots in the overhang beyond the frame rails, two pairs along the battery.
-    for y in (bat_front + bl * 0.25, bat_front + bl * 0.75):
-        for x in (CX - cradle_out[0] / 2 + 3.5, CX + cradle_out[0] / 2 - 3.5):
-            base -= Pos(x, y, FRAME_TOP_Z + PLATE_T / 2) * Box(STRAP_SLOT[0], STRAP_SLOT[1], PLATE_T * 3)
-
-    # Screws: the front row (beside the pod, which is narrower than the 50 mm row spacing), the row
-    # behind the pod, and the middle and last rows under the battery (counterbored).
-    plate_end = plate_front + plate_len
-    pod_half_w = pod_outer[0] / 2
-    assert all(abs(x - CX) > pod_half_w + HEAD_D / 2 for x in GRID_X), 'front screws would hit the pod'
-    ys = [y for y in GRID_Y if pod_back + 3 < y < plate_end - 3]
-    chosen = [GRID_Y[0], ys[0]] + ([ys[len(ys) // 2], ys[-1]] if len(ys) > 2 else ys[1:])
-    for y in chosen:
+    # Screws beside the pod (it is narrower than the 50 mm row spacing) and behind it.
+    assert all(abs(x - CX) > pod_outer[0] / 2 + HEAD_D / 2 for x in GRID_X), 'screws would hit the pod'
+    for y in rows:
         for x in GRID_X:
-            base -= Pos(x, y, FRAME_TOP_Z + PLATE_T / 2) * Cylinder(SCREW_CLEAR_D / 2, PLATE_T * 3)
-            if y > bat_front:
-                base -= Pos(x, y, PLATE_TOP - HEAD_DEPTH / 2 + 0.01) * Cylinder(HEAD_D / 2, HEAD_DEPTH)
+            mount -= Pos(x, y, FRAME_TOP_Z + PLATE_T / 2) * Cylinder(SCREW_CLEAR_D / 2, PLATE_T * 3)
+
     report = {
-        'plate_mm': (round(cradle_out[0], 1), round(plate_len, 1), PLATE_T),
+        'plate_mm': (round(plate_w, 1), round(plate_len, 1), PLATE_T),
         'pod_outer_mm': tuple(round(v, 1) for v in pod_outer),
-        'screw_rows_y': [round(y, 1) for y in chosen],
-        'battery_front_y': round(bat_front, 1),
-        'plate_rear_y': round(plate_end, 1),
+        'screw_rows_y': [round(y, 1) for y in rows],
+        'mount_rear_y': round(plate_front + plate_len, 1),
     }
-    return base, lid_w, lid, place * xiao_loc, report
+    return mount, lid_w, lid, place * xiao_loc, report
 
 
 if __name__ == '__main__':
-    base, lid_world, lid_print, xiao_loc, report = build()
+    mount, lid_world, lid_print, xiao_loc, report = build()
     OUT.mkdir(exist_ok=True)
-    export_stl(base, str(OUT / 'housing-base.stl'))
-    # Lid printed roof-down: flip it.
-    lid_flat = Rot(180, 0, 0) * lid_print
-    export_stl(lid_flat, str(OUT / 'housing-lid.stl'))
-    # Test-fit piece: the pod on a plate section covering both rails and the first two screw rows
-    # (4 screws), so it mounts exactly like the front of the real plate (relief pocket included).
-    stub_front = FRAME_FRONT_Y - PLATE_FRONT_EXTEND
-    stub_len = report['screw_rows_y'][1] + 5.5 - stub_front
-    stub_w = GRID_X[1] - GRID_X[0] + 10
-    stub = base & (Pos(CX, stub_front + stub_len / 2, FRAME_TOP_Z + 25) * Box(stub_w, stub_len, 50))
-    export_stl(stub, str(OUT / 'housing-pod-testfit.stl'))
-    # Quick test-fit print: the pod on a short stub of plate (no screws needed).
+    for old in OUT.glob('*.stl'):
+        old.unlink()
+    export_stl(mount, str(OUT / 'pod-mount.stl'))
+    export_stl(Rot(180, 0, 0) * lid_print, str(OUT / 'pod-lid.stl'))   # printed roof-down
     for k, v in report.items():
         print(f'{k}: {v}')
-    bb = base.bounding_box()
-    print(f'base print size: {bb.size.X:.1f} x {bb.size.Y:.1f} x {bb.size.Z:.1f} mm, volume {base.volume / 1000:.1f} cm3')
+    bb = mount.bounding_box()
+    print(f'pod mount print size: {bb.size.X:.1f} x {bb.size.Y:.1f} x {bb.size.Z:.1f} mm, volume {mount.volume / 1000:.1f} cm3')
