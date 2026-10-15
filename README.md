@@ -14,7 +14,7 @@ wirelessly to the stock receiver and drive electronics.
 ## Status
 
 - Chassis (OpenFrame Two 4WD) printing started 2026-10-14, first tire in TPU.
-- Camera housing: own pod (PETG) had fit issues; Seeed's official XIAO Sense case fits; it plugs onto a USB-C camera dock (`housing/cam-dock`) screwed to the front of the frame (2026-10-15).
+- Camera housing: own pod (PETG) had fit issues; Seeed's official XIAO Sense case fits; it snaps onto a 90° magnetic USB cable held upright by the camera dock (`housing/cam-dock`) at the front of the frame; the cable's elbow sets the tilt (2026-10-15).
 - XIAO ESP32S3 Sense firmware configured and bench-verified 2026-10-14: OV3660 camera (VGA MJPEG ~15 fps), 5 Hz telemetry with health and mic level, settings over HTTP, updates over Wi-Fi ([firmware/xiao-cam](firmware/xiao-cam/README.md)). Powered by an iPhone Air battery pack.
 - Autonomy software will be ported from the working Mini-T stack (command path, autonomy loop, detector + dashboard, calibration discipline) — see [PLAN.md](PLAN.md) for the reuse mapping.
 
