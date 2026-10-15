@@ -1,39 +1,39 @@
-# Camera pod mount
+# Camera dock
 
-A pod for the XIAO ESP32S3 Sense at the front of the OpenFrame Two, on a small plate that screws
-onto the top frame, plus a lid. The iPhone Air power bank is strapped to the chassis separately.
+A dock for the XIAO ESP32S3 Sense in Seeed's official case (kept local, not in git) at the front
+of the OpenFrame Two: a plate that screws onto the top frame with a tower that holds an Apple USB-C
+cable plug pointing up. The case plugs onto it USB-C end down, antenna up, and drops into a collar;
+lift it off to remove. Power comes from the iPhone Air power bank strapped to the chassis.
 Parametric: edit the numbers at the top of `housing.py` and re-run.
 
 | File | Print |
 | --- | --- |
-| `out/pod-mount.stl` | Pod + 60 × 32.5 × 3 mm plate, ~26 mm tall. Plate on the bed, no supports. 3 walls recommended (screw holes, lens window). |
-| `out/pod-lid.stl` | Lid, flat roof on the bed, lip up; no supports. The antenna sticks on the flat roof. |
+| `out/cam-dock.stl` | 60 × 32.5 × 3 mm plate + 26.8 × 11.4 × 29 mm tower, 32 mm tall overall. Plate on the bed, no supports, PETG. ~11 g. |
 
 ## Design
 
 - **Mounting:** 4 × M2.5 × 8–10 mm button-head screws into the frame's 2.5 mm hole grid (rows 50 mm
-  apart): the front row beside the pod and the row just behind it. The plate overhangs the frame
-  front by 2.5 mm so the front holes have 3 mm of material to the edge. Fit the screws before the lid.
-- **Camera:** lens window in the pod front, tilted 5° up (`TILT_UP_DEG`), lens ~10 cm off the floor.
-- **XIAO:** stack (24.4 × 17.8 × 14 mm, from Seeed's STEP) stands upright with the camera forward, 0.4 mm
-  clearance; the lid's lip holds it down. USB-C exits the left wall (seen from behind).
-- **Antenna:** cable up through the slot in the lid; the 39 × 19 mm antenna sticks on the roof, the
-  highest point, with only plastic around it.
-- **Vents:** slots in the right wall and lid for heat and to let sound reach the mic (placement is
-  an estimate; watch for resets or heat while streaming).
-- **Chassis clearance:** checked against the OpenFrame Two STEP, no collisions. A steering gear rises
-  0.4 mm above the frame top 25–55 mm behind the front; the plate has a 1.5 mm relief pocket over it.
-
-**Power bank:** strap it behind the steering-gear zone (more than ~6 cm back from the front of the
-frame) so it doesn't press on the gear, and use a short right-angle USB-C to USB-C cable to the pod.
+  apart), the front row and the row behind it. The plate overhangs the frame front by 2.5 mm.
+- **Plug channel:** 13.25 × 7.4 mm, open at the back for the full height: slide the plug in from
+  behind; the cable bends out wherever the plug ends and runs back along the plate. Sized to Apple's
+  USB-C cable envelope (its case guidance keeps plugs within 12.45 × 6.60 mm); no exact Apple plug
+  dimensions are published.
+- **Collar:** 22.8 × 7.0 mm, 5 mm deep, around the case's slim USB-C end (22.2 × ~6.4 mm for its
+  first ~7 mm, measured from Seeed's STL). The case rests on ledges either side of the plug, so the
+  collar takes bumps and the XIAO's USB-C port only carries power.
+- **Camera:** faces forward (-Y), collar top 32 mm above the frame. `TILT_UP_DEG` tilts the tower
+  (0 = level); a different angle is a reprint.
+- **Antenna:** stays on the case, pointing up, the highest point on the rover.
+- **Chassis clearance:** checked against the OpenFrame Two STEP, no collisions. The plate has a
+  1.5 mm relief pocket over the steering gear that rises 0.4 mm above the frame top.
 
 ## Checks
 
-`check.py` (needs the local chassis STEP and Seeed's XIAO model, both kept out of git) verifies zero
-overlap between the XIAO, mount and lid, and no collisions with the chassis.
+`check.py` (needs the local chassis STEP, kept out of git) verifies no collisions with the chassis.
 
 ## Assumptions to confirm on the first print
 
-- The lens window position comes from Seeed's model; the OV3660 module on your board may sit
-  slightly differently.
-- Antenna size (39 × 19 mm) is from a forum report.
+- Case slim-end depth (6.4 mm) is read from Seeed's STL with the two halves assumed to stack flat;
+  if the case is loose or tight in the collar, change `CASE_END`.
+- Apple plug size is the published upper bound; if the plug is loose, it's held in line by the case
+  once plugged in.
