@@ -22,6 +22,10 @@ Bench results 2026-10-14 (bare motors and servo on the receiver, servo on port S
 - W 300 ms: both motors ran, stop ACKed 324 ms after start. A/D 600 ms: stop ACKed at 624–625 ms.
 - Mac crash: holding W, the Mac process was SIGKILLed after 1 s with no stop sent; the receiver
   reported stopped afterwards (its 500 ms watchdog). Visual stop timing still to confirm.
+- Steering servo on S2: a ±20° command produced roughly a 270° turn and back, which suggests a
+  continuous-rotation (360°) servo (angle = speed) rather than a positional one. **Check before
+  fitting it to the steering linkage:** a continuous servo would drive the steering into its stops.
+  The OpenFrame guide calls for a 9 g positional micro servo.
 - Not checkable on bare motors: which motor direction is forward and which way A/D steer; calibrate
   `MOTOR_SIGNS`, `STEER_CENTER`, `STEER_TRAVEL` once the chassis is assembled. Still to test: USB
   unplug and transmitter power loss mid-drive.
