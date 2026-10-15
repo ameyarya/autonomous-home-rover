@@ -142,18 +142,23 @@ class Transmitter:
         if b'\r\nACK' not in out and not out.startswith(b'ACK'):
             raise RuntimeError('Receiver did not acknowledge stop')
 
-    def pulse(self, key, ms):
+    def pulse(self, key, ms, abort=None):
+        """Hold `key` for up to `ms` (capped), then stop with ACK. `abort` (threading.Event)
+        ends the pulse early."""
         if key not in 'WASD':
             raise ValueError('key must be W, A, S or D')
         ms = max(0, min(int(ms), MAX_PULSE_MS))
         end = time.monotonic() + ms / 1000
         try:
-            while True:
+            while not (abort and abort.is_set()):
                 self.wire(key)
                 remaining = end - time.monotonic()
                 if remaining <= 0:
                     break
-                time.sleep(min(REPEAT_S, remaining))
+                if abort:
+                    abort.wait(min(REPEAT_S, remaining))
+                else:
+                    time.sleep(min(REPEAT_S, remaining))
         finally:
             self.stop()
 

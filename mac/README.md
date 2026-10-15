@@ -9,7 +9,9 @@ age, refuses stale frames, and feeds the detector ported from
 | `xiao_link.py` | `XiaoLink`: background MJPEG + WebSocket readers, XIAO→Mac clock mapping, `fresh_frame()` stale gate, `save()` in Mini-T frame naming. `python3 xiao_link.py` prints live link stats. |
 | `dashboard.py` | http://localhost:8010/: live view, link health, and the planner view (exact labeled frame the detector saw). |
 | `rover_detector.py` | Mini-T detector (YOLO-World / bullseye matcher), ported with only paths and port (8767) changed. |
-| `dog_watcher.py` | Phase 1 dog companion (camera side): YOLO11s finds the dog, motion/stillness, Qwen3-VL describes what he is doing, timeline log, rover intent. Status on :8768, shown in the dashboard. **Sends no drive commands.** |
+| `dog_watcher.py` | Phase 1 dog companion: YOLO11s finds the dog, motion/stillness, Qwen3-VL describes what he is doing, timeline log, and drives through `drive_client.py` when the dashboard has armed the drive server. Status on :8768. |
+| `drive_client.py` | Watcher decisions → bounded pulses via the drive server (forward W 300 ms, back S 250, turn A/D 250, scan A 400, park/stop X), then 0.6 s of post-stop frames before the next move. Disarmed: logs what it would send. |
+| `test_drive_client.py` | Disarmed records only, observe dwell, hold sends nothing, single stop on park, server down. |
 | `dog_behavior.py` | The companion state machine (parked → following → searching), pure logic. |
 | `test_dog_behavior.py` | State machine tests: follow on movement, tail-wag counts, park after sleep, search then park, back off when charged, stale camera stops. |
 | `test_xiao_link.py` | Tests against a fake XIAO: clock mapping, frame age, stale detection, telemetry loss, camera fault, captured-after waits. |

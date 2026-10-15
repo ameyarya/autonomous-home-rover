@@ -24,6 +24,7 @@ FRAMES = ROOT / 'vision-output'
 MINI_T = Path.home() / 'Documents/Projects/ai-driven-mini-t'
 DETECTOR_URL = 'http://127.0.0.1:8767'
 DOG_WATCHER_URL = 'http://127.0.0.1:8768'
+DRIVE_URL = 'http://127.0.0.1:8769'
 
 _detector_lock = threading.Lock()
 
@@ -141,7 +142,12 @@ pre{font:11px ui-monospace,monospace;white-space:pre-wrap;color:var(--dim);margi
 <main>
 <section><h2>Live · <span id=state>connecting</span></h2><img id=live alt="live view">
 <dl id=health></dl></section>
-<section><h2>Dog watcher · <span id=dogstate>offline</span></h2><img id=dog alt="dog watcher view">
+<section><h2>Dog watcher · <span id=dogstate>offline</span></h2>
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+<button id=arm style="background:#444">Arm drive</button>
+<button id=estop style="background:#d1242f;flex:1">STOP (Esc)</button>
+<span id=drivestate style="font:12px ui-monospace,monospace;color:var(--dim)">drive server offline</span></div>
+<img id=dog alt="dog watcher view">
 <dl id=dogfacts></dl><ol id=events style="font:12px ui-monospace,monospace;color:var(--dim);padding-left:18px;max-height:220px;overflow:auto"></ol></section>
 <section><h2>Planner view (exact detector input)</h2>
 <form id=f><input id=goal placeholder="detector prompt (optional; no Phase 1 target)" aria-label="detector prompt"><button>Observe</button></form>
@@ -160,12 +166,21 @@ row('fw',t.fw)+row('reset reason',t.reset_reason)+row('device restarts seen',h.d
 row('errors',JSON.stringify(h.errors))+row('last error',h.last_error);}catch(e){$('state').textContent='dashboard offline';$('state').className='stale'}
 setTimeout(poll,250)}poll();
 async function dogPoll(){try{const d=await (await fetch('/dog/status')).json();
-$('dogstate').textContent=d.state+' · intent '+d.intent+' (no drive commands sent)';$('dogstate').className=d.camera_ok?'ok':'stale';
+$('dogstate').textContent=d.state+' · intent '+d.intent+(d.drive&&d.drive.sent?' · sent '+d.drive.sent:'');$('dogstate').className=d.camera_ok?'ok':'stale';
 $('dog').src='/dog/frame.jpg?'+Date.now();
 $('dogfacts').innerHTML=row('reason',d.reason)+row('dog visible',d.dog_visible)+row('moving',d.moving)+row('still for',d.still_for_s!=null?d.still_for_s+' s':null)+
 row('doing',d.activity?d.activity+' ('+d.dog_state+', '+d.activity_age_s+' s ago)':null)+row('park after asleep',d.sleep_after_s+' s')+row('model error',d.describe_error);
 $('events').innerHTML=d.events.slice().reverse().map(e=>`<li>${e.t.slice(11,19)} ${e.event} ${e.activity||e.reason||e.state||''}</li>`).join('')}
 catch(e){$('dogstate').textContent='offline — run python3 mac/dog_watcher.py';$('dogstate').className='stale'}setTimeout(dogPoll,1000)}dogPoll();
+let armed=false;
+async function drive(path,body){const r=await fetch('/drive'+path,{method:'POST',body:JSON.stringify(body||{})});return r.json()}
+function showDrive(st){$('drivestate').textContent=st.error?('error: '+st.error):(st.armed?'ARMED — rover may move':'disarmed — decisions are only logged')+(st.last&&st.last.key?' · last '+st.last.key+(st.last.ms?' '+st.last.ms+' ms':'')+(st.last.why?' ('+st.last.why+')':''):'');
+$('arm').textContent=st.armed?'Disarm':'Arm drive';$('arm').style.background=st.armed?'#2f81f7':'#444';armed=st.armed}
+$('arm').onclick=async()=>{try{showDrive(await drive('/arm',{armed:!armed}))}catch(e){$('drivestate').textContent='drive server offline'}};
+async function estop(){armed=false;try{showDrive(await drive('/stop'))}catch(e){}}
+$('estop').onclick=estop;addEventListener('keydown',e=>{if(e.key==='Escape')estop()});
+async function lease(){try{if(armed)showDrive(await drive('/arm',{armed:true}));else showDrive(await (await fetch('/drive/status')).json())}catch(e){$('drivestate').textContent='drive server offline — run python3 drive/drive_server.py'}setTimeout(lease,1000)}lease();
+addEventListener('pagehide',()=>{if(armed)navigator.sendBeacon('/drive/stop','{}')});
 $('f').onsubmit=async e=>{e.preventDefault();$('obs').innerHTML=row('status','observing…');
 const r=await fetch('/observe',{method:'POST',body:JSON.stringify({goal:$('goal').value})});const o=await r.json();
 if(!r.ok){$('obs').innerHTML=row('refused',o.error);return}
@@ -212,6 +227,12 @@ def make_handler(dashboard):
                         return self.reply(200, response.read(), response.headers.get('Content-Type'))
                 except OSError:
                     return self.reply(503, {'error': 'dog watcher not running'})
+            if path == '/drive/status':
+                try:
+                    with urllib.request.urlopen(DRIVE_URL + '/status', timeout=2) as response:
+                        return self.reply(200, response.read())
+                except OSError:
+                    return self.reply(503, {'error': 'drive server not running'})
             if path == '/planner.jpg':
                 if dashboard.planner_image is None:
                     return self.reply(404, {'error': 'no observation yet'})
@@ -219,6 +240,15 @@ def make_handler(dashboard):
             self.reply(404, {'error': 'not found'})
 
         def do_POST(self):
+            if self.path in ('/drive/arm', '/drive/stop'):
+                size = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(size) if size else b'{}'
+                try:
+                    req = urllib.request.Request(DRIVE_URL + self.path[6:], body, {'Content-Type': 'application/json'})
+                    with urllib.request.urlopen(req, timeout=3) as response:
+                        return self.reply(200, response.read())
+                except OSError as error:
+                    return self.reply(503, {'error': f'drive server: {error}'})
             if self.path != '/observe':
                 return self.reply(404, {'error': 'not found'})
             try:

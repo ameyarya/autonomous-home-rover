@@ -6,8 +6,11 @@ Status on http://127.0.0.1:8768/status (shown in the dashboard). Re-runs itself 
 detector Python (ultralytics + torch) if needed; uses Ollama qwen3-vl:4b-instruct for
 descriptions.
 
-NO DRIVE COMMANDS ARE SENT. The drive path is not integrated yet; decisions are logged as
-intent ("turn_left: dog at 30%") so the behaviour can be checked before the rover moves.
+Drive: decisions become bounded pulses through drive/drive_server.py, but only while the
+dashboard's Arm switch is on (the server refuses pulses otherwise). Disarmed, decisions are
+logged as intent only. After every pulse the watcher waits for fresh post-stop frames
+(move -> stop -> observe) and restarts its dog-motion window, so camera motion is not
+mistaken for dog motion.
 """
 import argparse
 import base64
@@ -41,6 +44,7 @@ except ImportError:
     os.execve(str(python), [str(python), str(Path(__file__).resolve()), *sys.argv[1:]], env)
 
 from dog_behavior import Behavior, Dog, Settings  # noqa: E402
+from drive_client import DriveExecutor  # noqa: E402
 from xiao_link import DEFAULT_HOST, StaleFrame, XiaoLink  # noqa: E402
 
 LOG_DIR = ROOT / 'dog-log'
@@ -169,6 +173,7 @@ class Watcher:
         self.behavior = Behavior(settings)
         self.timeline = Timeline(LOG_DIR)
         self.describer = Describer(self.timeline)
+        self.executor = DriveExecutor()
         self.model = YOLO(str(WEIGHTS))
         self.prev_gray = None
         self.visible = False
@@ -203,7 +208,7 @@ class Watcher:
     def step(self):
         now = time.monotonic()
         try:
-            frame = self.link.fresh_frame(timeout=1.0)
+            frame = self.link.fresh_frame(captured_after=self.executor.captured_after, timeout=1.0)
         except StaleFrame as error:
             if self.camera_ok is not False:
                 self.timeline.log('camera_stale', reason=str(error))
@@ -264,12 +269,22 @@ class Watcher:
         if previous is None or decision.state != previous.state:
             self.timeline.log('state', state=decision.state, action=decision.action, reason=decision.reason,
                               previous=previous.state if previous else None)
+        result = self.executor.act(decision.action, now)
+        if result.get('sent') and result['sent'] != 'X':
+            # The camera moved: restart the dog-motion window and in-box pixel baseline.
+            self.behavior.motion.samples.clear()
+            self.prev_gray = None
+            self.timeline.log('drive', action=decision.action, pulse=result['sent'], reason=decision.reason)
+        elif result.get('sent') == 'X' and (previous is None or previous.action != decision.action):
+            self.timeline.log('drive', action=decision.action, pulse='X', reason=decision.reason)
         with self.lock:
             self.decision = decision
         return decision
 
     def _annotate(self, boxed, found, decision, frame):
-        lines = [f'{decision.state.upper()}  intent: {decision.action}  (no drive commands sent)', decision.reason]
+        drive = self.executor.last or {}
+        sent = drive.get('sent') or ('disarmed' if drive.get('why') == 'disarmed' else '-')
+        lines = [f'{decision.state.upper()}  intent: {decision.action}  drive: {sent}', decision.reason]
         if found:
             m = self.behavior.motion
             lines.append(f"dog {found['confidence']:.2f}  {'MOVING' if m.moving else 'still'} "
@@ -290,7 +305,7 @@ class Watcher:
             d = self.decision
         latest = self.describer.latest
         return {
-            'drive_commands_sent': False,
+            'drive': self.executor.last,
             'state': d.state if d else None, 'intent': d.action if d else None, 'reason': d.reason if d else None,
             'camera_ok': self.camera_ok, 'dog_visible': self.visible,
             'moving': m.moving if self.visible else None,
@@ -358,7 +373,7 @@ def main():
     link = XiaoLink(args.host).start()
     watcher = Watcher(link, Settings(sleep_after_s=args.sleep_after))
     serve(watcher, args.port)
-    watcher.timeline.log('watcher_start', host=args.host, sleep_after_s=args.sleep_after, drive_commands_sent=False)
+    watcher.timeline.log('watcher_start', host=args.host, sleep_after_s=args.sleep_after)
     watcher.run()
 
 
