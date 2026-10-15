@@ -31,6 +31,8 @@ Bench results 2026-10-14 (bare motors and servo on the receiver, servo on port S
   ~270°), unusable for steering. Replaced with the Mini-T's disc-launcher servo, a positional 180°
   CyberBrick servo: short and long A pulses now give the same small deflection, D the other way,
   and it re-centres. Ready for the linkage (cut its horn per OpenFrame guide step 3.2).
+- Wireless: with the receiver off the Mac's USB and on its own power, the signed status reply and a
+  W 300 ms pulse worked (stop ACKed at 324 ms), same as on USB.
 - Not checkable on bare motors: which motor direction is forward and which way A/D steer; calibrate
   `MOTOR_SIGNS`, `STEER_CENTER`, `STEER_TRAVEL` once the chassis is assembled. Still to test: USB
   unplug and transmitter power loss mid-drive.
