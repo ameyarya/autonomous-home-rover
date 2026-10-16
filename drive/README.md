@@ -15,7 +15,7 @@ behaviour is an app installed into it over the air.
 Transmitter LED: solid green once the receiver ACKs a stop at connect, red if it doesn't (the stock
 breathing purple means our link code isn't running).
 
-Run: `python3 mac/dashboard.py`, then start the drive server and dog watcher from its header (or run
+Run: `python3 mac/dashboard.py` (http://rover.local:8010/), then start the drive server and dog watcher from its header (or run
 `python3 drive/drive_server.py` and `python3 mac/dog_watcher.py` yourself), then Arm (STOP / Esc / Space
 any time; closing the page disarms). While armed, hold WASD/arrows to drive manually.
 
