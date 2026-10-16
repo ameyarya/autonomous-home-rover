@@ -12,6 +12,8 @@ firmware/*/main/secrets.h
 # Mac runtime output
 mac/vision-output/
 mac/detector-server.log
+mac/drive-server.log
+mac/dog-watcher.log
 __pycache__/
 mac/weights/
 mac/dog-log/

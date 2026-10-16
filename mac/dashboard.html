@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Home Rover</title>
+<style>
+:root{color-scheme:dark;--bg:#10151d;--panel:#19212d;--line:#2c3748;--line2:#40516b;--fg:#edf2fa;--dim:#9caec5;--dim2:#8295af;--ok:#91dfb7;--okbg:#23563f;--warn:#f0c674;--bad:#ff8b80;--badbg:#5c1f1b;font-family:system-ui;background:var(--bg);color:var(--fg)}
+*{box-sizing:border-box}body{max-width:1400px;margin:auto;padding:16px;background:var(--bg)}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+h1{font-size:22px;margin:0}h2{font-size:14px;margin:0 0 10px}h3{font-size:12px;margin:12px 0 6px;color:var(--dim)}
+.muted{color:var(--dim);font-size:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 10px;border:1px solid var(--line2);border-radius:999px;font-size:12px;background:var(--panel)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dim2)}.dot.ok{background:#3fb950}.dot.warn{background:var(--warn)}.dot.bad{background:#f85149}
+.chip button{font-size:11px;padding:3px 9px}
+button{font:inherit;color:inherit;background:#29364a;border:1px solid var(--line2);border-radius:8px;padding:9px 12px;cursor:pointer;touch-action:none;user-select:none}
+button:hover{background:#344662}button:active{background:#42648e}button:disabled{opacity:.45;cursor:not-allowed}
+.primary{background:#277b58;border-color:#46a477}.danger{background:#8e2a24;border-color:#d1554b;font-weight:700}
+.armed{background:#9a6a12;border-color:#e0a83a}
+#alert{display:none;margin-bottom:12px;padding:10px 12px;border:1px solid #d1554b;background:var(--badbg);border-radius:10px;font-size:13px}
+#alert button{float:right;font-size:11px;padding:3px 9px}
+main{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px}main>*{min-width:0}
+.views{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.pane{position:relative;border:1px solid var(--line);border-radius:12px;background:#080b10;overflow:hidden;aspect-ratio:4/3}
+.pane img{display:block;width:100%;height:100%;object-fit:contain}.pane img.off{visibility:hidden}
+.label{position:absolute;top:8px;left:10px;font-size:11px;padding:4px 7px;border-radius:5px;background:#10151de6}
+.corner{position:absolute;right:10px;bottom:8px;font-size:11px;padding:4px 7px;border-radius:5px;background:#10151de6}
+.empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--dim2);font-size:13px;text-align:center;padding:20px}
+.cards{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px}
+.card,.panel{padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-width:0}
+.panel{display:flex;flex-direction:column;gap:14px;align-self:start}
+.section{border-top:1px solid #354154;padding-top:12px}.section:first-child{border:0;padding:0}
+.row{display:flex;gap:8px}.row button{flex:1}
+#stop{font-size:16px;padding:12px}
+.g{display:grid;grid-template-columns:repeat(3,48px);gap:5px;justify-content:center;margin:10px 0 4px}
+.g button{height:42px;padding:0;font-size:18px}.g button.on{background:#42648e}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px}
+.kv span{color:var(--dim2)}.kv strong{font-weight:500;color:#c4d2e4;overflow-wrap:anywhere}
+.tele{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 8px;font-size:12px}
+.tele span{display:block;color:var(--dim2);font-size:10px;margin-bottom:2px}.tele strong{font-weight:500;color:#c4d2e4}
+.status{font-size:12px;color:var(--dim);line-height:1.5;min-height:18px}
+.say{font-size:13px;line-height:1.5;color:var(--ok)}
+#timeline{list-style:none;margin:0;padding:0;font-size:12px;max-height:260px;overflow:auto}
+#timeline li.none{display:block;color:var(--dim2)}#timeline li{display:grid;grid-template-columns:58px 70px 1fr;gap:6px;padding:4px 0;border-bottom:1px solid #222c3a}
+#timeline time{color:var(--dim2)}#timeline b{font-weight:500;color:#b6c9e6}
+details summary{cursor:pointer;color:var(--dim);font-size:12px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;font-size:12px}
+.form label{display:flex;flex-direction:column;gap:3px;color:var(--dim2)}
+.form label.check{flex-direction:row;align-items:center;gap:6px}
+select,input{font:inherit;color:inherit;background:#101722;border:1px solid var(--line2);border-radius:6px;padding:6px}
+input[type=checkbox]{width:16px;height:16px}
+#planner{width:100%;border-radius:8px;margin-top:8px;display:none}
+.hint{font-size:11px;line-height:1.5;color:var(--dim)}
+@media(max-width:1000px){main{grid-template-columns:minmax(0,1fr)}.panel{order:-1}}
+@media(max-width:640px){body{padding:16px}.views,.cards{grid-template-columns:minmax(0,1fr)}.tele{grid-template-columns:1fr 1fr}}
+</style></head><body>
+<header>
+  <div><h1>Home Rover</h1><div class="muted">Phase 1 · dog companion · camera <span id="host">…</span></div></div>
+  <div class="chips">
+    <div class="chip"><span class="dot" id="cam-dot"></span>Camera <b id="cam-chip">…</b></div>
+    <div class="chip"><span class="dot" id="drive-dot"></span>Drive server <b id="drive-chip">…</b><button id="drive-svc" hidden></button></div>
+    <div class="chip"><span class="dot" id="watcher-dot"></span>Dog watcher <b id="watcher-chip">…</b><button id="watcher-svc" hidden></button></div>
+  </div>
+</header>
+<div id="alert"><button id="alert-ok">Dismiss</button><b>Camera restarted.</b> <span id="alert-text"></span></div>
+<main>
+  <section>
+    <div class="views">
+      <div class="pane"><img id="live" class="off" alt=""><span class="label">Live camera</span><span class="corner" id="live-age">—</span><div class="empty" id="live-empty">Waiting for the camera…</div></div>
+      <div class="pane"><img id="dog" class="off" alt=""><span class="label">Dog watcher · exact frame it acts on</span><div class="empty" id="dog-empty">Dog watcher not running.<br>Start it from the header.</div></div>
+    </div>
+    <div class="cards">
+      <div class="card"><h2>Timeline</h2><ul id="timeline"><li class="none">No events yet</li></ul></div>
+      <div class="card"><h2>Camera health</h2>
+        <div class="tele" id="tele"></div>
+        <details id="settings"><summary>Camera settings</summary>
+          <div class="form">
+            <label>Resolution<select data-k="framesize"><option>qvga</option><option>vga</option><option>svga</option><option>xga</option><option>hd</option></select></label>
+            <label>JPEG quality (10 best – 63)<input data-k="quality" type="number" min="10" max="63"></label>
+            <label>Exposure (ae_level)<select data-k="ae_level"><option>-2</option><option>-1</option><option>0</option><option>1</option><option>2</option></select></label>
+            <label>Brightness<select data-k="brightness"><option>-2</option><option>-1</option><option>0</option><option>1</option><option>2</option></select></label>
+            <label class="check"><input data-k="hmirror" type="checkbox">Mirror</label>
+            <label class="check"><input data-k="vflip" type="checkbox">Flip</label>
+            <label class="check"><input data-k="led" type="checkbox">Status LED</label>
+            <button id="cfg-apply" class="primary">Apply</button>
+          </div>
+          <p class="status" id="cfg-status">Saved on the camera across reboots.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+  <aside class="panel">
+    <div class="section">
+      <h2>Drive</h2>
+      <div class="row"><button id="arm">Arm</button><button id="stop" class="danger">STOP</button></div>
+      <div class="g">
+        <span></span><button data-key="W" aria-label="Forward">↑</button><span></span>
+        <button data-key="A" aria-label="Forward left">↖</button><button data-key="S" aria-label="Reverse">↓</button><button data-key="D" aria-label="Forward right">↗</button>
+      </div>
+      <p class="hint">Hold W/A/S/D or arrow keys (or the buttons) to drive while armed; release to stop. A/D drive forward while steering. Esc or Space = STOP. Arm also lets the dog watcher drive.</p>
+      <p class="status" id="drive-status">Drive server offline</p>
+    </div>
+    <div class="section">
+      <h2>Dog</h2>
+      <p class="say" id="activity">—</p>
+      <div class="kv">
+        <span>State</span><strong id="dstate">—</strong>
+        <span>Intent</span><strong id="dintent">—</strong>
+        <span>Why</span><strong id="dreason">—</strong>
+        <span>Moving</span><strong id="dmoving">—</strong>
+        <span>Drive</span><strong id="ddrive">—</strong>
+      </div>
+    </div>
+    <div class="section">
+      <details><summary>Detector check (optional)</summary>
+        <div class="row" style="margin-top:8px"><input id="goal" placeholder="Detector prompt, e.g. dog" style="flex:1;min-width:0"><button id="observe" style="flex:0">Observe</button></div>
+        <p class="status" id="obs-status"></p><img id="planner" alt="Detector input">
+      </details>
+    </div>
+  </aside>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+async function getJSON(u){const r=await fetch(u,{cache:'no-store'});return r.json()}
+async function postJSON(u,b){const r=await fetch(u,{method:'POST',body:JSON.stringify(b||{})});let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error(j.error||r.status);return j}
+function dot(id,c){$(id).className='dot '+(c||'')}
+const fmt=(v,u='')=>v===null||v===undefined?'—':v+u;
+
+// Live view: request the next frame as soon as one arrives.
+const live=$('live');
+live.onload=()=>{live.classList.remove('off');$('live-empty').hidden=true;setTimeout(nextLive,30)};
+live.onerror=()=>{live.classList.add('off');$('live-empty').hidden=false;setTimeout(nextLive,700)};
+function nextLive(){live.src='/live.jpg?'+Date.now()}nextLive();
+
+// Camera health + restart alert.
+let dismissed=0;
+$('alert-ok').onclick=async()=>{dismissed=(await getJSON('/status')).restarts.length;$('alert').style.display='none'};
+async function camPoll(){
+  try{
+    const h=await getJSON('/status'),t=h.telemetry||{};
+    $('host').textContent=h.host;
+    const ok=h.state==='ok';
+    dot('cam-dot',ok?'ok':(h.stream_connected?'warn':'bad'));
+    $('cam-chip').textContent=ok?'ok':(h.stream_connected?'stale':'offline');
+    $('live-age').textContent=h.frame_age_ms!=null?`${h.frame_age_ms} ms old · ${h.fps} fps`:(h.problems||[]).join('; ');
+    const up=t.t_us?Math.round(t.t_us/1e6):null;
+    const upText=up==null?'—':(up>=3600?`${(up/3600).toFixed(1)} h`:up>=60?`${Math.floor(up/60)} min`:`${up} s`);
+    const cells=[['Wi-Fi',fmt(t.rssi,' dBm')],['Camera fps',fmt(t.fps)],['Received fps',fmt(h.fps)],
+      ['Frame age',fmt(h.frame_age_ms,' ms')],['Uptime',upText],['Last reset',fmt(t.reset_reason)],
+      ['Mic',t.mic_dbfs!=null?t.mic_dbfs+' dBFS':'—'],['Firmware',fmt(t.fw)],['Free PSRAM',t.psram_free?Math.round(t.psram_free/1024)+' KB':'—']];
+    $('tele').innerHTML=cells.map(([k,v])=>`<div><span>${k}</span><strong>${v}</strong></div>`).join('');
+    const r=h.restarts||[];
+    if(r.length>dismissed){const last=r[r.length-1];
+      $('alert-text').textContent=`${r.length-dismissed} restart(s) this session; last at ${last.at}, reason: ${last.reason}. A power drop (cable/magnet) shows as poweron or brownout.`;
+      $('alert').style.display='block'}
+    if(h.observation){showObs(h.observation)}
+  }catch(e){dot('cam-dot','bad');$('cam-chip').textContent='dashboard offline'}
+  setTimeout(camPoll,1000)}
+camPoll();
+
+// Services.
+async function svcPoll(){
+  try{const s=await getJSON('/services');for(const n of ['drive','watcher'])showSvc(n,s[n])}catch(e){}
+  setTimeout(svcPoll,2000)}
+function showSvc(n,s){
+  const b=$(n+'-svc');b.hidden=false;
+  dot(n+'-dot',s.running?'ok':s.starting?'warn':'');
+  $(n+'-chip').textContent=s.running?'running':s.starting?'starting…':(s.exited!=null?'exited':'off');
+  $(n+'-chip').title=s.log_tail||'';
+  if(s.running&&!s.managed){b.hidden=true;return}
+  b.textContent=(s.running||s.starting)?'Stop':'Start';b.dataset.act=(s.running||s.starting)?'stop':'start'}
+for(const n of ['drive','watcher'])$(n+'-svc').onclick=async e=>{
+  e.target.disabled=true;try{const s=await postJSON(`/services/${n}/${e.target.dataset.act}`);showSvc(n,s[n])}catch(err){alert(err.message)}e.target.disabled=false};
+svcPoll();
+
+// Drive: arm lease, STOP, hold-to-drive.
+let armed=false,held=null,holdTimer=null;
+function showDrive(s){
+  if(s.error&&s.armed===undefined){$('drive-status').textContent=s.error;return}
+  armed=!!s.armed;
+  $('arm').textContent=armed?'Armed · click to disarm':'Arm';$('arm').className=armed?'armed':'';
+  const last=s.last?(s.last.manual?`manual ${s.last.key}`:s.last.key==='X'?`stopped (${s.last.why||'stop'})`:`pulse ${s.last.key} ${s.last.ms} ms`):'nothing yet';
+  $('drive-status').textContent=(armed?'ARMED — the rover can move. ':'Disarmed. ')+`Last: ${last}`+(s.holding?` · holding ${s.holding}`:'')+(s.error?` · ${s.error}`:'')}
+async function lease(){
+  try{showDrive(armed?await postJSON('/drive/arm',{armed:true}):await getJSON('/drive/status'))}
+  catch(e){armed=false;$('arm').textContent='Arm';$('arm').className='';$('drive-status').textContent='Drive server offline — start it from the header (transmitter on USB).'}
+  setTimeout(lease,1000)}
+lease();
+$('arm').onclick=async()=>{try{showDrive(await postJSON('/drive/arm',{armed:!armed}))}catch(e){$('drive-status').textContent=e.message}};
+async function estop(){release();armed=false;try{showDrive(await postJSON('/drive/stop'))}catch(e){}}
+$('stop').onclick=estop;
+function press(key){
+  if(!armed){$('drive-status').textContent='Arm first to drive.';return}
+  if(held===key)return;held=key;
+  document.querySelectorAll('.g button').forEach(b=>b.classList.toggle('on',b.dataset.key===key));
+  const send=()=>postJSON('/drive/hold',{key}).catch(e=>{$('drive-status').textContent=e.message;release()});
+  send();clearInterval(holdTimer);holdTimer=setInterval(send,150)}
+function release(){held=null;clearInterval(holdTimer);holdTimer=null;document.querySelectorAll('.g button').forEach(b=>b.classList.remove('on'))}
+const keymap={w:'W',arrowup:'W',a:'A',arrowleft:'A',s:'S',arrowdown:'S',d:'D',arrowright:'D'};
+addEventListener('keydown',e=>{
+  if(e.target.closest('input,select'))return;
+  const k=e.key.toLowerCase();
+  if(k==='escape'||k===' '){e.preventDefault();estop();return}
+  if(keymap[k]){e.preventDefault();press(keymap[k])}});
+addEventListener('keyup',e=>{if(keymap[e.key.toLowerCase()]===held)release()});
+addEventListener('blur',release);
+document.querySelectorAll('.g button').forEach(b=>{
+  b.onpointerdown=e=>{b.setPointerCapture(e.pointerId);press(b.dataset.key)};
+  b.onpointerup=b.onpointercancel=b.onlostpointercapture=release});
+addEventListener('pagehide',()=>{if(armed)navigator.sendBeacon('/drive/stop','{}')});
+
+// Dog watcher.
+const dogImg=$('dog');let dogUp=false;
+dogImg.onload=()=>{dogImg.classList.remove('off');$('dog-empty').hidden=true};dogImg.onerror=()=>{dogImg.classList.add('off');$('dog-empty').hidden=false};
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function eventText(e){
+  const f={...e};delete f.t;delete f.event;delete f.snapshot;delete f.detection;
+  if(e.event==='activity')return `${e.activity} (${e.state})`;
+  if(e.event==='state')return `${e.state} → ${e.action}: ${e.reason}`;
+  if(e.event==='drive')return `${e.action}: ${e.pulse||'—'}`;
+  return Object.entries(f).map(([k,v])=>`${k} ${typeof v==='object'?JSON.stringify(v):v}`).join(', ')}
+let lastEvents='';
+async function dogPoll(){
+  try{
+    const d=await getJSON('/dog/status');if(d.error)throw 0;
+    dogUp=true;
+    $('activity').textContent=d.activity?`${d.activity} · ${d.dog_state} (${d.activity_age_s}s ago)`:(d.dog_visible?'Dog in view':'No dog in view');
+    $('dstate').textContent=d.state||'—';$('dintent').textContent=d.intent||'—';$('dreason').textContent=d.reason||'—';
+    $('dmoving').textContent=d.moving==null?'—':(d.moving?'yes':`still ${d.still_for_s}s`);
+    const dr=d.drive;$('ddrive').textContent=dr?(dr.sent||dr.why||'—')+(dr.would_send?` (would send ${dr.would_send})`:''):'—';
+    const ev=(d.events||[]).slice().reverse();const sig=JSON.stringify(ev[0]||'')+ev.length;
+    if(sig!==lastEvents){lastEvents=sig;
+      $('timeline').innerHTML=ev.length?ev.map(e=>`<li><time>${esc((e.t||'').slice(11,19))}</time><b>${esc(e.event)}</b><span>${esc(eventText(e))}</span></li>`).join(''):'<li class="none">No events yet</li>'}
+  }catch(e){dogUp=false;$('activity').textContent='Dog watcher not running';dogImg.classList.add('off');$('dog-empty').hidden=false}
+  setTimeout(dogPoll,1000)}
+dogPoll();
+(function dogFrames(){if(dogUp)dogImg.src='/dog/frame.jpg?'+Date.now();setTimeout(dogFrames,250)})();
+
+// Camera settings.
+async function loadCfg(){try{const c=await getJSON('/cam/config');
+  document.querySelectorAll('#settings [data-k]').forEach(el=>{const v=c[el.dataset.k];if(v===undefined)return;
+    if(el.type==='checkbox')el.checked=!!v;else el.value=v});$('cfg-status').textContent='Saved on the camera across reboots.'}
+  catch(e){$('cfg-status').textContent='Camera settings unavailable'}}
+$('settings').ontoggle=()=>{if($('settings').open)loadCfg()};
+$('cfg-apply').onclick=async()=>{const b={};
+  document.querySelectorAll('#settings [data-k]').forEach(el=>b[el.dataset.k]=el.type==='checkbox'?(el.checked?1:0):el.value);
+  try{await postJSON('/cam/config',b);$('cfg-status').textContent='Applied.';loadCfg()}catch(e){$('cfg-status').textContent='Failed: '+e.message}};
+
+// Detector check.
+function showObs(o){$('obs-status').textContent=o.decision?`${o.decision} · frame ${o.frame_age_ms_at_capture} ms old · ${o.total_ms} ms total`:(o.detector_error||'')}
+$('observe').onclick=async()=>{const goal=$('goal').value.trim();if(!goal)return;$('obs-status').textContent='Observing…';
+  try{showObs(await postJSON('/observe',{goal}));$('planner').style.display='block';$('planner').src='/planner.jpg?'+Date.now()}
+  catch(e){$('obs-status').textContent=e.message}};
+</script>
+</body></html>

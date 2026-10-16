@@ -14,6 +14,9 @@ class FakeTx:
     def stop(self):
         self.calls.append('X')
 
+    def wire(self, key):
+        self.calls.append(key)
+
     def pulse(self, key, ms, abort=None):
         self.calls.append(f'{key}{ms}')
         end = time.monotonic() + ms / 1000
@@ -61,6 +64,44 @@ class DriveStateTest(unittest.TestCase):
         t.join(2)
         self.assertLess(time.monotonic() - started, 0.4)
         self.assertFalse(self.s.armed)
+
+    def test_hold_drives_while_renewed_then_stops(self):
+        self.s.arm(True)
+        for _ in range(4):
+            self.s.hold('A')
+            time.sleep(0.15)
+        self.assertTrue(self.s.holding)
+        time.sleep(drive_server.HOLD_S + 0.4)
+        self.assertFalse(self.s.holding)
+        self.assertEqual(self.tx.calls[-1], 'X')
+        self.assertGreaterEqual(self.tx.calls.count('A'), 4)
+
+    def test_hold_refused_when_disarmed(self):
+        with self.assertRaises(PermissionError):
+            self.s.hold('W')
+        self.assertEqual(self.tx.calls, [])
+
+    def test_stop_ends_hold_quickly(self):
+        self.s.arm(True)
+        self.s.hold('W')
+        time.sleep(0.1)
+        started = time.monotonic()
+        self.s.stop()
+        while self.s.holding and time.monotonic() - started < 1:
+            time.sleep(0.01)
+        self.assertLess(time.monotonic() - started, 0.3)
+        self.assertEqual(self.tx.calls[-1], 'X')
+
+    def test_autonomy_waits_after_manual_driving(self):
+        self.s.arm(True)
+        self.s.hold('W')
+        with self.assertRaises(RuntimeError):
+            self.s.pulse('W', 100)
+
+    def test_hold_bad_key(self):
+        self.s.arm(True)
+        with self.assertRaises(ValueError):
+            self.s.hold('Q')
 
     def test_bad_key(self):
         self.s.arm(True)

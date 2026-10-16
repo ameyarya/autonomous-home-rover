@@ -1,18 +1,26 @@
-"""Rover camera dashboard: live XIAO view, link health, and the exact planner view.
+"""Rover dashboard: live camera, the dog watcher's exact input, drive controls, camera health.
 
 Run: python3 mac/dashboard.py [--host rover-cam.local] [--port 8010]
-Then open http://localhost:8010/.
+Then open http://localhost:8010/. The page is mac/dashboard.html.
 
-"Observe" waits for a fresh frame captured after the click, saves it to mac/vision-output/,
-and runs the ported Mini-T detector on it. The planner pane shows that labeled frame with its
-age, so what you see is exactly what a planner would act on. No drive commands are sent.
+- Services: start/stop the drive server (drive/drive_server.py) and dog watcher
+  (mac/dog_watcher.py) from the header; ones started elsewhere show as running.
+- Drive: Arm (lease renewed by the page), STOP (Esc/Space), hold-to-drive with WASD/arrows.
+- Camera: health from XiaoLink, settings via the XIAO's /config, and an alert whenever the
+  XIAO restarts (power drop on the magnetic cable, brownout, crash), with its reset reason.
+- Detector check: "Observe" saves a fresh frame and runs the ported Mini-T detector on it.
 """
 import argparse
+import collections
+import datetime
 import json
 import os
 import subprocess
+import sys
+import urllib.parse
 import threading
 import time
+import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -20,6 +28,8 @@ from pathlib import Path
 from xiao_link import DEFAULT_HOST, MAX_FRAME_AGE_S, StaleFrame, XiaoLink
 
 ROOT = Path(__file__).resolve().parent
+REPO = ROOT.parent
+PAGE_FILE = ROOT / 'dashboard.html'
 FRAMES = ROOT / 'vision-output'
 MINI_T = Path.home() / 'Documents/Projects/ai-driven-mini-t'
 DETECTOR_URL = 'http://127.0.0.1:8767'
@@ -27,6 +37,12 @@ DOG_WATCHER_URL = 'http://127.0.0.1:8768'
 DRIVE_URL = 'http://127.0.0.1:8769'
 
 _detector_lock = threading.Lock()
+
+# name -> (status URL, command, log file)
+SERVICES = {
+    'drive': (DRIVE_URL + '/status', [sys.executable, '-u', str(REPO / 'drive/drive_server.py')], ROOT / 'drive-server.log'),
+    'watcher': (DOG_WATCHER_URL + '/status', [sys.executable, '-u', str(ROOT / 'dog_watcher.py')], ROOT / 'dog-watcher.log'),
+}
 
 
 def read_json(url, body=None, timeout=5):
@@ -82,9 +98,100 @@ def ensure_detector():
         raise RuntimeError('Detector startup timed out')
 
 
-class Dashboard:
+class Services:
+    """Starts/stops the drive server and dog watcher; reports any instance answering on its port."""
+
+    def __init__(self, camera_host):
+        self.camera_host = camera_host
+        self.processes = {}
+        self.lock = threading.Lock()
+
+    def status(self):
+        out = {}
+        for name, (url, _, log) in SERVICES.items():
+            process = self.processes.get(name)
+            managed = process is not None and process.poll() is None
+            try:
+                read_json(url, timeout=0.5)
+                running = True
+            except (OSError, ValueError):
+                running = False
+            starting = managed and not running
+            out[name] = {'running': running, 'starting': starting, 'managed': managed,
+                         'exited': process.returncode if process is not None and not managed else None,
+                         'log_tail': self._tail(log) if not running else None}
+        return out
+
+    @staticmethod
+    def _tail(log):
+        try:
+            return log.read_text(errors='replace').strip().splitlines()[-1][-200:]
+        except (OSError, IndexError):
+            return None
+
+    def start(self, name):
+        url, command, log = SERVICES[name]
+        with self.lock:
+            process = self.processes.get(name)
+            if process is not None and process.poll() is None:
+                return
+            try:
+                read_json(url, timeout=0.5)
+                return  # already running elsewhere
+            except (OSError, ValueError):
+                pass
+            if name == 'watcher':
+                command = command + ['--host', self.camera_host]
+            with log.open('ab') as out:
+                out.write(f'\n--- started from dashboard {datetime.datetime.now():%Y-%m-%d %H:%M:%S}\n'.encode())
+                self.processes[name] = subprocess.Popen(command, cwd=REPO, stdout=out, stderr=out,
+                                                        start_new_session=True)
+
+    def stop(self, name):
+        with self.lock:
+            process = self.processes.get(name)
+            if process is None or process.poll() is not None:
+                return False
+            process.terminate()
+            try:
+                process.wait(5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+            return True
+
+    def stop_all(self):
+        for name in SERVICES:
+            self.stop(name)
+
+
+class RestartWatch:
+    """Records every XIAO restart (uptime going backwards) with its reset reason, so a power
+    drop (e.g. the magnetic cable on a bump) can't go unnoticed during drive tests."""
+
     def __init__(self, link):
         self.link = link
+        self.events = collections.deque(maxlen=20)
+        self.seen = None
+
+    def run(self):
+        while True:
+            health = self.link.health()
+            restarts = health.get('device_restarts_seen', 0)
+            reason = (health.get('telemetry') or {}).get('reset_reason')
+            if self.seen is None:
+                self.seen = restarts
+            elif restarts > self.seen and reason:
+                self.seen = restarts
+                self.events.append({'at': datetime.datetime.now().strftime('%H:%M:%S'), 'reason': reason})
+            time.sleep(1)
+
+
+class Dashboard:
+    def __init__(self, link, services=None):
+        self.link = link
+        self.services = services
+        self.restarts = RestartWatch(link)
+        threading.Thread(target=self.restarts.run, daemon=True).start()
         self.lock = threading.Lock()
         self.observation = None
         self.planner_image = None
@@ -123,74 +230,6 @@ class Dashboard:
         return 'target not located'
 
 
-PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'>
-<title>Rover camera</title>
-<style>
-:root{--bg:#101214;--panel:#1a1d21;--fg:#d8dde3;--dim:#8a929b;--ok:#3fb950;--bad:#f85149}
-body{margin:0;background:var(--bg);color:var(--fg);font:14px -apple-system,system-ui,sans-serif}
-main{display:flex;flex-wrap:wrap;gap:16px;padding:16px}
-section{flex:1 1 420px;background:var(--panel);border-radius:10px;padding:12px;min-width:0}
-h2{font-size:13px;margin:0 0 8px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
-img{width:100%;display:block;border-radius:6px;background:#000;aspect-ratio:4/3;object-fit:contain}
-#state{font-weight:600}#state.ok{color:var(--ok)}#state.stale{color:var(--bad)}
-dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:8px 0 0;font:12px ui-monospace,monospace}
-dt{color:var(--dim)}dd{margin:0}
-form{display:flex;gap:8px;margin-bottom:8px}input{flex:1;background:#0b0d0f;color:var(--fg);border:1px solid #333;border-radius:6px;padding:6px}
-button{background:#2f81f7;color:#fff;border:0;border-radius:6px;padding:6px 14px;font-weight:600}
-pre{font:11px ui-monospace,monospace;white-space:pre-wrap;color:var(--dim);margin:8px 0 0}
-</style>
-<main>
-<section><h2>Live · <span id=state>connecting</span></h2><img id=live alt="live view">
-<dl id=health></dl></section>
-<section><h2>Dog watcher · <span id=dogstate>offline</span></h2>
-<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-<button id=arm style="background:#444">Arm drive</button>
-<button id=estop style="background:#d1242f;flex:1">STOP (Esc)</button>
-<span id=drivestate style="font:12px ui-monospace,monospace;color:var(--dim)">drive server offline</span></div>
-<img id=dog alt="dog watcher view">
-<dl id=dogfacts></dl><ol id=events style="font:12px ui-monospace,monospace;color:var(--dim);padding-left:18px;max-height:220px;overflow:auto"></ol></section>
-<section><h2>Planner view (exact detector input)</h2>
-<form id=f><input id=goal placeholder="detector prompt (optional; no Phase 1 target)" aria-label="detector prompt"><button>Observe</button></form>
-<img id=planner alt="planner view"><dl id=obs></dl><pre id=raw></pre></section>
-</main>
-<script>
-const $=id=>document.getElementById(id);
-const row=(k,v)=>`<dt>${k}</dt><dd>${v??'–'}</dd>`;
-function nextLive(){$('live').src='/live.jpg?'+Date.now()}
-$('live').onload=()=>setTimeout(nextLive,30);$('live').onerror=()=>setTimeout(nextLive,500);nextLive();
-async function poll(){try{const h=await (await fetch('/status')).json();const t=h.telemetry||{};
-$('state').textContent=h.state+(h.problems.length?' — '+h.problems.join('; '):'');$('state').className=h.state;
-$('health').innerHTML=row('frame age',h.frame_age_ms+' ms (limit '+h.max_frame_age_ms+')')+row('fps (Mac)',h.fps)+
-row('telemetry age',h.telemetry_age_ms+' ms')+row('rssi',t.rssi+' dBm')+row('mic',t.mic_dbfs+' dBFS')+
-row('fw',t.fw)+row('reset reason',t.reset_reason)+row('device restarts seen',h.device_restarts_seen)+
-row('errors',JSON.stringify(h.errors))+row('last error',h.last_error);}catch(e){$('state').textContent='dashboard offline';$('state').className='stale'}
-setTimeout(poll,250)}poll();
-async function dogPoll(){try{const d=await (await fetch('/dog/status')).json();
-$('dogstate').textContent=d.state+' · intent '+d.intent+(d.drive&&d.drive.sent?' · sent '+d.drive.sent:'');$('dogstate').className=d.camera_ok?'ok':'stale';
-$('dog').src='/dog/frame.jpg?'+Date.now();
-$('dogfacts').innerHTML=row('reason',d.reason)+row('dog visible',d.dog_visible)+row('moving',d.moving)+row('still for',d.still_for_s!=null?d.still_for_s+' s':null)+
-row('doing',d.activity?d.activity+' ('+d.dog_state+', '+d.activity_age_s+' s ago)':null)+row('park after asleep',d.sleep_after_s+' s')+row('model error',d.describe_error);
-$('events').innerHTML=d.events.slice().reverse().map(e=>`<li>${e.t.slice(11,19)} ${e.event} ${e.activity||e.reason||e.state||''}</li>`).join('')}
-catch(e){$('dogstate').textContent='offline — run python3 mac/dog_watcher.py';$('dogstate').className='stale'}setTimeout(dogPoll,1000)}dogPoll();
-let armed=false;
-async function drive(path,body){const r=await fetch('/drive'+path,{method:'POST',body:JSON.stringify(body||{})});return r.json()}
-function showDrive(st){$('drivestate').textContent=st.error?('error: '+st.error):(st.armed?'ARMED — rover may move':'disarmed — decisions are only logged')+(st.last&&st.last.key?' · last '+st.last.key+(st.last.ms?' '+st.last.ms+' ms':'')+(st.last.why?' ('+st.last.why+')':''):'');
-$('arm').textContent=st.armed?'Disarm':'Arm drive';$('arm').style.background=st.armed?'#2f81f7':'#444';armed=st.armed}
-$('arm').onclick=async()=>{try{showDrive(await drive('/arm',{armed:!armed}))}catch(e){$('drivestate').textContent='drive server offline'}};
-async function estop(){armed=false;try{showDrive(await drive('/stop'))}catch(e){}}
-$('estop').onclick=estop;addEventListener('keydown',e=>{if(e.key==='Escape')estop()});
-async function lease(){try{if(armed)showDrive(await drive('/arm',{armed:true}));else showDrive(await (await fetch('/drive/status')).json())}catch(e){$('drivestate').textContent='drive server offline — run python3 drive/drive_server.py'}setTimeout(lease,1000)}lease();
-addEventListener('pagehide',()=>{if(armed)navigator.sendBeacon('/drive/stop','{}')});
-$('f').onsubmit=async e=>{e.preventDefault();$('obs').innerHTML=row('status','observing…');
-const r=await fetch('/observe',{method:'POST',body:JSON.stringify({goal:$('goal').value})});const o=await r.json();
-if(!r.ok){$('obs').innerHTML=row('refused',o.error);return}
-$('planner').src='/planner.jpg?'+Date.now();
-$('obs').innerHTML=row('decision',o.decision)+row('frame seq',o.seq)+row('frame age at capture',o.frame_age_ms_at_capture+' ms')+
-row('wait for fresh frame',o.capture_wait_ms+' ms')+row('total',o.total_ms+' ms')+row('detector error',o.detector_error);
-$('raw').textContent=o.measurement?JSON.stringify(o.measurement,null,1):''};
-</script>"""
-
-
 def make_handler(dashboard):
     class Handler(BaseHTTPRequestHandler):
         def reply(self, status, body, content_type='application/json', headers=None):
@@ -208,11 +247,20 @@ def make_handler(dashboard):
         def do_GET(self):
             path = self.path.split('?')[0]
             if path == '/':
-                return self.reply(200, PAGE.encode(), 'text/html; charset=utf-8')
+                return self.reply(200, PAGE_FILE.read_bytes(), 'text/html; charset=utf-8')
             if path == '/status':
                 health = dashboard.link.health()
                 health['observation'] = dashboard.observation
+                health['restarts'] = list(dashboard.restarts.events)
                 return self.reply(200, health)
+            if path == '/services':
+                return self.reply(200, dashboard.services.status())
+            if path == '/cam/config':
+                try:
+                    with urllib.request.urlopen(f'http://{dashboard.link.host}/config', timeout=3) as response:
+                        return self.reply(200, response.read())
+                except OSError as error:
+                    return self.reply(503, {'error': f'camera: {error}'})
             if path == '/live.jpg':
                 frame = dashboard.link.latest()
                 if frame is None:
@@ -240,13 +288,35 @@ def make_handler(dashboard):
             self.reply(404, {'error': 'not found'})
 
         def do_POST(self):
-            if self.path in ('/drive/arm', '/drive/stop'):
+            parts = self.path.strip('/').split('/')
+            if len(parts) == 3 and parts[0] == 'services' and parts[1] in SERVICES and parts[2] in ('start', 'stop'):
+                try:
+                    getattr(dashboard.services, parts[2])(parts[1])
+                    return self.reply(200, dashboard.services.status())
+                except Exception as error:
+                    return self.reply(500, {'error': str(error)})
+            if self.path == '/cam/config':
+                size = int(self.headers.get('Content-Length', 0))
+                changes = json.loads(self.rfile.read(size) or b'{}')
+                query = urllib.parse.urlencode({k: v for k, v in changes.items()
+                                                if k in ('framesize', 'quality', 'vflip', 'hmirror', 'brightness',
+                                                         'contrast', 'saturation', 'ae_level', 'led')})
+                try:
+                    with urllib.request.urlopen(f'http://{dashboard.link.host}/config?{query}', timeout=5) as response:
+                        return self.reply(200, response.read())
+                except urllib.error.HTTPError as error:
+                    return self.reply(400, {'error': error.read().decode(errors='replace') or str(error)})
+                except OSError as error:
+                    return self.reply(503, {'error': f'camera: {error}'})
+            if self.path in ('/drive/arm', '/drive/stop', '/drive/hold'):
                 size = int(self.headers.get('Content-Length', 0))
                 body = self.rfile.read(size) if size else b'{}'
                 try:
                     req = urllib.request.Request(DRIVE_URL + self.path[6:], body, {'Content-Type': 'application/json'})
                     with urllib.request.urlopen(req, timeout=3) as response:
                         return self.reply(200, response.read())
+                except urllib.error.HTTPError as error:
+                    return self.reply(error.code, error.read())
                 except OSError as error:
                     return self.reply(503, {'error': f'drive server: {error}'})
             if self.path != '/observe':
@@ -275,9 +345,15 @@ def main():
     parser.add_argument('--max-frame-age', type=float, default=MAX_FRAME_AGE_S, help='seconds')
     args = parser.parse_args()
     link = XiaoLink(args.host, max_frame_age_s=args.max_frame_age).start()
-    server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(Dashboard(link)))
+    services = Services(args.host)
+    server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(Dashboard(link, services)))
     print(f'Rover dashboard on http://localhost:{args.port}/  (camera {args.host})', flush=True)
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        services.stop_all()   # the drive server's stop-on-exit stops the motors
 
 
 if __name__ == '__main__':

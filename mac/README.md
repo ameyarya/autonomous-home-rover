@@ -7,7 +7,7 @@ age, refuses stale frames, and feeds the detector ported from
 | File | What |
 | --- | --- |
 | `xiao_link.py` | `XiaoLink`: background MJPEG + WebSocket readers, XIAO→Mac clock mapping, `fresh_frame()` stale gate, `save()` in Mini-T frame naming. `python3 xiao_link.py` prints live link stats. |
-| `dashboard.py` | http://localhost:8010/: live view, link health, and the planner view (exact labeled frame the detector saw). |
+| `dashboard.py` + `dashboard.html` | http://localhost:8010/, the rover dashboard: live camera beside the dog watcher's exact input frame; header chips to start/stop the drive server and dog watcher (logs `mac/drive-server.log`, `mac/dog-watcher.log`); Arm/STOP and hold-to-drive (WASD/arrows); dog state and timeline; camera health with an alert whenever the XIAO restarts (reset reason, e.g. a magnetic-cable power drop); camera settings; optional detector check. Local only (127.0.0.1). |
 | `rover_detector.py` | Mini-T detector (YOLO-World / bullseye matcher), ported with only paths and port (8767) changed. |
 | `dog_watcher.py` | Phase 1 dog companion: YOLO11s finds the dog, motion/stillness, Qwen3-VL describes what he is doing, timeline log, and drives through `drive_client.py` when the dashboard has armed the drive server. Status on :8768. |
 | `drive_client.py` | Watcher decisions → bounded pulses via the drive server (forward W 300 ms, back S 250, turn = forward arc A/D 300, scan = alternating arc A/D 350 + straight reverse S 300, park/stop X), then 0.6 s of post-stop frames before the next move. Disarmed: logs what it would send. |
@@ -21,20 +21,20 @@ Python 3 standard library only; the detector runs in its own environment (below)
 ## Run
 
 ```sh
-python3 mac/dashboard.py                    # or --host 192.168.1.194 if mDNS is slow
+python3 mac/dashboard.py                    # or --host 192.168.1.194 if mDNS is slow; start the rest from its header
 python3 mac/xiao_link.py --seconds 10       # link stats only
 cd mac && python3 -m unittest test_xiao_link
 ```
 
-The **Observe** button is optional plumbing (Phase 1 has no vision target): give it a detector prompt and it waits
+The **Observe** button (Detector check, in the side panel) is optional plumbing (Phase 1 has no vision target): give it a detector prompt and it waits
 for a frame captured after the click, saves it to `mac/vision-output/` (gitignored), runs the
 detector, and shows the labeled result with the frame's age.
 
 ## Dog watcher
 
 ```sh
-python3 mac/dog_watcher.py                  # add --sleep-after 60 to test parking faster
-python3 mac/dashboard.py                    # Dog watcher pane at http://localhost:8010/
+python3 mac/dog_watcher.py                  # or Start in the dashboard header; add --sleep-after 60 to test parking faster
+python3 mac/dashboard.py                    # dog pane, timeline and watcher frame at http://localhost:8010/
 cd mac && python3 -m unittest test_dog_behavior
 ```
 

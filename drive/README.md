@@ -8,15 +8,16 @@ behaviour is an app installed into it over the air.
 | File | What |
 | --- | --- |
 | `rover_drive_app.py` | Receiver app (class `TankApp`, as the service expects). W/A/D forward with steering centred/left/right, S reverse, X stop + centre. Steering re-centres 500 ms after the last command. Calibration constants at the top. |
-| `drive_server.py` | Owns the transmitter USB port; HTTP on 127.0.0.1:8769. Pulses only while armed; the arm lease (3 s) must be renewed by the dashboard, otherwise it disarms and stops. STOP aborts a running pulse. Pulse caps: W/A/D 600 ms, S 400 ms. |
-| `test_drive_server.py` | Lease expiry, refusal while disarmed, caps, STOP aborting a pulse (fake transmitter). |
+| `drive_server.py` | Owns the transmitter USB port; HTTP on 127.0.0.1:8769. Pulses only while armed; the arm lease (3 s) must be renewed by the dashboard, otherwise it disarms and stops. STOP aborts a running pulse or hold. Pulse caps: W/A/D 600 ms, S 400 ms. Manual hold-to-drive (`/hold`): drives while the dashboard renews every 150 ms, stops with ACK 0.35 s after the last renewal; autonomous pulses are refused (409) for 2 s after manual driving. |
+| `test_drive_server.py` | Lease expiry, refusal while disarmed, caps, STOP aborting a pulse; hold drives while renewed then stops, STOP ends a hold, autonomy waits after manual driving (fake transmitter). |
 | `rover_drive.py` | Mac tool: `--status`, `--update APP`, `--rollback`, `--pulse KEY MS` (bounded; repeats every 150 ms, always ends with an ACKed stop; max 2 s). |
 
 Transmitter LED: solid green once the receiver ACKs a stop at connect, red if it doesn't (the stock
 breathing purple means our link code isn't running).
 
-Run order for autonomy: `python3 drive/drive_server.py`, `python3 mac/dog_watcher.py`, `python3 mac/dashboard.py`,
-then use the dashboard's Arm switch (STOP / Esc any time; closing the page disarms).
+Run: `python3 mac/dashboard.py`, then start the drive server and dog watcher from its header (or run
+`python3 drive/drive_server.py` and `python3 mac/dog_watcher.py` yourself), then Arm (STOP / Esc / Space
+any time; closing the page disarms). While armed, hold WASD/arrows to drive manually.
 
 Hardware IDs: transmitter 20:6E:F1:45:0F:1C, receiver 20:6E:F1:4D:8D:04. The signing key stays in
 the Mini-T folder (`.tank_update.key`; override with `ROVER_UPDATE_KEY`); it is never copied here.

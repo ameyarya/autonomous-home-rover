@@ -5,8 +5,10 @@ Run: python3 drive/drive_server.py        (HTTP on 127.0.0.1:8769)
   GET  /status                     armed, busy, last pulse, receiver app
   POST /arm    {"armed": true}     arm, or renew the lease (expires after LEASE_S without renewal)
   POST /arm    {"armed": false}    disarm and stop
-  POST /pulse  {"key": "W", "ms": 300}   bounded pulse; refused (403) unless armed
-  POST /stop                       abort any pulse, disarm, stop with ACK
+  POST /pulse  {"key": "W", "ms": 300}   bounded pulse; refused (403) unless armed, (409) during manual driving
+  POST /hold   {"key": "W"}        manual hold-to-drive: drives while renewed every ~150 ms, stops with
+                                   ACK HOLD_S after the last renewal; refused (403) unless armed
+  POST /stop                       abort any pulse or hold, disarm, stop with ACK
 
 Motion only happens while armed, and the arm lease must be renewed every second or so
 (the dashboard page does this while its Arm switch is on). If the page closes, the network
@@ -25,6 +27,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 LEASE_S = 3.0
 PULSE_LIMITS_MS = {'W': 600, 'S': 400, 'A': 600, 'D': 600}
+HOLD_S = 0.35                 # manual drive stops this long after the last /hold renewal
+MANUAL_QUIET_S = 2.0          # autonomous pulses refused this long after manual driving
+REPEAT_S = 0.15               # resend the key this often (receiver watchdog is 500 ms)
 
 
 class DriveState:
@@ -36,6 +41,10 @@ class DriveState:
         self.busy = False
         self.last = None
         self.error = None
+        self.hold_key = None
+        self.hold_until = 0.0
+        self.manual_until = 0.0
+        self.holding = False
 
     @property
     def armed(self):
@@ -62,6 +71,8 @@ class DriveState:
     def pulse(self, key, ms):
         if not self.armed:
             raise PermissionError('not armed')
+        if time.monotonic() < self.manual_until:
+            raise RuntimeError('manual driving')
         if key not in PULSE_LIMITS_MS:
             raise ValueError('key must be W, A, S or D')
         ms = max(0, min(int(ms), PULSE_LIMITS_MS[key]))
@@ -78,6 +89,41 @@ class DriveState:
         self.last = {'key': key, 'ms': ms, 'stopped_after_ms': took, 't': time.time()}
         return self.last
 
+    def hold(self, key):
+        """Manual hold-to-drive: start or renew. Drives until HOLD_S passes without renewal,
+        the lease lapses, or stop() is called; always ends with an ACKed stop."""
+        if not self.armed:
+            raise PermissionError('not armed')
+        if key not in PULSE_LIMITS_MS:
+            raise ValueError('key must be W, A, S or D')
+        now = time.monotonic()
+        self.hold_key = key
+        self.hold_until = now + HOLD_S
+        self.manual_until = now + HOLD_S + MANUAL_QUIET_S
+        if not self.holding:
+            self.holding = True
+            threading.Thread(target=self._hold_loop, daemon=True).start()
+        return {'holding': key}
+
+    def _hold_loop(self):
+        try:
+            with self.lock:
+                self.busy = True
+                try:
+                    while (self.armed and not self.abort.is_set()
+                           and time.monotonic() < self.hold_until):
+                        self.tx.wire(self.hold_key)
+                        self.last = {'key': self.hold_key, 'manual': True, 't': time.time()}
+                        self.abort.wait(REPEAT_S)
+                finally:
+                    try:
+                        self.tx.stop()
+                    except Exception as error:
+                        self.error = f'stop failed: {error}'
+                    self.busy = False
+        finally:
+            self.holding = False
+
     def watchdog(self):
         was_armed = False
         while True:
@@ -88,8 +134,8 @@ class DriveState:
             time.sleep(0.2)
 
     def status(self):
-        return {'armed': self.armed, 'busy': self.busy, 'last': self.last, 'error': self.error,
-                'lease_s': LEASE_S, 'pulse_limits_ms': PULSE_LIMITS_MS}
+        return {'armed': self.armed, 'busy': self.busy, 'holding': self.hold_key if self.holding else None,
+                'last': self.last, 'error': self.error, 'lease_s': LEASE_S, 'pulse_limits_ms': PULSE_LIMITS_MS}
 
 
 def make_handler(state):
@@ -122,9 +168,13 @@ def make_handler(state):
                 if self.path == '/pulse':
                     b = self.body()
                     return self.reply(200, state.pulse(str(b.get('key', '')).upper(), b.get('ms', 0)))
+                if self.path == '/hold':
+                    return self.reply(200, state.hold(str(self.body().get('key', '')).upper()))
                 self.reply(404, {'error': 'not found'})
             except PermissionError as error:
                 self.reply(403, {'error': str(error)})
+            except RuntimeError as error:
+                self.reply(409, {'error': str(error)})
             except ValueError as error:
                 self.reply(400, {'error': str(error)})
             except Exception as error:
