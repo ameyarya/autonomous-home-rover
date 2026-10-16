@@ -27,9 +27,11 @@ The first release should support manual commissioning, camera capture, autonomou
 
 ## Phases (locked 2026-10-08)
 
+Roadmap framing (2026-10-16): the Mini-T was the proof of concept; Phase 1 replicates what it did on the rover (Mac brain, camera, bounded autonomy, now aimed at the dog); Phase 2 is the full build, going all out: real sensors, onboard compute, ROS 2 / SLAM / Nav2, and the study items below.
+
 **Phase 1 — Mini-T parity on the rover.** Mac brain, Mac transmission, XIAO camera onboard. Print and assemble the chassis, verify manual control, build a printed housing for the XIAO Sense, bench-bring-up the camera stream, and port the Mini-T stack (server/command path, autonomy loop, detector + dashboard, calibration files) to the wheeled chassis and XIAO pipeline. Done when the rover behaves like the Mini-T: manual drive, live camera, bounded autonomous find/align/approach with safety stops.
 
-**Phase 2 — upgrades (study only for now).** Hardware, in order: encoders + IMU → single-point ranging → 2D LiDAR → onboard compute (desk Pi first, then onboard) → split power rails. Software: ROS 2 transports, SLAM (default candidate slam_toolbox), Nav2 + docking. Study the options while executing Phase 1; no purchases and no rewrites until Phase 1 is done.
+**Phase 2 — the full build (study only for now).** Hardware, in order: encoders + IMU → single-point ranging → 2D LiDAR → onboard compute (desk Pi first, then onboard) → split power rails. Software: ROS 2 transports, SLAM (default candidate slam_toolbox), Nav2 + docking. Study the options while executing Phase 1; no purchases and no rewrites until Phase 1 is done.
 
 **Phase 2 reference — OOMWOO (reviewed 2026-10-15).** [makerspet/oomwoo](https://github.com/makerspet/oomwoo) (Apache-2.0) is an open-source DIY robot vacuum (ROS 2 / Nav2, Raspberry Pi or old smartphone, STM32 I/O board), still in simulation, not buildable. Nothing to reuse in Phase 1 (our stack is Mac + ESP32 camera, Ackermann steering, no range sensors). For Phase 2: cheap vacuum spare-part 2D LiDARs (LDS02RR class, ~US$15–30, BOM sourcing tips) with the [kaiaai/LDS](https://github.com/kaiaai/LDS) driver library (ESP32 Arduino); Roomba-style cliff sensors and bumper micro-switches (~US$2) as hardware stop reflexes; their `recovery-safety`, `obstacle-avoidance` (front ToF) and `health-monitor` RFCs as design notes; `mac-dev-env` (pixi ROS 2 on Apple Silicon) for running SLAM/Nav2 on the Mac.
 
