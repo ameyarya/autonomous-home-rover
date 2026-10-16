@@ -9,7 +9,7 @@ bank strapped to the chassis. Parametric: edit the numbers at the top of `housin
 
 | File | Print |
 | --- | --- |
-| `out/cam-dock-fit-test.stl` | Print first (~10 min): three 10 mm clip slices on a strip, mouths 5.0 / 5.4 / 5.8 mm, marked by 1 / 2 / 3 notches on the front edge. Snap the barrel into each; pick the one that clicks in with firm thumb pressure and doesn't spin. |
+| `out/cam-dock-fit-test.stl` | Print first (~15 min): a 1.2 mm copy of the base plate (same outline, screw holes and gear relief) with three 10 mm clip slices, mouths 5.0 / 5.4 / 5.8 mm, marked by 1 / 2 / 3 notches on the front edge. Check all 4 holes line up with the frame grid (M2.5 screws drop through), then snap the barrel into each clip and pick the one that clicks in with firm thumb pressure and doesn't spin. |
 | `out/cam-dock.stl` | 60 × 32.5 × 3 mm plate + 30 mm clip, 33 mm tall overall. Plate on the bed, no supports, PETG. ~9 g. Set `CLIP_MOUTH` to the fit test's winner first. |
 
 ## Design

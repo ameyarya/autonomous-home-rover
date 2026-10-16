@@ -42,6 +42,7 @@ FOOT = (18.0, 16.0, 6.0)               # wider base so the clip doesn't snap off
 CLIP_Y = FRAME_FRONT_Y + 9.0           # clip axis, behind the frame front
 TEST_MOUTHS = (5.0, 5.4, 5.8)          # fit test: one short clip per mouth width, marked by 1/2/3 notches
 TEST_H = 10.0
+TEST_PLATE_T = 1.2                     # fit-test plate: thin, same outline and holes
 SCREW_CLEAR_D = 2.9                    # M2.5 clearance
 HEAD_D = 5.4                           # M2.5 button head, for clearance checks
 
@@ -60,41 +61,53 @@ def clip():
     return body, od
 
 
+def plate_outline(thickness):
+    """Base plate in world coordinates: outline, screw holes and steering-gear relief."""
+    rows = GRID_Y[:SCREW_ROWS]
+    plate_front = FRAME_FRONT_Y - PLATE_FRONT_EXTEND
+    plate_len = rows[-1] + 5.5 - plate_front
+    plate_w = GRID_X[1] - GRID_X[0] + 10
+    plate = Pos(CX, plate_front + plate_len / 2, FRAME_TOP_Z + thickness / 2) * Box(plate_w, plate_len, thickness)
+    for (x0, x1), (y0, y1), depth in RELIEFS:
+        plate -= Pos((x0 + x1) / 2, (y0 + y1) / 2, FRAME_TOP_Z + min(depth, thickness - 0.6) / 2 - 0.01) * Box(
+            x1 - x0 + 2 * RELIEF_MARGIN, y1 - y0 + 2 * RELIEF_MARGIN, min(depth, thickness - 0.6))
+    for y in rows:
+        for x in GRID_X:
+            plate -= Pos(x, y, FRAME_TOP_Z + thickness / 2) * Cylinder(SCREW_CLEAR_D / 2, thickness * 3)
+    return plate, (plate_w, plate_len)
+
+
 def fit_test():
-    """Short clips side by side on a strip, one per TEST_MOUTHS entry, to pick the snap fit
-    before printing the full dock. Notches on the strip's front edge: 1 = first mouth, etc."""
+    """Thin copy of the base plate (same outline and holes) carrying short clips, one per
+    TEST_MOUTHS entry, to check the screw holes against the frame and pick the snap fit before
+    printing the full dock. Notches on the plate's front edge mark the clips: 1 = first mouth, etc."""
+    plate, (plate_w, plate_len) = plate_outline(TEST_PLATE_T)
     od = BORE_D + 2 * CLIP_WALL
     pitch = od + 6
     n = len(TEST_MOUTHS)
-    strip = Pos(0, 0, 1) * Box(pitch * n, od + 6, 2)
+    plate_front = FRAME_FRONT_Y - PLATE_FRONT_EXTEND
+    yc = plate_front + plate_len / 2
+    z0 = FRAME_TOP_Z + TEST_PLATE_T
     for i, mouth in enumerate(TEST_MOUTHS):
-        x = (i - (n - 1) / 2) * pitch
-        ring = Cylinder(od / 2, TEST_H, align=(Align.CENTER, Align.CENTER, Align.MIN))
-        strip += Pos(x, 0, 0) * ring
-        strip -= Pos(x, 0, -1) * Cylinder(BORE_D / 2, TEST_H + 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
-        strip -= Pos(x, od / 2 + 3, TEST_H / 2) * Box(mouth, od + 6, TEST_H + 4)
+        x = CX + (i - (n - 1) / 2) * pitch
+        plate += Pos(x, yc, z0) * Cylinder(od / 2, TEST_H, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        plate -= Pos(x, yc, z0 - 0.4) * Cylinder(BORE_D / 2, TEST_H + 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        plate -= Pos(x, yc + od / 2, z0 + TEST_H / 2 + 0.01) * Box(mouth, od, TEST_H)
         for k in range(i + 1):
-            strip -= Pos(x + (k - i / 2) * 2.0, -(od + 6) / 2, 1) * Box(1.0, 2.0, 4)
-    return strip
+            plate -= Pos(x + (k - i / 2) * 2.0, plate_front, FRAME_TOP_Z + TEST_PLATE_T / 2) * Box(1.0, 3.0, TEST_PLATE_T * 3)
+    return Pos(0, 0, -FRAME_TOP_Z) * plate
 
 
 def build():
     c, od = clip()
     rows = GRID_Y[:SCREW_ROWS]
-    plate_front = FRAME_FRONT_Y - PLATE_FRONT_EXTEND
-    plate_len = rows[-1] + 5.5 - plate_front
-    plate_w = GRID_X[1] - GRID_X[0] + 10
-    plate = Pos(CX, plate_front + plate_len / 2, FRAME_TOP_Z + PLATE_T / 2) * Box(plate_w, plate_len, PLATE_T)
+    plate, (plate_w, plate_len) = plate_outline(PLATE_T)
     dock = plate + Pos(CX, CLIP_Y, PLATE_TOP) * c
-
+    assert all(abs(x - CX) > FOOT[0] / 2 + HEAD_D / 2 for x in GRID_X), 'screws would hit the clip'
+    # Holes and relief again, in case the clip foot covers them.
     for (x0, x1), (y0, y1), depth in RELIEFS:
         dock -= Pos((x0 + x1) / 2, (y0 + y1) / 2, FRAME_TOP_Z + depth / 2 - 0.01) * Box(
             x1 - x0 + 2 * RELIEF_MARGIN, y1 - y0 + 2 * RELIEF_MARGIN, depth)
-
-    assert all(abs(x - CX) > FOOT[0] / 2 + HEAD_D / 2 for x in GRID_X), 'screws would hit the clip'
-    for y in rows:
-        for x in GRID_X:
-            dock -= Pos(x, y, FRAME_TOP_Z + PLATE_T / 2) * Cylinder(SCREW_CLEAR_D / 2, PLATE_T * 3)
 
     report = {
         'plate_mm': (round(plate_w, 1), round(plate_len, 1), PLATE_T),
