@@ -3,7 +3,7 @@ that holds the barrel of a 90° magnetic USB cable pointing up. The XIAO ESP32S3
 official case with the cable's magnetic tip in its USB-C port, snaps magnetically onto the cable
 head; the cable's rotating elbow sets the camera tilt. Pull it off to remove.
 
-Run: cad/.venv/bin/python housing/housing.py   -> housing/out/cam-dock.stl
+Run: cad/.venv/bin/python housing/housing.py   -> housing/out/cam-dock.stl, cam-dock-fit-test.stl
 housing/check.py checks for collisions against the local chassis STEP.
 
 World coordinates are the chassis STEP's: X across the car, Y along it (front = -Y),
@@ -40,6 +40,8 @@ CLIP_WALL = 2.4
 CLIP_MOUTH = 5.4                       # opening at the back, narrower than the barrel: it snaps in
 FOOT = (18.0, 16.0, 6.0)               # wider base so the clip doesn't snap off at the plate
 CLIP_Y = FRAME_FRONT_Y + 9.0           # clip axis, behind the frame front
+TEST_MOUTHS = (5.0, 5.4, 5.8)          # fit test: one short clip per mouth width, marked by 1/2/3 notches
+TEST_H = 10.0
 SCREW_CLEAR_D = 2.9                    # M2.5 clearance
 HEAD_D = 5.4                           # M2.5 button head, for clearance checks
 
@@ -56,6 +58,24 @@ def clip():
     # Mouth: full height at the back, so the barrel snaps in and the cable bends out anywhere.
     body -= Pos(0, max(od, fy) / 2, CLIP_H / 2) * Box(CLIP_MOUTH, max(od, fy), CLIP_H + 2)
     return body, od
+
+
+def fit_test():
+    """Short clips side by side on a strip, one per TEST_MOUTHS entry, to pick the snap fit
+    before printing the full dock. Notches on the strip's front edge: 1 = first mouth, etc."""
+    od = BORE_D + 2 * CLIP_WALL
+    pitch = od + 6
+    n = len(TEST_MOUTHS)
+    strip = Pos(0, 0, 1) * Box(pitch * n, od + 6, 2)
+    for i, mouth in enumerate(TEST_MOUTHS):
+        x = (i - (n - 1) / 2) * pitch
+        ring = Cylinder(od / 2, TEST_H, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        strip += Pos(x, 0, 0) * ring
+        strip -= Pos(x, 0, -1) * Cylinder(BORE_D / 2, TEST_H + 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        strip -= Pos(x, od / 2 + 3, TEST_H / 2) * Box(mouth, od + 6, TEST_H + 4)
+        for k in range(i + 1):
+            strip -= Pos(x + (k - i / 2) * 2.0, -(od + 6) / 2, 1) * Box(1.0, 2.0, 4)
+    return strip
 
 
 def build():
@@ -91,6 +111,7 @@ if __name__ == '__main__':
     for old in OUT.glob('*.stl'):
         old.unlink()
     export_stl(dock, str(OUT / 'cam-dock.stl'))
+    export_stl(fit_test(), str(OUT / 'cam-dock-fit-test.stl'))
     for k, v in report.items():
         print(f'{k}: {v}')
     bb = dock.bounding_box()

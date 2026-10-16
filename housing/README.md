@@ -9,7 +9,8 @@ bank strapped to the chassis. Parametric: edit the numbers at the top of `housin
 
 | File | Print |
 | --- | --- |
-| `out/cam-dock.stl` | 60 × 32.5 × 3 mm plate + 30 mm clip, 33 mm tall overall. Plate on the bed, no supports, PETG. ~9 g. |
+| `out/cam-dock-fit-test.stl` | Print first (~10 min): three 10 mm clip slices on a strip, mouths 5.0 / 5.4 / 5.8 mm, marked by 1 / 2 / 3 notches on the front edge. Snap the barrel into each; pick the one that clicks in with firm thumb pressure and doesn't spin. |
+| `out/cam-dock.stl` | 60 × 32.5 × 3 mm plate + 30 mm clip, 33 mm tall overall. Plate on the bed, no supports, PETG. ~9 g. Set `CLIP_MOUTH` to the fit test's winner first. |
 
 ## Design
 
@@ -30,6 +31,6 @@ bank strapped to the chassis. Parametric: edit the numbers at the top of `housin
 
 ## To confirm on the first print
 
-- Snap fit: if the barrel won't go in, widen `CLIP_MOUTH`; if it spins or slides, shrink `BORE_D`.
+- Snap fit: chosen with the fit test. If none fits (all too loose or all too tight), change `BORE_D`.
 - Magnet on bumps: after a drive test, check the XIAO's reset reason and uptime for power drops.
 - Magnetic cables are usually power-only; recovery flashing over USB needs a normal cable.
