@@ -10,8 +10,8 @@ age, refuses stale frames, and feeds the detector ported from
 | `dashboard.py` | http://localhost:8010/: live view, link health, and the planner view (exact labeled frame the detector saw). |
 | `rover_detector.py` | Mini-T detector (YOLO-World / bullseye matcher), ported with only paths and port (8767) changed. |
 | `dog_watcher.py` | Phase 1 dog companion: YOLO11s finds the dog, motion/stillness, Qwen3-VL describes what he is doing, timeline log, and drives through `drive_client.py` when the dashboard has armed the drive server. Status on :8768. |
-| `drive_client.py` | Watcher decisions → bounded pulses via the drive server (forward W 300 ms, back S 250, turn A/D 250, scan A 400, park/stop X), then 0.6 s of post-stop frames before the next move. Disarmed: logs what it would send. |
-| `test_drive_client.py` | Disarmed records only, observe dwell, hold sends nothing, single stop on park, server down. |
+| `drive_client.py` | Watcher decisions → bounded pulses via the drive server (forward W 300 ms, back S 250, turn = forward arc A/D 300, scan = alternating arc A/D 350 + straight reverse S 300, park/stop X), then 0.6 s of post-stop frames before the next move. Disarmed: logs what it would send. |
+| `test_drive_client.py` | Disarmed records only, observe dwell, hold sends nothing, single stop on park, server down, scan arc/reverse alternation, pulses within the server's limits. |
 | `dog_behavior.py` | The companion state machine (parked → following → searching), pure logic. |
 | `test_dog_behavior.py` | State machine tests: follow on movement, tail-wag counts, park after sleep, search then park, back off when charged, stale camera stops. |
 | `test_xiao_link.py` | Tests against a fake XIAO: clock mapping, frame age, stale detection, telemetry loss, camera fault, captured-after waits. |
@@ -45,14 +45,19 @@ It re-runs itself under the detector Python and starts Ollama if needed. Needs
 | Rover state | Does | Leaves when |
 | --- | --- | --- |
 | parked | holds still, watches | dog moves (box moves ≥0.3 box-heights/s, or pixels inside his box change: wagging, head up) → following |
-| following | turn to centre him (±10%), forward/back to keep him 30–55% of frame height; back off if his box grows >25%/s | still ≥ `--sleep-after` (300 s) and the model says sleeping (or 2× that and resting) → parked; out of view 3 s → searching |
-| searching | scan in place | dog found → following; 60 s → parked |
+| following | back up straight if he's too close (>55% of frame height) or his box grows >25%/s; else arc toward him to centre him (±10%); else forward if he's small (<30%) | still ≥ `--sleep-after` (300 s) and the model says sleeping (or 2× that and resting) → parked; out of view 3 s → searching |
+| searching | rotate roughly in place toward the side he was last seen: forward arc, straight reverse, repeat | dog found → following; 60 s → parked |
 
 The vision model describes him when he appears, when he starts/stops moving, and every 60 s while
 visible (at most every 15 s). Its state (`sleeping` / `resting` / `active` / `unclear`) gates parking.
 
 Log: `mac/dog-log/YYYY-MM-DD.jsonl` (events `seen`, `lost`, `moving`, `still`, `activity`,
 `state`, `camera_stale`) with snapshots in `mac/dog-log/snapshots/` (gitignored, stays on the Mac).
+
+Car steering: the OpenFrame has front-wheel steering and can't spin in place, and the receiver's
+drive service only accepts W/A/S/D/X (changing it is off-limits), so there is no reverse with
+steering. Turns are forward arcs; rotating in place is an arc + straight-reverse shuffle, a few
+degrees per pair (measure on the chassis and tune the pulse lengths).
 
 Limits: motion is judged only while the rover is stopped (camera motion would look like dog
 motion); stillness thresholds are first guesses to tune on the real dog; no drive path yet.

@@ -11,12 +11,18 @@ import urllib.request
 DRIVE_URL = 'http://127.0.0.1:8769'
 OBSERVE_S = 0.6
 # intent -> (key, ms). Short, conservative pulses; tune on the assembled chassis.
+# Car steering, keys W/A/S/D only: turns are forward arcs.
 PULSES = {
     'forward': ('W', 300),
     'back': ('S', 250),
-    'turn_left': ('A', 250),
-    'turn_right': ('D', 250),
-    'scan': ('A', 400),      # a car can't spin in place: scan by arcing left
+    'turn_left': ('A', 300),
+    'turn_right': ('D', 300),
+}
+# Scanning rotates roughly in place: forward arc, then straight reverse, repeated. Each pair
+# turns the rover a few degrees with little net travel (no reverse-with-steering on the receiver).
+SCANS = {
+    'scan_left': [('A', 350), ('S', 300)],
+    'scan_right': [('D', 350), ('S', 300)],
 }
 STOPS = {'stop', 'park'}
 
@@ -40,6 +46,7 @@ class DriveExecutor:
         self.captured_after = None   # Mac monotonic time of the last stop
         self.last = None             # last executed (or skipped) action, for status/logging
         self.stopped = True
+        self.scan_step = 0           # position in the scan's arc/reverse cycle
 
     def ready(self, now):
         return now >= self.observe_until
@@ -61,12 +68,16 @@ class DriveExecutor:
                 self.stopped = True
             self.last = {'action': action, 'sent': 'X'}
             return self.last
-        if action not in PULSES:
+        if action not in PULSES and action not in SCANS:
             self.last = {'action': action, 'sent': None}
             return self.last
         if not self.ready(now):
             return {'action': action, 'sent': None, 'why': 'observing'}
-        key, ms = PULSES[action]
+        if action in SCANS:
+            cycle = SCANS[action]
+            key, ms = cycle[self.scan_step % len(cycle)]
+        else:
+            key, ms = PULSES[action]
         if not self.armed():
             self.last = {'action': action, 'sent': None, 'why': 'disarmed', 'would_send': f'{key} {ms} ms'}
             return self.last
@@ -76,6 +87,7 @@ class DriveExecutor:
             done = time.monotonic()
             self.captured_after = done
             self.observe_until = done + OBSERVE_S
+            self.scan_step = self.scan_step + 1 if action in SCANS else 0
             self.last = {'action': action, 'sent': f'{key} {ms} ms', 'result': result}
         except OSError as error:
             self.last = {'action': action, 'sent': None, 'why': f'drive server: {error}'}

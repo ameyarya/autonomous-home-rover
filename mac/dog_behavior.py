@@ -10,6 +10,11 @@ States:
 
 Motion is only judged while the rover itself is stopped (the caller passes rover_moving);
 camera ego-motion would otherwise look like the dog moving.
+
+The rover steers like a car (front-wheel steering, no spinning in place) and the receiver only
+takes W/A/S/D/X, so there is no reverse-with-steering. Turning uses forward arcs: toward the dog
+when there is room, after backing up straight if he is too close. Searching rotates roughly in
+place by alternating a forward arc and a straight reverse (drive_client.py does the alternating).
 """
 import collections
 from dataclasses import dataclass, field
@@ -42,7 +47,7 @@ class Dog:
 @dataclass
 class Decision:
     state: str
-    action: str        # hold | turn_left | turn_right | forward | back | scan | park | stop
+    action: str        # hold | turn_left | turn_right (forward arcs) | forward | back | scan_left | scan_right | park | stop
     reason: str
 
 
@@ -107,6 +112,7 @@ class Behavior:
         self.last_seen = None
         self.search_started = None
         self.sleep_reason = None
+        self.last_x = 50.0         # where the dog was last seen, to scan toward that side
 
     def asleep(self, now, model_state):
         still = self.motion.still_for(now)
@@ -129,6 +135,7 @@ class Behavior:
 
         if dog is not None:
             self.last_seen = now
+            self.last_x = dog.x
             if not rover_moving:
                 self.motion.update(now, dog)
 
@@ -144,7 +151,7 @@ class Behavior:
             if dog is None:
                 if self.last_seen is not None and now - self.last_seen > s.lost_after_s:
                     self._go('searching', now)
-                    return Decision('searching', 'scan', 'dog out of view; scanning')
+                    return Decision('searching', self._scan_action(), 'dog out of view; scanning ' + self._scan_side())
                 return Decision('following', 'hold', 'dog briefly out of view')
             reason = self.asleep(now, model_state)
             if reason:
@@ -161,20 +168,27 @@ class Behavior:
         if now - self.search_started > s.search_limit_s:
             self._go('parked', now)
             return Decision('parked', 'park', f'dog not found in {s.search_limit_s:.0f} s; parked to wait')
-        return Decision('searching', 'scan', 'scanning for dog')
+        return Decision('searching', self._scan_action(), 'scanning ' + self._scan_side())
+
+    def _scan_side(self):
+        return 'left' if self.last_x < 50 else 'right'
+
+    def _scan_action(self):
+        return 'scan_' + self._scan_side()
 
     def _follow(self, dog, why):
         s = self.settings
         if self.motion.approach_rate > s.charge_rate:
             return Decision('following', 'back', f'{why}: dog closing fast; backing off')
-        offset = dog.x - 50
-        if offset < -s.center_tolerance:
-            return Decision('following', 'turn_left', f'{why}: dog at {dog.x:.0f}% (left)')
-        if offset > s.center_tolerance:
-            return Decision('following', 'turn_right', f'{why}: dog at {dog.x:.0f}% (right)')
         low, high = s.standoff_height
+        offset = dog.x - 50
+        if dog.height > high:
+            # Too close: back up straight first; a forward arc would drive into him.
+            return Decision('following', 'back', f'{why}: dog close ({dog.height:.0f}% tall)')
+        if offset < -s.center_tolerance:
+            return Decision('following', 'turn_left', f'{why}: dog at {dog.x:.0f}% (left); arc left')
+        if offset > s.center_tolerance:
+            return Decision('following', 'turn_right', f'{why}: dog at {dog.x:.0f}% (right); arc right')
         if dog.height < low:
             return Decision('following', 'forward', f'{why}: dog small ({dog.height:.0f}% tall)')
-        if dog.height > high:
-            return Decision('following', 'back', f'{why}: dog close ({dog.height:.0f}% tall)')
         return Decision('following', 'hold', f'{why}: dog centred at standoff')

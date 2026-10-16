@@ -55,6 +55,21 @@ class BehaviorTest(unittest.TestCase):
         self.assertEqual(sim.run(0.2, still_dog(height=15)).action, 'forward')
         self.assertEqual(sim.run(0.2, still_dog(height=70)).action, 'back')
 
+    def test_close_and_off_centre_backs_up_before_turning(self):
+        sim = Sim()
+        sim.run(1, walking)
+        self.assertEqual(sim.run(0.2, still_dog(x=15, height=70)).action, 'back',
+                         'a forward arc would drive into him')
+        self.assertEqual(sim.run(0.2, still_dog(x=15, height=40)).action, 'turn_left')
+
+    def test_scans_toward_side_dog_left(self):
+        for x, expected in ((20, 'scan_left'), (80, 'scan_right')):
+            sim = Sim()
+            sim.run(1, walking)
+            sim.run(0.4, still_dog(x=x))
+            d = sim.run(5, None)
+            self.assertEqual((d.state, d.action), ('searching', expected))
+
     def test_parks_when_dog_sleeps_for_a_while(self):
         sim = Sim(sleep_after_s=60)
         sim.run(1, walking)
@@ -88,7 +103,8 @@ class BehaviorTest(unittest.TestCase):
         sim.run(1, walking)
         self.assertEqual(sim.run(2, None).action, 'hold')
         d = sim.run(2, None)
-        self.assertEqual((d.state, d.action), ('searching', 'scan'))
+        self.assertEqual(d.state, 'searching')
+        self.assertIn(d.action, ('scan_left', 'scan_right'))
         d = sim.run(21, None)
         self.assertEqual(d.state, 'parked')
         self.assertIn('park', sim.actions)

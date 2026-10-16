@@ -50,6 +50,41 @@ class DriveExecutorTest(unittest.TestCase):
         ex.act('park', 11)
         self.assertEqual([p for p, _ in s.posts].count('/stop'), 1)
 
+    def test_scan_alternates_arc_and_reverse(self):
+        s = FakeServer()
+        ex = DriveExecutor(s.post, s.get)
+        t = 0
+        for _ in range(4):
+            ex.act('scan_right', t)
+            t = ex.captured_after + OBSERVE_S + 0.01
+        self.assertEqual([b['key'] for _, b in s.posts], ['D', 'S', 'D', 'S'])
+
+    def test_scan_cycle_restarts_with_arc(self):
+        s = FakeServer()
+        ex = DriveExecutor(s.post, s.get)
+        ex.act('scan_left', 0)
+        ex.act('forward', ex.captured_after + OBSERVE_S + 0.01)
+        ex.act('scan_left', ex.captured_after + OBSERVE_S + 0.01)
+        self.assertEqual([b['key'] for _, b in s.posts], ['A', 'W', 'A'])
+
+    def test_observing_does_not_advance_scan(self):
+        s = FakeServer()
+        ex = DriveExecutor(s.post, s.get)
+        ex.act('scan_left', 0)
+        ex.act('scan_left', ex.captured_after)          # still observing: skipped
+        ex.act('scan_left', ex.captured_after + OBSERVE_S + 0.01)
+        self.assertEqual([b['key'] for _, b in s.posts], ['A', 'S'])
+
+    def test_pulses_stay_within_server_limits(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'drive'))
+        from drive_client import PULSES, SCANS
+        from drive_server import PULSE_LIMITS_MS
+        for key, ms in list(PULSES.values()) + [p for cycle in SCANS.values() for p in cycle]:
+            self.assertIn(key, PULSE_LIMITS_MS)
+            self.assertLessEqual(ms, PULSE_LIMITS_MS[key])
+
     def test_server_down_is_safe(self):
         def down(*a, **k):
             raise OSError('connection refused')
