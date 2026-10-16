@@ -277,6 +277,14 @@ class Dashboard:
         return 'target not located'
 
 
+class QuietServer(ThreadingHTTPServer):
+    """Browsers drop image/poll connections mid-request all the time; don't print tracebacks for that."""
+
+    def handle_error(self, request, client_address):
+        if not isinstance(sys.exc_info()[1], (ConnectionResetError, BrokenPipeError)):
+            super().handle_error(request, client_address)
+
+
 def make_handler(dashboard, password):
     token = session_token(password)
 
@@ -428,7 +436,7 @@ def main():
     link = XiaoLink(args.host, max_frame_age_s=args.max_frame_age).start()
     services = Services(args.host)
     password = dashboard_password()
-    server = ThreadingHTTPServer((args.bind, args.port), make_handler(Dashboard(link, services), password))
+    server = QuietServer((args.bind, args.port), make_handler(Dashboard(link, services), password))
     mdns = None
     if args.bind not in ('127.0.0.1', 'localhost'):
         ip = lan_ip(args.host)

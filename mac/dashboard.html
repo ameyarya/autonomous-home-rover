@@ -24,6 +24,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px}main>*{min-
 .label{position:absolute;top:8px;left:10px;font-size:11px;padding:4px 7px;border-radius:5px;background:#10151de6}
 .corner{position:absolute;right:10px;bottom:8px;font-size:11px;padding:4px 7px;border-radius:5px;background:#10151de6}
 .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--dim2);font-size:13px;text-align:center;padding:20px}
+[hidden]{display:none!important}
 .cards{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px}
 .card,.panel{padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-width:0}
 .panel{display:flex;flex-direction:column;gap:14px;align-self:start}
@@ -41,7 +42,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px}main>*{min-
 #timeline{list-style:none;margin:0;padding:0;font-size:12px;max-height:260px;overflow:auto}
 #timeline li.none{display:block;color:var(--dim2)}#timeline li{display:grid;grid-template-columns:58px 70px 1fr;gap:6px;padding:4px 0;border-bottom:1px solid #222c3a}
 #timeline time{color:var(--dim2)}#timeline b{font-weight:500;color:#b6c9e6}
-details summary{cursor:pointer;color:var(--dim);font-size:12px}
+details summary{cursor:pointer;color:var(--dim);font-size:12px}#settings{margin-top:14px}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;font-size:12px}
 .form label{display:flex;flex-direction:column;gap:3px;color:var(--dim2)}
 .form label.check{flex-direction:row;align-items:center;gap:6px}
@@ -174,7 +175,7 @@ svcPoll();
 // Drive: arm lease, STOP, hold-to-drive.
 let armed=false,held=null,holdTimer=null;
 function showDrive(s){
-  if(s.error&&s.armed===undefined){$('drive-status').textContent=s.error;return}
+  if(s.error&&s.armed===undefined){$('drive-status').textContent='Drive server off. Start it in the header (transmitter on USB).';return}
   armed=!!s.armed;
   $('arm').textContent=armed?'Armed · click to disarm':'Arm';$('arm').className=armed?'armed':'';
   const last=s.last?(s.last.manual?`manual ${s.last.key}`:s.last.key==='X'?`stopped (${s.last.why||'stop'})`:`pulse ${s.last.key} ${s.last.ms} ms`):'nothing yet';

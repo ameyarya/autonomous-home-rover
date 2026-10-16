@@ -14,6 +14,7 @@ age, refuses stale frames, and feeds the detector ported from
 | `test_drive_client.py` | Disarmed records only, observe dwell, hold sends nothing, single stop on park, server down, scan arc/reverse alternation, pulses within the server's limits. |
 | `dog_behavior.py` | The companion state machine (parked → following → searching), pure logic. |
 | `test_dog_behavior.py` | State machine tests: follow on movement, tail-wag counts, park after sleep, search then park, back off when charged, stale camera stops. |
+| `test_dashboard_ui.py` | Browser tests (Playwright + installed Chrome) of the real page and server against fake camera, drive server and watcher: live view and placeholders, health tiles, restart alert, settings, service buttons, arm/hold/release/Esc driving, watcher pane and timeline, phone width, LAN login and STOP without login. Setup once: `python3 -m venv mac/.ui-venv && mac/.ui-venv/bin/pip install playwright`; run: `cd mac && .ui-venv/bin/python -m unittest test_dashboard_ui`. |
 | `test_xiao_link.py` | Tests against a fake XIAO: clock mapping, frame age, stale detection, telemetry loss, camera fault, captured-after waits. |
 
 Python 3 standard library only; the detector runs in its own environment (below).

@@ -15,6 +15,7 @@ mac/detector-server.log
 mac/drive-server.log
 mac/dog-watcher.log
 mac/.dashboard-password
+mac/.ui-venv/
 __pycache__/
 mac/weights/
 mac/dog-log/
