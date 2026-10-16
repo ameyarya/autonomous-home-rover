@@ -22,3 +22,7 @@ mac/dog-log/
 
 # CAD tooling
 cad/.venv/
+
+# Simulation
+sim/.venv/
+sim/out/

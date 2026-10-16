@@ -1,0 +1,59 @@
+<!-- Living room for the rover simulation. Units: metres. x along the room, y across, z up.
+     Rover and dog are mocap bodies posed kinematically by rover_sim.py each step. -->
+<mujoco model="home_rover">
+  <visual>
+    <global offwidth="640" offheight="480"/>
+    <quality shadowsize="2048"/>
+    <headlight ambient=".45 .45 .45" diffuse=".5 .5 .5" specular="0 0 0"/>
+  </visual>
+  <asset>
+    <texture name="floor" type="2d" builtin="checker" rgb1=".62 .52 .40" rgb2=".56 .46 .35" width="256" height="256"/>
+    <material name="floor" texture="floor" texrepeat="10 8"/>
+    <material name="wall" rgba=".86 .84 .78 1"/>
+    <material name="fur" rgba=".55 .36 .20 1"/>
+    <material name="fur_dark" rgba=".33 .21 .12 1"/>
+  </asset>
+  <worldbody>
+    <light pos="2.5 2 3" dir="0 0 -1" diffuse=".6 .6 .6"/>
+    <geom name="floor" type="plane" size="7 4 .1" pos="3.5 2 0" material="floor"/>
+    <!-- room 0..5 x 0..4, doorway in the x=5 wall at y 1.6..2.4 to a hall x 5..7, y 1.2..2.8 -->
+    <geom name="wall_s" type="box" size="2.5 .05 .6" pos="2.5 -.05 .6" material="wall"/>
+    <geom name="wall_n" type="box" size="2.5 .05 .6" pos="2.5 4.05 .6" material="wall"/>
+    <geom name="wall_w" type="box" size=".05 2 .6" pos="-.05 2 .6" material="wall"/>
+    <geom name="wall_e1" type="box" size=".05 .8 .6" pos="5.05 .8 .6" material="wall"/>
+    <geom name="wall_e2" type="box" size=".05 .8 .6" pos="5.05 3.2 .6" material="wall"/>
+    <geom name="hall_s" type="box" size="1 .05 .6" pos="6 1.15 .6" material="wall"/>
+    <geom name="hall_n" type="box" size="1 .05 .6" pos="6 2.85 .6" material="wall"/>
+    <geom name="hall_e" type="box" size=".05 .85 .6" pos="7.05 2 .6" material="wall"/>
+    <geom name="sofa" type="box" size="1 .35 .22" pos="2 3.6 .22" rgba=".25 .32 .45 1"/>
+    <geom name="sofa_back" type="box" size="1 .1 .4" pos="2 3.95 .4" rgba=".22 .28 .40 1"/>
+    <geom name="table" type="box" size=".4 .35 .2" pos="4.2 .65 .2" rgba=".45 .30 .18 1"/>
+    <geom name="rug" type="box" size=".9 .6 .002" pos="2.2 1.8 .002" rgba=".70 .25 .22 1" contype="0" conaffinity="0"/>
+
+    <body name="rover" mocap="true" pos="1 1 0">
+      <geom name="rv_frame" type="box" size=".115 .07 .012" pos="0 0 .055" rgba=".92 .92 .9 1" contype="0" conaffinity="0"/>
+      <geom name="rv_wheel_fl" type="cylinder" size=".028 .012" pos=".0785 .0725 .028" euler="90 0 0" rgba=".1 .1 .1 1" contype="0" conaffinity="0"/>
+      <geom name="rv_wheel_fr" type="cylinder" size=".028 .012" pos=".0785 -.0725 .028" euler="90 0 0" rgba=".1 .1 .1 1" contype="0" conaffinity="0"/>
+      <geom name="rv_wheel_rl" type="cylinder" size=".028 .012" pos="-.0785 .0725 .028" euler="90 0 0" rgba=".1 .1 .1 1" contype="0" conaffinity="0"/>
+      <geom name="rv_wheel_rr" type="cylinder" size=".028 .012" pos="-.0785 -.0725 .028" euler="90 0 0" rgba=".1 .1 .1 1" contype="0" conaffinity="0"/>
+      <geom name="rv_cam" type="box" size=".007 .011 .013" pos=".105 0 .13" rgba=".05 .05 .05 1" contype="0" conaffinity="0"/>
+      <!-- XIAO OV3660 on the dock: ~13 cm off the floor at the front, level, ~42 deg vertical FOV (4:3) -->
+      <camera name="rover_cam" pos=".113 0 .13" xyaxes="0 -1 0 0 0 1" fovy="42"/>
+    </body>
+
+    <body name="dog" mocap="true" pos="3 2 0">
+      <geom name="dog_body" type="capsule" size=".11 .2" pos="0 0 .32" euler="0 90 0" material="fur" contype="0" conaffinity="0"/>
+      <geom name="dog_head" type="sphere" size=".09" pos=".29 0 .44" material="fur" contype="0" conaffinity="0"/>
+      <geom name="dog_snout" type="capsule" size=".04 .05" pos=".38 0 .41" euler="0 90 0" material="fur_dark" contype="0" conaffinity="0"/>
+      <geom name="dog_ear_l" type="box" size=".02 .03 .05" pos=".27 .06 .52" material="fur_dark" contype="0" conaffinity="0"/>
+      <geom name="dog_ear_r" type="box" size=".02 .03 .05" pos=".27 -.06 .52" material="fur_dark" contype="0" conaffinity="0"/>
+      <geom name="dog_leg_fl" type="capsule" size=".035 .12" pos=".16 .07 .14" material="fur" contype="0" conaffinity="0"/>
+      <geom name="dog_leg_fr" type="capsule" size=".035 .12" pos=".16 -.07 .14" material="fur" contype="0" conaffinity="0"/>
+      <geom name="dog_leg_rl" type="capsule" size=".035 .12" pos="-.16 .07 .14" material="fur" contype="0" conaffinity="0"/>
+      <geom name="dog_leg_rr" type="capsule" size=".035 .12" pos="-.16 -.07 .14" material="fur" contype="0" conaffinity="0"/>
+      <geom name="dog_tail" type="capsule" size=".025 .09" pos="-.3 0 .38" euler="0 60 0" material="fur_dark" contype="0" conaffinity="0"/>
+    </body>
+
+    <camera name="overview" pos="2.5 -2.2 4.2" xyaxes="1 0 0 0 .78 .62"/>
+  </worldbody>
+</mujoco>

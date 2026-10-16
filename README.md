@@ -23,4 +23,5 @@ wirelessly to the stock receiver and drive electronics.
 - [PLAN.md](PLAN.md) — goals, architecture, milestones, open decisions, next actions.
 - [firmware/xiao-cam](firmware/xiao-cam/README.md) — XIAO camera/telemetry firmware (ESP-IDF): endpoints, build, flash.
 - [mac](mac/README.md) — Mac camera link (frame age, stale gate), ported Mini-T detector, dashboard.
+- [sim](sim/README.md) — MuJoCo simulation running the real dog-companion code in closed loop ([results](sim/RESULTS.md)).
 - Related: [ai-driven-mini-t](https://github.com/ameyarya/ai-driven-mini-t) — the proven tank project this rover builds on.
