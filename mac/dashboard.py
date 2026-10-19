@@ -219,6 +219,8 @@ class RestartWatch:
         self.link = link
         self.events = collections.deque(maxlen=20)
         self.seen = None
+        self.total = 0      # restarts seen since the dashboard started
+        self.acked = 0      # how many of those were dismissed (shared by every open page)
 
     def run(self):
         while True:
@@ -230,6 +232,7 @@ class RestartWatch:
             elif restarts > self.seen and reason:
                 self.seen = restarts
                 self.events.append({'at': datetime.datetime.now().strftime('%H:%M:%S'), 'reason': reason})
+                self.total += 1
             time.sleep(1)
 
 
@@ -335,6 +338,7 @@ def make_handler(dashboard, password):
                 health = dashboard.link.health()
                 health['observation'] = dashboard.observation
                 health['restarts'] = list(dashboard.restarts.events)
+                health['restarts_unacked'] = dashboard.restarts.total - dashboard.restarts.acked
                 return self.reply(200, health)
             if path == '/services':
                 return self.reply(200, dashboard.services.status())
@@ -382,6 +386,9 @@ def make_handler(dashboard, password):
                     return self.reply(200, dashboard.services.status())
                 except Exception as error:
                     return self.reply(500, {'error': str(error)})
+            if self.path == '/restarts/ack':
+                dashboard.restarts.acked = dashboard.restarts.total
+                return self.reply(200, {'acked': dashboard.restarts.acked})
             if self.path == '/cam/config':
                 size = int(self.headers.get('Content-Length', 0))
                 changes = json.loads(self.rfile.read(size) or b'{}')

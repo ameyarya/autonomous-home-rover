@@ -132,8 +132,7 @@ live.onerror=()=>{live.classList.add('off');$('live-empty').hidden=false;setTime
 function nextLive(){live.src='/live.jpg?'+Date.now()}nextLive();
 
 // Camera health + restart alert.
-let dismissed=0;
-$('alert-ok').onclick=async()=>{dismissed=(await getJSON('/status')).restarts.length;$('alert').style.display='none'};
+$('alert-ok').onclick=async()=>{$('alert').style.display='none';try{await postJSON('/restarts/ack')}catch(e){}};
 async function camPoll(){
   try{
     const h=await getJSON('/status'),t=h.telemetry||{};
@@ -149,9 +148,10 @@ async function camPoll(){
       ['Mic',t.mic_dbfs!=null?t.mic_dbfs+' dBFS':'—'],['Firmware',fmt(t.fw)],['Free PSRAM',t.psram_free?Math.round(t.psram_free/1024)+' KB':'—']];
     $('tele').innerHTML=cells.map(([k,v])=>`<div><span>${k}</span><strong>${v}</strong></div>`).join('');
     const r=h.restarts||[];
-    if(r.length>dismissed){const last=r[r.length-1];
-      $('alert-text').textContent=`${r.length-dismissed} restart(s) this session; last at ${last.at}, reason: ${last.reason}. A power drop (cable/magnet) shows as poweron or brownout.`;
-      $('alert').style.display='block'}
+    const unacked=h.restarts_unacked||0;
+    if(unacked>0&&r.length){const last=r[r.length-1];
+      $('alert-text').textContent=`${unacked} new restart(s); last at ${last.at}, reason: ${last.reason}. A power drop (cable/magnet) shows as poweron or brownout.`;
+      $('alert').style.display='block'}else{$('alert').style.display='none'}
     if(h.observation){showObs(h.observation)}
   }catch(e){dot('cam-dot','bad');$('cam-chip').textContent='dashboard offline'}
   setTimeout(camPoll,1000)}

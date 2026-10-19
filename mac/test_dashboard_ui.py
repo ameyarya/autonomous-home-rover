@@ -239,6 +239,12 @@ class DashboardUITest(unittest.TestCase):
         expect(self.page.locator('#alert-text')).to_contain_text('brownout')
         self.page.click('#alert-ok')
         expect(self.page.locator('#alert')).to_be_hidden()
+        self.page.reload()                                   # dismissal sticks across reloads
+        self.page.wait_for_timeout(2500)
+        expect(self.page.locator('#alert')).to_be_hidden()
+        self.link.restarts += 1                              # a new restart shows it again
+        expect(self.page.locator('#alert')).to_be_visible(timeout=5000)
+        expect(self.page.locator('#alert-text')).to_contain_text('1 new restart')
 
     def test_camera_settings_load_and_apply(self):
         self.open()
