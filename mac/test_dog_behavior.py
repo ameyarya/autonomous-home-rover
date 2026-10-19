@@ -1,7 +1,7 @@
 """Run: cd mac && python3 -m unittest test_dog_behavior"""
 import unittest
 
-from dog_behavior import Behavior, Dog, Settings
+from dog_behavior import Behavior, Dog, Settings, ViewChange
 
 
 def still_dog(x=50, height=40, pixels=2.0):
@@ -69,6 +69,72 @@ class BehaviorTest(unittest.TestCase):
             sim.run(0.4, still_dog(x=x))
             d = sim.run(5, None)
             self.assertEqual((d.state, d.action), ('searching', expected))
+
+    def test_blocked_moves_back_out_then_stop(self):
+        sim = Sim()
+        sim.run(1, walking)
+        sim.b.note_move(True)
+        self.assertNotEqual(sim.run(0.2, still_dog(x=20)).action, 'back', 'one blocked move is not yet stuck')
+        sim.b.note_move(True)
+        d = sim.run(0.2, still_dog(x=20))
+        self.assertEqual(d.action, 'back')
+        self.assertIn('blocked', d.reason)
+        for _ in range(3):
+            sim.b.note_move(True)
+        d = sim.run(0.2, still_dog(x=20))
+        self.assertEqual((d.state, d.action), ('parked', 'park'))
+        self.assertIn('stuck', d.reason)
+        d = sim.run(10, walking)
+        self.assertEqual((d.state, d.action), ('parked', 'hold'), 'waits before trying again')
+        d = sim.run(25, walking)
+        self.assertEqual(d.state, 'following')
+
+    def test_a_free_move_resets_blocked_count(self):
+        sim = Sim()
+        sim.run(1, walking)
+        sim.b.note_move(True)
+        sim.b.note_move(False)
+        sim.b.note_move(True)
+        self.assertNotEqual(sim.run(0.2, still_dog(x=20)).action, 'back')
+
+    def test_view_change_threshold_follows_camera_noise(self):
+        v = ViewChange()
+        self.assertFalse(v.blocked('W', 4.0))               # default noise 1.2 -> threshold ~3.1
+        self.assertTrue(v.blocked('W', 2.0))
+        for _ in range(20):
+            v.note_still(5.0)                               # a noisier camera
+        self.assertTrue(v.blocked('W', 12.5))
+        self.assertFalse(v.blocked('A', 14.0))
+        self.assertFalse(v.blocked('S', 12.5), 'reverse uses a lower threshold')
+        self.assertTrue(v.blocked('S', 11.0))
+
+    def test_blocked_behind_holds_instead_of_backing(self):
+        sim = Sim()
+        sim.run(1, walking)
+        self.assertEqual(sim.run(0.2, still_dog(height=70)).action, 'back')
+        sim.b.note_move(True, 'S')
+        d = sim.run(0.2, still_dog(height=70))
+        self.assertEqual(d.action, 'hold')
+        self.assertIn('blocked behind', d.reason)
+        sim.b.note_move(False, 'A')                      # a free forward arc doesn't clear it
+        self.assertEqual(sim.run(0.2, still_dog(height=70)).action, 'hold')
+        self.assertEqual(sim.run(25, still_dog(height=70)).action, 'back', 'tries reversing again later')
+
+    def test_wedged_both_ways_stops(self):
+        sim = Sim()
+        sim.run(1, walking)
+        sim.b.note_move(True, 'W')
+        sim.b.note_move(True, 'W')
+        sim.b.note_move(True, 'S')
+        d = sim.run(0.2, still_dog(x=20))
+        self.assertEqual((d.state, d.action), ('parked', 'park'))
+        self.assertIn('ahead and behind', d.reason)
+
+    def test_unjudged_move_keeps_count(self):
+        sim = Sim()
+        sim.b.note_move(True)
+        sim.b.note_move(None)
+        self.assertEqual(sim.b.blocked, 1)
 
     def test_parks_when_dog_sleeps_for_a_while(self):
         sim = Sim(sleep_after_s=60)

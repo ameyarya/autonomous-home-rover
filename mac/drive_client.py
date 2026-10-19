@@ -21,8 +21,8 @@ PULSES = {
 # Scanning rotates roughly in place: forward arc, then straight reverse, repeated. Each pair
 # turns the rover a few degrees with little net travel (no reverse-with-steering on the receiver).
 SCANS = {
-    'scan_left': [('A', 350), ('S', 300)],
-    'scan_right': [('D', 350), ('S', 300)],
+    'scan_left': [('A', 500), ('S', 300)],     # ~19 deg per pair in the simulator
+    'scan_right': [('D', 500), ('S', 300)],
 }
 STOPS = {'stop', 'park'}
 
@@ -47,6 +47,7 @@ class DriveExecutor:
         self.last = None             # last executed (or skipped) action, for status/logging
         self.stopped = True
         self.scan_step = 0           # position in the scan's arc/reverse cycle
+        self.last_key = None         # key of the last pulse sent
 
     def ready(self, now):
         return now >= self.observe_until
@@ -88,6 +89,7 @@ class DriveExecutor:
             self.captured_after = done
             self.observe_until = done + OBSERVE_S
             self.scan_step = self.scan_step + 1 if action in SCANS else 0
+            self.last_key = key
             self.last = {'action': action, 'sent': f'{key} {ms} ms', 'result': result}
         except OSError as error:
             self.last = {'action': action, 'sent': None, 'why': f'drive server: {error}'}

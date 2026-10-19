@@ -200,6 +200,7 @@ class World:
         self.dog_contacts = 0       # rover moves stopped by the dog
         self.bumps = 0              # rover moves stopped by walls/furniture
         self.odometer = 0.0
+        self.last_pulse_blocked = False
 
     # ---- setup ----
     def place(self, rover, dog):
@@ -270,7 +271,11 @@ class World:
 
     def pulse(self, key, ms):
         """One drive-server pulse: motion for ms (+ stop latency), then the time until the ACK."""
+        before = self.dog_contacts + self.bumps
+        start = (self.x, self.y)
         self.advance(ms / 1000 + self.p.stop_latency, key)
+        moved = math.hypot(self.x - start[0], self.y - start[1])
+        self.last_pulse_blocked = self.dog_contacts + self.bumps > before and moved < 0.02
         self.v = 0.0
         self.advance(max(0.0, self.p.ack_s - self.p.stop_latency))
 

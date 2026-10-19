@@ -10,7 +10,7 @@ age, refuses stale frames, and feeds the detector ported from
 | `dashboard.py` + `dashboard.html` | http://rover.local:8010/ (any device on the home Wi-Fi, advertised over mDNS) or http://localhost:8010/, the rover dashboard: live camera beside the dog watcher's exact input frame; header chips to start/stop the drive server and dog watcher (logs `mac/drive-server.log`, `mac/dog-watcher.log`); Arm/STOP and hold-to-drive (WASD/arrows); dog state and timeline; camera health with an alert whenever the XIAO restarts (reset reason, e.g. a magnetic-cable power drop); camera settings; optional detector check. Other devices log in with the password in `mac/.dashboard-password` (created on first run, gitignored; edit it to change); this Mac needs no login; STOP works without login. `--bind 127.0.0.1` keeps it to this Mac. Port 80 (a bare http://rover.local/) is taken by another local app, hence :8010. |
 | `rover_detector.py` | Mini-T detector (YOLO-World / bullseye matcher), ported with only paths and port (8767) changed. |
 | `dog_watcher.py` | Phase 1 dog companion: YOLO11s finds the dog, motion/stillness, Qwen3-VL describes what he is doing, timeline log, and drives through `drive_client.py` when the dashboard has armed the drive server. Status on :8768. |
-| `drive_client.py` | Watcher decisions → bounded pulses via the drive server (forward W 300 ms, back S 250, turn = forward arc A/D 300, scan = alternating arc A/D 350 + straight reverse S 300, park/stop X), then 0.6 s of post-stop frames before the next move. Disarmed: logs what it would send. |
+| `drive_client.py` | Watcher decisions → bounded pulses via the drive server (forward W 300 ms, back S 250, turn = forward arc A/D 300, scan = alternating arc A/D 500 + straight reverse S 300, park/stop X), then 0.6 s of post-stop frames before the next move. Disarmed: logs what it would send. |
 | `test_drive_client.py` | Disarmed records only, observe dwell, hold sends nothing, single stop on park, server down, scan arc/reverse alternation, pulses within the server's limits. |
 | `dog_behavior.py` | The companion state machine (parked → following → searching), pure logic. |
 | `test_dog_behavior.py` | State machine tests: follow on movement, tail-wag counts, park after sleep, search then park, back off when charged, stale camera stops. |
@@ -47,7 +47,7 @@ It re-runs itself under the detector Python and starts Ollama if needed. Needs
 | --- | --- | --- |
 | parked | holds still, watches | dog moves (box moves ≥0.3 box-heights/s, or pixels inside his box change: wagging, head up) → following |
 | following | back up straight if he's too close (>55% of frame height) or his box grows >25%/s; else arc toward him to centre him (±10%); else forward if he's small (<30%) | still ≥ `--sleep-after` (300 s) and the model says sleeping (or 2× that and resting) → parked; out of view 3 s → searching |
-| searching | rotate roughly in place toward the side he was last seen: forward arc, straight reverse, repeat | dog found → following; 60 s → parked |
+| searching | rotate roughly in place toward the side he was last seen: forward arc, straight reverse, repeat (~19° per pair) | dog found → following; 75 s → parked |
 
 The vision model describes him when he appears, when he starts/stops moving, and every 60 s while
 visible (at most every 15 s). Its state (`sleeping` / `resting` / `active` / `unclear`) gates parking.
@@ -59,6 +59,12 @@ Car steering: the OpenFrame has front-wheel steering and can't spin in place, an
 drive service only accepts W/A/S/D/X (changing it is off-limits), so there is no reverse with
 steering. Turns are forward arcs; rotating in place is an arc + straight-reverse shuffle, a few
 degrees per pair (measure on the chassis and tune the pulse lengths).
+
+Blocked moves: after each pulse the watcher compares the whole frame before and after with the camera's
+own frame-to-frame noise. A forward or turning move that barely changed the view counts as blocked: two in
+a row → back up straight; five → stop ("stuck") and wait 30 s. A blocked reverse → no reversing for 20 s.
+Each one is logged as a `blocked` timeline event with the change and threshold, so the simulator-tuned
+factors can be checked on the real camera.
 
 Limits: motion is judged only while the rover is stopped (camera motion would look like dog
 motion); stillness thresholds are first guesses to tune on the real dog; no drive path yet.

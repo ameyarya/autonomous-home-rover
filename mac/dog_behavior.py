@@ -8,6 +8,10 @@ States:
              dog out of view for lost_after_s -> searching.
   searching  scan in place. Dog found -> following; nothing for search_limit_s -> parked.
 
+Blocked moves: the caller reports after each pulse whether the camera view changed
+(note_move). Two blocked moves in a row -> back up straight; stuck_give_up_after -> park and
+wait stuck_wait_s (the rover is wedged on a wall or furniture and pushing achieves nothing).
+
 Motion is only judged while the rover itself is stopped (the caller passes rover_moving);
 camera ego-motion would otherwise look like the dog moving.
 
@@ -25,7 +29,11 @@ class Settings:
     sleep_after_s: float = 300.0       # dog still this long + model says sleeping -> park
     resting_factor: float = 2.0        # or still sleep_after_s * this + model says resting
     lost_after_s: float = 3.0
-    search_limit_s: float = 60.0
+    search_limit_s: float = 75.0       # a full scan turn takes ~60 s (19 deg per arc + reverse pair)
+    stuck_back_after: int = 2          # blocked moves in a row before backing out
+    stuck_give_up_after: int = 5       # ... before stopping
+    stuck_wait_s: float = 30.0
+    no_reverse_after_blocked_s: float = 20.0   # after a blocked reverse, don't reverse for this long
     center_tolerance: float = 10.0     # percent of image width either side of centre
     standoff_height: tuple = (30.0, 55.0)  # dog box height, percent of image height
     charge_rate: float = 25.0          # box height growth, percent/s, that counts as charging
@@ -104,6 +112,35 @@ class MotionTracker:
         return 0.0 if self.still_since is None else now - self.still_since
 
 
+class ViewChange:
+    """Was a move blocked? Compares the whole-frame change across a pulse with the camera's own
+    noise (frame-to-frame change while the rover is still), so the threshold suits the real camera.
+    Reversing straight away from a scene changes it least, so reverse gets a lower threshold."""
+    # Tuned in the simulator (sim/RESULTS.md): free moves changed the view >= 3.0x the noise,
+    # blocked ones <= 2.2x. Recheck on the real camera ('blocked' events in the timeline).
+    FACTOR = 2.6
+    REVERSE_FACTOR = 2.4
+    DEFAULT_NOISE = 1.2     # grey levels at 160x120, until still frames have been seen
+
+    def __init__(self):
+        self.still = collections.deque(maxlen=60)
+
+    def note_still(self, change):
+        self.still.append(change)
+
+    def noise(self):
+        if len(self.still) < 5:
+            return self.DEFAULT_NOISE
+        return sorted(self.still)[len(self.still) // 2]
+
+    def threshold(self, key='W'):
+        return self.noise() * (self.REVERSE_FACTOR if key == 'S' else self.FACTOR)
+
+    def blocked(self, key, change):
+        """Whether a pulse with this key was blocked, judged by the view change across it."""
+        return change < self.threshold(key)
+
+
 class Behavior:
     def __init__(self, settings=None):
         self.settings = settings or Settings()
@@ -113,6 +150,24 @@ class Behavior:
         self.search_started = None
         self.sleep_reason = None
         self.last_x = 50.0         # where the dog was last seen, to scan toward that side
+        self.blocked = 0           # consecutive forward/turn moves that did not change the camera view
+        self.back_blocked_at = None   # when a reverse move was last blocked
+        self.now = 0.0
+        self.stuck_until = None
+
+    def note_move(self, blocked, key='W'):
+        """Report whether the last pulse (key W/A/S/D) was blocked; None = not judged."""
+        if blocked is None:
+            return
+        if key == 'S':
+            if blocked:
+                self.back_blocked_at = self.now
+        else:
+            self.blocked = self.blocked + 1 if blocked else 0
+
+    def blocked_behind(self, now):
+        at = self.back_blocked_at
+        return at is not None and now - at < self.settings.no_reverse_after_blocked_s
 
     def asleep(self, now, model_state):
         still = self.motion.still_for(now)
@@ -129,6 +184,19 @@ class Behavior:
             self.search_started = now
 
     def update(self, now, dog, model_state=None, camera_ok=True, rover_moving=False):
+        self.now = now
+        decision = self._update(now, dog, model_state, camera_ok, rover_moving)
+        if decision.action == 'back' and self.blocked_behind(now):
+            if self.blocked >= self.settings.stuck_back_after:
+                # Wedged both ways: stop pushing.
+                self.blocked, self.back_blocked_at = 0, None
+                self._go('parked', now)
+                self.stuck_until = now + self.settings.stuck_wait_s
+                return Decision('parked', 'park', 'stuck: blocked ahead and behind; stopped')
+            return Decision(decision.state, 'hold', decision.reason + '; but blocked behind, holding')
+        return decision
+
+    def _update(self, now, dog, model_state, camera_ok, rover_moving):
         s = self.settings
         if not camera_ok:
             return Decision(self.state, 'stop', 'camera stale; not acting on old frames')
@@ -138,6 +206,18 @@ class Behavior:
             self.last_x = dog.x
             if not rover_moving:
                 self.motion.update(now, dog)
+
+        if self.stuck_until is not None:
+            if now < self.stuck_until:
+                return Decision('parked', 'hold', f'stuck; waiting {self.stuck_until - now:.0f} s before trying again')
+            self.stuck_until = None
+        if self.state != 'parked' and self.blocked >= s.stuck_give_up_after:
+            n, self.blocked = self.blocked, 0
+            self._go('parked', now)
+            self.stuck_until = now + s.stuck_wait_s
+            return Decision('parked', 'park', f'stuck: {n} moves in a row changed nothing; stopped')
+        if self.state != 'parked' and self.blocked >= s.stuck_back_after:
+            return Decision(self.state, 'back', f'blocked {self.blocked} moves in a row; backing out')
 
         if self.state == 'parked':
             if dog is not None and self.motion.moving:

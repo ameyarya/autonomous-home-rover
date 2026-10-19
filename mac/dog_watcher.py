@@ -43,7 +43,7 @@ except ImportError:
     env['DOG_WATCHER_REEXEC'] = '1'
     os.execve(str(python), [str(python), str(Path(__file__).resolve()), *sys.argv[1:]], env)
 
-from dog_behavior import Behavior, Dog, Settings  # noqa: E402
+from dog_behavior import Behavior, Dog, Settings, ViewChange  # noqa: E402
 from drive_client import DriveExecutor  # noqa: E402
 from xiao_link import DEFAULT_HOST, StaleFrame, XiaoLink  # noqa: E402
 
@@ -185,6 +185,9 @@ class Watcher:
         self.detection = None
         self.annotated = None
         self.processed = 0
+        self.last_gray = None
+        self.pre_move_gray = None
+        self.view_change = ViewChange()
         self.lock = threading.Lock()
 
     def detect(self, image):
@@ -222,6 +225,18 @@ class Watcher:
         image = cv2.imdecode(np.frombuffer(frame.jpeg, np.uint8), cv2.IMREAD_COLOR)
         h, w = image.shape[:2]
         gray = cv2.cvtColor(cv2.resize(image, (160, 120)), cv2.COLOR_BGR2GRAY)
+        if self.pre_move_gray is not None:
+            # First frame after a pulse: did the view change? If not, the move was blocked.
+            change = float(np.mean(cv2.absdiff(gray, self.pre_move_gray)))
+            blocked = self.view_change.blocked(self.executor.last_key, change)
+            self.behavior.note_move(blocked, self.executor.last_key)
+            if blocked:
+                self.timeline.log('blocked', change=round(change, 2), threshold=round(self.view_change.threshold(self.executor.last_key), 2),
+                                  in_a_row=self.behavior.blocked)
+            self.pre_move_gray = None
+        elif self.last_gray is not None:
+            self.view_change.note_still(float(np.mean(cv2.absdiff(gray, self.last_gray))))   # camera noise
+        self.last_gray = gray
         found = self.detect(image)
         dog = None
         if found:
@@ -274,6 +289,7 @@ class Watcher:
             # The camera moved: restart the dog-motion window and in-box pixel baseline.
             self.behavior.motion.samples.clear()
             self.prev_gray = None
+            self.pre_move_gray = self.last_gray
             self.timeline.log('drive', action=decision.action, pulse=result['sent'], reason=decision.reason)
         elif result.get('sent') == 'X' and (previous is None or previous.action != decision.action):
             self.timeline.log('drive', action=decision.action, pulse='X', reason=decision.reason)

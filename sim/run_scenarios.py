@@ -27,7 +27,7 @@ import numpy as np  # noqa: E402
 
 import drive_client  # noqa: E402
 import rover_sim as rs  # noqa: E402
-from dog_behavior import Behavior, Dog, Settings  # noqa: E402
+from dog_behavior import Behavior, Dog, Settings, ViewChange  # noqa: E402
 
 FRAME_PERIOD_S = 0.2
 CAMERA_FRAME_S = 1 / 25
@@ -80,10 +80,16 @@ class Episode:
         self.moving = None
         self.trace = []
         self.pulses = []
+        self.pre_move_gray = None
+        self.last_gray = None
+        self.view_change = ViewChange()
+        self.last_key = None
+        self.move_changes = []   # (frame change after a pulse, truly blocked)
 
     def _post(self, path, body=None, timeout=0):
         if path == '/pulse':
             self.pulses.append((round(self.w.t, 2), body['key'], body['ms']))
+            self.last_key = body['key']
             self.w.pulse(body['key'], body['ms'])
         return {'ok': True}
 
@@ -91,6 +97,14 @@ class Episode:
         w = self.w
         now = w.t
         gray, mask, _ = w.camera()
+        if self.pre_move_gray is not None:
+            change = float(np.mean(np.abs(gray - self.pre_move_gray)))
+            self.move_changes.append((change, w.last_pulse_blocked, self.last_key))
+            self.behavior.note_move(self.view_change.blocked(self.last_key, change), self.last_key)
+            self.pre_move_gray = None
+        elif self.last_gray is not None:
+            self.view_change.note_still(float(np.mean(np.abs(gray - self.last_gray))))
+        self.last_gray = gray
         found = w.detect(mask)
         dog = None
         if found:
@@ -122,8 +136,10 @@ class Episode:
         if sent and sent != 'X':
             self.behavior.motion.samples.clear()
             self.prev_gray = None
+            self.pre_move_gray = gray
         in_view = bool(mask.sum() >= 40)
         self.trace.append({'t': round(now, 2), 'state': decision.state, 'action': decision.action, 'sent': sent,
+                           'reason': decision.reason,
                            'detected': dog is not None, 'in_view': in_view, 'gap': round(w.gap_to_dog(), 3),
                            'dog': truth, 'dog_speed': w.dog.speed, 'x': round(w.x, 3), 'y': round(w.y, 3),
                            'yaw': round(w.yaw, 3)})
@@ -236,6 +252,9 @@ def metrics(name, ep, world):
         'final_state': states[-1],
         'time_following_s': round(len(following) * FRAME_PERIOD_S, 1),
         'searched': 'searching' in states,
+        'blocked_pulses': sum(b for _, b, _k in ep.move_changes),
+        'stuck_stops': sum(1 for r in tr if r['action'] == 'park' and r['reason'].startswith('stuck')),
+        'move_changes': [(round(c, 2), b, k) for c, b, k in ep.move_changes],
     }
     if name == 'walk_then_sleep':
         slept = first(lambda r: r['dog'] == 'sleeping')
