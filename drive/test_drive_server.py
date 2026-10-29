@@ -17,6 +17,13 @@ class FakeTx:
     def wire(self, key):
         self.calls.append(key)
 
+    def update_app(self, source):
+        self.installed_source = source
+        self.calls.append('UPDATE')
+
+    def status(self):
+        return 'rover-drive-test|0'
+
     def pulse(self, key, ms, abort=None):
         self.calls.append(f'{key}{ms}')
         end = time.monotonic() + ms / 1000
@@ -102,6 +109,28 @@ class DriveStateTest(unittest.TestCase):
         self.s.arm(True)
         with self.assertRaises(ValueError):
             self.s.hold('Q')
+
+    def test_calibration_install_disarms_then_updates(self):
+        import calibration
+        original = calibration.CAL_FILE.read_text()
+        try:
+            self.s.arm(True)
+            values = dict(calibration.load(), motor_signs=[1, -1], steer_center=95)
+            result = self.s.save_calibration(values, install=True)
+            self.assertFalse(self.s.armed)
+            self.assertEqual(self.tx.calls[-2:], ['X', 'UPDATE'])
+            self.assertIn(b'MOTOR_SIGNS = (1, -1)', self.tx.installed_source)
+            self.assertIn(b'STEER_CENTER = 95', self.tx.installed_source)
+            self.assertEqual(result['saved']['steer_center'], 95)
+        finally:
+            calibration.CAL_FILE.write_text(original)
+
+    def test_calibration_rejects_bad_values(self):
+        import calibration
+        with self.assertRaises(ValueError):
+            calibration.validate(dict(calibration.load(), steer_travel=90))
+        with self.assertRaises(ValueError):
+            calibration.validate(dict(calibration.load(), motor_signs=[1, 0]))
 
     def test_bad_key(self):
         self.s.arm(True)

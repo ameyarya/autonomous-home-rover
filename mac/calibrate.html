@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Calibrate Drive</title>
+<style>
+:root{color-scheme:dark;--bg:#10151d;--panel:#19212d;--line:#2c3748;--line2:#40516b;--fg:#edf2fa;--dim:#9caec5;--dim2:#8295af;--ok:#91dfb7;--warn:#f0c674;--bad:#ff8b80;font-family:system-ui;background:var(--bg);color:var(--fg)}
+*{box-sizing:border-box}body{max-width:1100px;margin:auto;padding:16px;background:var(--bg)}
+a{color:var(--dim)}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+h1{font-size:22px;margin:0}h2{font-size:15px;margin:0 0 10px}h3{font-size:13px;margin:0 0 4px}
+.muted{color:var(--dim);font-size:12px}
+.chip{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 10px;border:1px solid var(--line2);border-radius:999px;font-size:12px;background:var(--panel)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dim2)}.dot.ok{background:#3fb950}.dot.warn{background:var(--warn)}
+.chip button{font-size:11px;padding:3px 9px}
+.banner{margin-bottom:12px;padding:10px 12px;border:1px solid #9a6a12;background:#3a2a0b;border-radius:10px;font-size:13px}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:16px}
+@media(max-width:820px){main{grid-template-columns:minmax(0,1fr)}}
+.card{padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-width:0}
+button{font:inherit;color:inherit;background:#29364a;border:1px solid var(--line2);border-radius:8px;padding:9px 12px;cursor:pointer;touch-action:none;user-select:none}
+button:hover{background:#344662}button:active{background:#42648e}button:disabled{opacity:.45;cursor:not-allowed}
+.primary{background:#277b58;border-color:#46a477}.danger{background:#8e2a24;border-color:#d1554b;font-weight:700}.armed{background:#9a6a12;border-color:#e0a83a}
+.row{display:flex;gap:8px;align-items:center}.row>button{flex:1}
+.g{display:grid;grid-template-columns:repeat(3,64px);gap:6px;justify-content:center;margin:12px 0}
+.g button{height:48px;padding:0;font-size:15px;font-weight:600}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim2)}
+input[type=range]{width:100%}
+.status{font-size:12px;color:var(--dim);line-height:1.5;min-height:18px;margin:8px 0 0}
+.step{border-top:1px solid #354154;padding:12px 0}.step:first-of-type{border-top:0;padding-top:0}
+.step p{font-size:12px;color:var(--dim);margin:0 0 8px;line-height:1.5}
+.check{flex-direction:row;align-items:center;gap:8px;color:var(--fg);font-size:13px}
+input[type=checkbox]{width:18px;height:18px}
+.stepper{display:flex;align-items:center;gap:6px}.stepper button{width:44px;padding:6px}
+.stepper output{min-width:64px;text-align:center;font-size:16px;font-variant-numeric:tabular-nums}
+.install{position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid #354154}
+#install{width:100%;font-size:15px;padding:12px}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+</style></head><body>
+<header>
+  <div><h1>Calibrate drive</h1><div class="muted"><a href="/">← Dashboard</a> · receiver app <span id="installed">…</span></div></div>
+  <div class="chip"><span class="dot" id="drive-dot"></span>Drive server <b id="drive-chip">…</b><button id="drive-svc" hidden></button></div>
+</header>
+<div class="banner"><b>Lift the rover</b> so the wheels are off the ground before testing. STOP (or Esc / Space) stops at once and centres the steering.</div>
+<main>
+  <section class="card">
+    <h2>Test</h2>
+    <div class="row"><button id="arm">Arm</button><button id="stop" class="danger">STOP</button></div>
+    <label style="margin-top:12px">Pulse length <span><output id="ms-out">300</output> ms</span><input id="ms" type="range" min="100" max="600" step="50" value="300"></label>
+    <div class="g">
+      <span></span><button data-key="W" title="Forward, steering centred">W ↑</button><span></span>
+      <button data-key="A" title="Forward, steering left">A ↖</button><button data-key="S" title="Reverse, steering centred">S ↓</button><button data-key="D" title="Forward, steering right">D ↗</button>
+    </div>
+    <p class="muted">Click a button for one pulse. Reverse is capped at 400 ms, the others at 600 ms. Holding a key (W/A/S/D or arrows) drives while held.</p>
+    <p class="status" id="drive-status">Drive server offline</p>
+  </section>
+  <section class="card">
+    <h2>Calibration</h2>
+    <div class="step"><h3>1 · Motor directions</h3>
+      <p>Press <b>W</b>. Every wheel should spin forward. If one axle spins backwards, flip its motor.</p>
+      <label class="check"><input type="checkbox" id="flip0"> Flip motor 1 (M1)</label>
+      <label class="check"><input type="checkbox" id="flip1"> Flip motor 2 (M2)</label>
+    </div>
+    <div class="step"><h3>2 · Steering direction</h3>
+      <p>Press <b>A</b>. The front wheels should turn <b>left</b>. If they turn right, swap.</p>
+      <label class="check"><input type="checkbox" id="swap"> Swap steering left/right</label>
+    </div>
+    <div class="step"><h3>3 · Steering centre</h3>
+      <p>Press <b>STOP</b> (it centres the steering) and look from above. Nudge until the front wheels point straight.</p>
+      <div class="stepper"><button data-adj="steer_center" data-d="-1">−1°</button><output id="steer_center">90</output><button data-adj="steer_center" data-d="1">+1°</button></div>
+    </div>
+    <div class="step"><h3>4 · Steering range</h3>
+      <p>Press <b>A</b> and <b>D</b>. Raise until the wheels reach nearly full lock; lower it if the servo buzzes or strains at the end.</p>
+      <div class="stepper"><button data-adj="steer_travel" data-d="-2">−2°</button><output id="steer_travel">20</output><button data-adj="steer_travel" data-d="2">+2°</button></div>
+    </div>
+    <div class="step"><h3>5 · Speed</h3>
+      <p>Motor power for every move (of 2048). Indoor dog-following: slow enough to stop well short of him.</p>
+      <label><span><output id="speed-out">900</output></span><input id="speed" type="range" min="200" max="1600" step="50" value="900"></label>
+    </div>
+    <div class="install">
+      <button id="install" class="primary">Install on rover</button>
+      <p class="status" id="cal-status">Loading…</p>
+    </div>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+async function getJSON(u){const r=await fetch(u,{cache:'no-store'});let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error(j.error||r.status);return j}
+async function postJSON(u,b){const r=await fetch(u,{method:'POST',body:JSON.stringify(b||{})});let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error(j.error||r.status);return j}
+
+// ---- calibration form ----
+let cal=null,limits={},expected=null,installedApp=null,installing=false;
+function fromForm(){return {speed:+$('speed').value,motor_signs:[$('flip0').checked?-1:1,$('flip1').checked?-1:1],
+  steer_sign:$('swap').checked?-1:1,steer_channel:cal?cal.steer_channel:2,steer_center:+$('steer_center').value,steer_travel:+$('steer_travel').value}}
+function toForm(c){cal=c;$('speed').value=c.speed;$('speed-out').value=c.speed;$('flip0').checked=c.motor_signs[0]<0;$('flip1').checked=c.motor_signs[1]<0;
+  $('swap').checked=c.steer_sign<0;$('steer_center').value=c.steer_center;$('steer_travel').value=c.steer_travel}
+function same(a,b){return Object.keys(a).every(k=>JSON.stringify(a[k])===JSON.stringify(b[k]))}
+function showCal(){
+  if(installing)return;
+  const changed=cal&&!same(fromForm(),cal);
+  const appVer=(installedApp||'').split('|')[0];
+  let t,cls;
+  if(changed){t='Changed — not installed yet. Install to try it.';cls='warn'}
+  else if(expected&&appVer===expected){t=`Installed: ${appVer}`;cls='ok'}
+  else if(appVer){t=`Saved but the rover runs ${appVer}. Install to apply.`;cls='warn'}
+  else{t='Saved. Start the drive server to see what the rover runs.';cls=''}
+  $('cal-status').textContent=t;$('cal-status').className='status '+cls}
+async function loadCal(){try{const r=await getJSON('/drive/calibration');limits=r.limits;expected=r.expected_version;installedApp=r.installed;
+  if(!cal||!installing)toForm(r.saved);$('installed').textContent=(r.installed||'unknown').split('|')[0];showCal()}
+  catch(e){$('cal-status').textContent='Drive server offline — start it above (transmitter on USB).';$('cal-status').className='status'}}
+document.querySelectorAll('[data-adj]').forEach(b=>b.onclick=()=>{const k=b.dataset.adj,o=$(k),[lo,hi]=limits[k]||[0,180];
+  o.value=Math.max(lo,Math.min(hi,+o.value+ +b.dataset.d));showCal()});
+['flip0','flip1','swap'].forEach(id=>$(id).onchange=showCal);
+$('speed').oninput=()=>{$('speed-out').value=$('speed').value;showCal()};
+$('install').onclick=async()=>{installing=true;$('install').disabled=true;armed=false;
+  $('cal-status').textContent='Installing on the rover over the radio (10–30 s)… it is disarmed meanwhile.';$('cal-status').className='status';
+  try{const r=await postJSON('/drive/calibration',{values:fromForm(),install:true});installing=false;toForm(r.saved);expected=r.expected_version;installedApp=r.installed;
+    $('installed').textContent=(r.installed||'').split('|')[0];showCal();$('cal-status').textContent+=' Press STOP to centre the steering, then Arm and test.'}
+  catch(e){installing=false;$('cal-status').textContent='Install failed: '+e.message+' (the rover keeps its previous app).';$('cal-status').className='status bad'}
+  $('install').disabled=false};
+loadCal();setInterval(()=>{if(!installing)getJSON('/drive/status').then(s=>{installedApp=s.installed;showCal()}).catch(()=>{})},3000);
+
+// ---- drive server service ----
+async function svcPoll(){try{const s=(await getJSON('/services')).drive;const b=$('drive-svc');b.hidden=s.running&&!s.managed;
+  $('drive-dot').className='dot '+(s.running?'ok':s.starting?'warn':'');$('drive-chip').textContent=s.running?'running':s.starting?'starting…':(s.exited!=null?'exited':'off');
+  $('drive-chip').title=s.log_tail||'';b.textContent=(s.running||s.starting)?'Stop':'Start';b.dataset.act=(s.running||s.starting)?'stop':'start';
+  if(s.running&&!cal)loadCal()}catch(e){}setTimeout(svcPoll,2000)}
+$('drive-svc').onclick=async e=>{e.target.disabled=true;try{await postJSON(`/services/drive/${e.target.dataset.act}`)}catch(err){alert(err.message)}e.target.disabled=false};
+svcPoll();
+
+// ---- arm / stop / pulses / hold ----
+let armed=false,held=null,holdTimer=null,note='',noteUntil=0;
+$('ms').oninput=()=>$('ms-out').value=$('ms').value;
+function showDrive(s){if(s.armed===undefined){$('drive-status').textContent='Drive server offline';return}
+  armed=!!s.armed;$('arm').textContent=armed?'Armed · click to disarm':'Arm';$('arm').className=armed?'armed':'';
+  const l=s.last;const last=l?(l.manual?`held ${l.key}`:l.key==='X'?`stopped (${l.why||'stop'})`:`pulse ${l.key} ${l.ms} ms, stop ACKed after ${l.stopped_after_ms} ms`):'nothing yet';
+  $('drive-status').textContent=(armed?'ARMED. ':'Disarmed. ')+'Last: '+last+(s.busy?' · busy':'')+(s.error?' · '+s.error:'')+(Date.now()<noteUntil?' · '+note:'')}
+async function lease(){if(!installing){try{showDrive(armed?await postJSON('/drive/arm',{armed:true}):await getJSON('/drive/status'))}catch(e){armed=false;$('arm').textContent='Arm';$('arm').className='';$('drive-status').textContent='Drive server offline'}}setTimeout(lease,1000)}
+lease();
+$('arm').onclick=async()=>{try{showDrive(await postJSON('/drive/arm',{armed:!armed}))}catch(e){$('drive-status').textContent=e.message}};
+async function estop(){release();armed=false;try{showDrive(await postJSON('/drive/stop'))}catch(e){}}
+$('stop').onclick=estop;
+async function pulse(key){if(!armed){$('drive-status').textContent='Arm first.';return}
+  const ms=key==='S'?Math.min(400,+$('ms').value):+$('ms').value;
+  try{await postJSON('/drive/pulse',{key,ms});showDrive(await getJSON('/drive/status'))}
+  catch(e){note='pulse refused: '+e.message;noteUntil=Date.now()+5000;$('drive-status').textContent=note}}
+document.querySelectorAll('.g button').forEach(b=>b.onclick=()=>pulse(b.dataset.key));
+function press(key){if(!armed){$('drive-status').textContent='Arm first.';return}if(held===key)return;held=key;
+  const send=()=>postJSON('/drive/hold',{key}).catch(e=>{$('drive-status').textContent=e.message;release()});send();clearInterval(holdTimer);holdTimer=setInterval(send,150)}
+function release(){held=null;clearInterval(holdTimer);holdTimer=null}
+const keymap={w:'W',arrowup:'W',a:'A',arrowleft:'A',s:'S',arrowdown:'S',d:'D',arrowright:'D'};
+addEventListener('keydown',e=>{if(e.target.closest('input'))return;const k=e.key.toLowerCase();
+  if(k==='escape'||k===' '){e.preventDefault();estop();return}if(keymap[k]){e.preventDefault();press(keymap[k])}});
+addEventListener('keyup',e=>{if(keymap[e.key.toLowerCase()]===held)release()});
+addEventListener('blur',release);
+addEventListener('pagehide',()=>{if(armed)navigator.sendBeacon('/drive/stop','{}')});
+</script>
+</body></html>

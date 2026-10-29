@@ -1,0 +1,8 @@
+{
+ "speed": 900,
+ "motor_signs": [1, 1],
+ "steer_sign": 1,
+ "steer_channel": 2,
+ "steer_center": 90,
+ "steer_travel": 20
+}

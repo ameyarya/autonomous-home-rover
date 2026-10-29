@@ -14,9 +14,12 @@ and travel. Start with small STEER_TRAVEL; a servo forced past the linkage's end
 import time
 import __main__ as receiver
 
-VERSION = 'rover-drive-0.2'
+# Calibration: the drive server rewrites these lines from drive/calibration.json when you press
+# "Install on rover" on the dashboard's Calibrate page (http://rover.local:8010/calibrate).
+VERSION = 'rover-drive-0.3'
 SPEED = 900                 # of 2048; indoor dog-following pace
 MOTOR_SIGNS = (1, 1)        # flip one if that axle drives backwards
+STEER_SIGN = 1              # -1 swaps left/right if A turns the wheels right
 STEER_CHANNEL = 2           # receiver servo port S2
 STEER_CENTER = 90
 STEER_TRAVEL = 20           # degrees each way; raise only after checking the linkage limits
@@ -46,7 +49,7 @@ class TankApp:
 
     def set_steer(self, steer):
         self.steer = steer
-        self.servos.set_angle(STEER_CHANNEL, STEER_CENTER + steer * STEER_TRAVEL)
+        self.servos.set_angle(STEER_CHANNEL, STEER_CENTER + STEER_SIGN * steer * STEER_TRAVEL)
 
     def ensure_servo(self):
         if self.servos is not None:

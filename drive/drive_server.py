@@ -9,6 +9,9 @@ Run: python3 drive/drive_server.py        (HTTP on 127.0.0.1:8769)
   POST /hold   {"key": "W"}        manual hold-to-drive: drives while renewed every ~150 ms, stops with
                                    ACK HOLD_S after the last renewal; refused (403) unless armed
   POST /stop                       abort any pulse or hold, disarm, stop with ACK
+  GET  /calibration                saved calibration, the app version it makes, the installed app
+  POST /calibration {values, install}   save (validated); install=true disarms, then installs the
+                                   calibrated app on the receiver with the signed update
 
 Motion only happens while armed, and the arm lease must be renewed every second or so
 (the dashboard page does this while its Arm switch is on). If the page closes, the network
@@ -24,6 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import calibration  # noqa: E402
 
 LEASE_S = 3.0
 PULSE_LIMITS_MS = {'W': 600, 'S': 400, 'A': 600, 'D': 600}
@@ -45,6 +49,7 @@ class DriveState:
         self.hold_until = 0.0
         self.manual_until = 0.0
         self.holding = False
+        self.installed = None         # receiver app|running, refreshed after installs
 
     @property
     def armed(self):
@@ -124,6 +129,25 @@ class DriveState:
         finally:
             self.holding = False
 
+    def calibration(self):
+        saved = calibration.load()
+        return {'saved': saved, 'expected_version': calibration.version(saved), 'installed': self.installed,
+                'limits': calibration.LIMITS}
+
+    def save_calibration(self, values, install):
+        saved = calibration.save(values)
+        if install:
+            self.stop('installing calibration')
+            source = calibration.render(saved)
+            with self.lock:
+                self.busy = True
+                try:
+                    self.tx.update_app(source)
+                    self.installed = self.tx.status()
+                finally:
+                    self.busy = False
+        return self.calibration()
+
     def watchdog(self):
         was_armed = False
         while True:
@@ -135,6 +159,7 @@ class DriveState:
 
     def status(self):
         return {'armed': self.armed, 'busy': self.busy, 'holding': self.hold_key if self.holding else None,
+                'installed': self.installed,
                 'last': self.last, 'error': self.error, 'lease_s': LEASE_S, 'pulse_limits_ms': PULSE_LIMITS_MS}
 
 
@@ -155,6 +180,8 @@ def make_handler(state):
         def do_GET(self):
             if self.path == '/status':
                 return self.reply(200, state.status())
+            if self.path == '/calibration':
+                return self.reply(200, state.calibration())
             self.reply(404, {'error': 'not found'})
 
         def do_POST(self):
@@ -168,6 +195,9 @@ def make_handler(state):
                 if self.path == '/pulse':
                     b = self.body()
                     return self.reply(200, state.pulse(str(b.get('key', '')).upper(), b.get('ms', 0)))
+                if self.path == '/calibration':
+                    b = self.body()
+                    return self.reply(200, state.save_calibration(b.get('values') or {}, bool(b.get('install'))))
                 if self.path == '/hold':
                     return self.reply(200, state.hold(str(self.body().get('key', '')).upper()))
                 self.reply(404, {'error': 'not found'})
@@ -194,9 +224,10 @@ def main():
     from rover_drive import Transmitter
     tx = Transmitter()
     state = DriveState(tx)
+    state.installed = tx.status()
     threading.Thread(target=state.watchdog, daemon=True).start()
     server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(state))
-    print(f'drive server on http://127.0.0.1:{args.port} (disarmed; receiver app {tx.status()})', flush=True)
+    print(f'drive server on http://127.0.0.1:{args.port} (disarmed; receiver app {state.installed})', flush=True)
     try:
         server.serve_forever()
     finally:

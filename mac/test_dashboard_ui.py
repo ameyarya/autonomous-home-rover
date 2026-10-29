@@ -113,6 +113,15 @@ class FakeTx:
         self.calls.append(f'{key}{ms}')
         self.stop()
 
+    def update_app(self, source):
+        self.installed_source = source
+        self.calls.append('UPDATE')
+        import re
+        self.version = re.search(rb"^VERSION = '([^']+)'", source, re.M).group(1).decode()
+
+    def status(self):
+        return getattr(self, 'version', 'rover-drive-0.2') + '|0'
+
 
 class FakeCamera(BaseHTTPRequestHandler):
     config = {'framesize': 'vga', 'quality': 12, 'vflip': 0, 'hmirror': 1, 'brightness': 0,
@@ -169,9 +178,15 @@ class FakeWatcher(BaseHTTPRequestHandler):
 class DashboardUITest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        import calibration, shutil, tempfile
+        cls.cal_dir = tempfile.mkdtemp()
+        cls.cal_file = Path(cls.cal_dir) / 'calibration.json'
+        shutil.copy(calibration.CAL_FILE, cls.cal_file)
+        calibration.CAL_FILE = cls.cal_file            # never touch the real drive/calibration.json
         cls.camera = serve(FakeCamera)
         cls.tx = FakeTx()
         cls.drive_state = drive_server.DriveState(cls.tx)
+        cls.drive_state.installed = cls.tx.status()     # as drive_server.main() does at startup
         cls.drive = serve(drive_server.make_handler(cls.drive_state))
         dashboard.DRIVE_URL = f'http://127.0.0.1:{cls.drive.server_port}'
         dashboard.DOG_WATCHER_URL = f'http://127.0.0.1:{free_port()}'      # nothing there: watcher offline
@@ -194,6 +209,7 @@ class DashboardUITest(unittest.TestCase):
     def setUp(self):
         self.link.frames = True
         self.drive_state.stop('test reset')
+        self.drive_state.manual_until = 0.0     # no carry-over of the post-manual-driving pause
         self.tx.calls.clear()
         self.context = self.browser.new_context(viewport={'width': 1400, 'height': 1000})
         self.page = self.context.new_page()
@@ -343,6 +359,44 @@ class DashboardUITest(unittest.TestCase):
         finally:
             dashboard.DOG_WATCHER_URL = old
             watcher.shutdown()
+
+    # ---- calibrate page ----
+
+    def test_calibrate_loads_changes_and_installs(self):
+        self.page.goto(self.url + 'calibrate')
+        expect(self.page.locator('#steer_center')).to_have_text('90')
+        expect(self.page.locator('#cal-status')).to_contain_text('Install to apply')
+        self.page.click('[data-adj=steer_center][data-d="1"]')
+        self.page.check('#flip1')
+        expect(self.page.locator('#cal-status')).to_contain_text('Changed')
+        self.page.click('#install')
+        expect(self.page.locator('#cal-status')).to_contain_text('Installed: rover-drive-0.3+c', timeout=10000)
+        self.assertIn(b'STEER_CENTER = 91', self.tx.installed_source)
+        self.assertIn(b'MOTOR_SIGNS = (1, -1)', self.tx.installed_source)
+        self.assertFalse(self.drive_state.armed)
+        saved = json.loads(self.cal_file.read_text())
+        self.assertEqual((saved['steer_center'], saved['motor_signs']), (91, [1, -1]))
+
+    def test_calibrate_pulse_error_stays_visible(self):
+        self.page.goto(self.url + 'calibrate')
+        self.page.click('#arm')
+        expect(self.page.locator('#arm')).to_contain_text('Armed')
+        self.drive_state.manual_until = time.monotonic() + 10      # as right after hold-to-drive
+        self.page.click('.g button[data-key=W]')
+        expect(self.page.locator('#drive-status')).to_contain_text('manual driving')
+        self.page.wait_for_timeout(1500)                            # survives the next status poll
+        expect(self.page.locator('#drive-status')).to_contain_text('manual driving')
+
+    def test_calibrate_pulse_needs_arm_then_sends(self):
+        self.page.goto(self.url + 'calibrate')
+        self.page.click('.g button[data-key=W]')
+        expect(self.page.locator('#drive-status')).to_contain_text('Arm first')
+        self.page.click('#arm')
+        expect(self.page.locator('#arm')).to_contain_text('Armed')
+        self.page.fill('#ms', '200')
+        self.page.click('.g button[data-key=A]')
+        expect(self.page.locator('#drive-status')).to_contain_text('pulse A 200 ms')
+        self.assertIn('A200', self.tx.calls)
 
     # ---- layout ----
 
