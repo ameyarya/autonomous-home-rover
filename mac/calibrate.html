@@ -30,6 +30,7 @@ input[type=range]{width:100%}
 input[type=checkbox]{width:18px;height:18px}
 .stepper{display:flex;align-items:center;gap:6px}.stepper button{width:44px;padding:6px}
 .stepper output{min-width:64px;text-align:center;font-size:16px;font-variant-numeric:tabular-nums}
+.row button.sel{background:#277b58;border-color:#46a477}
 .install{position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid #354154}
 #install{width:100%;font-size:15px;padding:12px}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
@@ -57,6 +58,10 @@ input[type=checkbox]{width:18px;height:18px}
       <p>Press <b>W</b>. Every wheel should spin forward. If one axle spins backwards, flip its motor.</p>
       <label class="check"><input type="checkbox" id="flip0"> Flip motor 1 (M1)</label>
       <label class="check"><input type="checkbox" id="flip1"> Flip motor 2 (M2)</label>
+    </div>
+    <div class="step"><h3>0 · Steering servo port</h3>
+      <p>Which receiver port the steering servo is plugged into (printed on the board next to the pins). If <b>A</b>/<b>D</b> don't move the servo, this is usually why.</p>
+      <div class="row" id="ports"><button data-port="1">S1</button><button data-port="2">S2</button><button data-port="3">S3</button><button data-port="4">S4</button></div>
     </div>
     <div class="step"><h3>2 · Steering direction</h3>
       <p>Press <b>A</b>. The front wheels should turn <b>left</b>. If they turn right, swap.</p>
@@ -86,10 +91,12 @@ async function getJSON(u){const r=await fetch(u,{cache:'no-store'});let j={};try
 async function postJSON(u,b){const r=await fetch(u,{method:'POST',body:JSON.stringify(b||{})});let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error(j.error||r.status);return j}
 
 // ---- calibration form ----
-let cal=null,limits={},expected=null,installedApp=null,installing=false;
+let cal=null,limits={},expected=null,installedApp=null,installing=false,port=2;
+function showPort(){document.querySelectorAll('[data-port]').forEach(b=>b.classList.toggle('sel',+b.dataset.port===port))}
+document.querySelectorAll('[data-port]').forEach(b=>b.onclick=()=>{port=+b.dataset.port;showPort();showCal()});
 function fromForm(){return {speed:+$('speed').value,motor_signs:[$('flip0').checked?-1:1,$('flip1').checked?-1:1],
-  steer_sign:$('swap').checked?-1:1,steer_channel:cal?cal.steer_channel:2,steer_center:+$('steer_center').value,steer_travel:+$('steer_travel').value}}
-function toForm(c){cal=c;$('speed').value=c.speed;$('speed-out').value=c.speed;$('flip0').checked=c.motor_signs[0]<0;$('flip1').checked=c.motor_signs[1]<0;
+  steer_sign:$('swap').checked?-1:1,steer_channel:port,steer_center:+$('steer_center').value,steer_travel:+$('steer_travel').value}}
+function toForm(c){cal=c;port=c.steer_channel;showPort();$('speed').value=c.speed;$('speed-out').value=c.speed;$('flip0').checked=c.motor_signs[0]<0;$('flip1').checked=c.motor_signs[1]<0;
   $('swap').checked=c.steer_sign<0;$('steer_center').value=c.steer_center;$('steer_travel').value=c.steer_travel}
 function same(a,b){return Object.keys(a).every(k=>JSON.stringify(a[k])===JSON.stringify(b[k]))}
 function showCal(){
