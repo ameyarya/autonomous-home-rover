@@ -179,7 +179,7 @@ function showDrive(s){
   armed=!!s.armed;
   $('arm').textContent=armed?'Armed · click to disarm':'Arm';$('arm').className=armed?'armed':'';
   const last=s.last?(s.last.manual?`manual ${s.last.key}`:s.last.key==='X'?`stopped (${s.last.why||'stop'})`:`pulse ${s.last.key} ${s.last.ms} ms`):'nothing yet';
-  $('drive-status').textContent=(armed?'ARMED — the rover can move. ':'Disarmed. ')+`Last: ${last}`+(s.holding?` · holding ${s.holding}`:'')+(s.error?` · ${s.error}`:'')}
+  $('drive-status').textContent=((s.installed||'').includes('-steertest')?'Steering-only test mode is installed: A/D won\'t drive. Turn it off on the Calibrate page. ':'')+(armed?'ARMED — the rover can move. ':'Disarmed. ')+`Last: ${last}`+(s.holding?` · holding ${s.holding}`:'')+(s.error?` · ${s.error}`:'')}
 async function lease(){
   try{showDrive(armed?await postJSON('/drive/arm',{armed:true}):await getJSON('/drive/status'))}
   catch(e){armed=false;$('arm').textContent='Arm';$('arm').className='';$('drive-status').textContent='Drive server offline — start it from the header (transmitter on USB).'}

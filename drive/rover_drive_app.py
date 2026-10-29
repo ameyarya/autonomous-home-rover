@@ -23,6 +23,7 @@ STEER_SIGN = 1              # -1 swaps left/right if A turns the wheels right
 STEER_CHANNEL = 2           # receiver servo port S2
 STEER_CENTER = 90
 STEER_TRAVEL = 20           # degrees each way; raise only after checking the linkage limits
+STEER_ONLY = False          # bench test: A/D turn the servo without driving (never leave on)
 STEER_HOLD_MS = 500         # steering re-centres if no command arrives
 
 
@@ -35,7 +36,8 @@ class TankApp:
         a, b = MOTOR_SIGNS
         fwd = (a * SPEED, b * SPEED)
         rev = (-a * SPEED, -b * SPEED)
-        self.moves = {b'W': (fwd, 0), b'A': (fwd, -1), b'D': (fwd, 1), b'S': (rev, 0), b'X': ((0, 0), 0)}
+        arc = (0, 0) if STEER_ONLY else fwd
+        self.moves = {b'W': (fwd, 0), b'A': (arc, -1), b'D': (arc, 1), b'S': (rev, 0), b'X': ((0, 0), 0)}
 
     def command(self, key):
         motors, steer = self.moves.get(key, ((0, 0), 0))

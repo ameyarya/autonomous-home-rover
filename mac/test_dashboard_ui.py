@@ -181,7 +181,8 @@ class DashboardUITest(unittest.TestCase):
         import calibration, shutil, tempfile
         cls.cal_dir = tempfile.mkdtemp()
         cls.cal_file = Path(cls.cal_dir) / 'calibration.json'
-        shutil.copy(calibration.CAL_FILE, cls.cal_file)
+        cls.cal_file.write_text(json.dumps({'speed': 900, 'motor_signs': [1, 1], 'steer_sign': 1, 'steer_channel': 2,
+                                            'steer_center': 90, 'steer_travel': 20}))   # fixed start, not the live file
         calibration.CAL_FILE = cls.cal_file            # never touch the real drive/calibration.json
         cls.camera = serve(FakeCamera)
         cls.tx = FakeTx()
@@ -379,6 +380,18 @@ class DashboardUITest(unittest.TestCase):
         self.assertFalse(self.drive_state.armed)
         saved = json.loads(self.cal_file.read_text())
         self.assertEqual((saved['steer_center'], saved['motor_signs']), (91, [1, -1]))
+
+    def test_steering_only_test_mode(self):
+        self.page.goto(self.url + 'calibrate')
+        expect(self.page.locator('#steer_center')).not_to_have_text('')
+        self.page.check('#steeronly')
+        self.page.click('#install')
+        expect(self.page.locator('#cal-status')).to_contain_text('steering-only test is ON', timeout=10000)
+        self.assertIn(b'STEER_ONLY = True', self.tx.installed_source)
+        self.page.uncheck('#steeronly')
+        self.page.click('#install')
+        expect(self.page.locator('#cal-status')).not_to_contain_text('steering-only', timeout=10000)
+        self.assertIn(b'STEER_ONLY = False', self.tx.installed_source)
 
     def test_calibrate_pulse_error_stays_visible(self):
         self.page.goto(self.url + 'calibrate')

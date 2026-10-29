@@ -67,6 +67,10 @@ input[type=checkbox]{width:18px;height:18px}
       <p>Press <b>A</b>. The front wheels should turn <b>left</b>. If they turn right, swap.</p>
       <label class="check"><input type="checkbox" id="swap"> Swap steering left/right</label>
     </div>
+    <div class="step"><h3>Steering-only test</h3>
+      <p>While on: <b>A</b>/<b>D</b> turn the servo without spinning the motors, for checking direction, centre and range on the stand. <b>Turn it off and install again before driving</b>: with it on, the rover can't turn.</p>
+      <label class="check"><input type="checkbox" id="steeronly"> A/D steer only (no driving)</label>
+    </div>
     <div class="step"><h3>3 · Steering centre</h3>
       <p>Press <b>STOP</b> (it centres the steering) and look from above. Nudge until the front wheels point straight.</p>
       <div class="stepper"><button data-adj="steer_center" data-d="-1">−1°</button><output id="steer_center">90</output><button data-adj="steer_center" data-d="1">+1°</button></div>
@@ -95,9 +99,9 @@ let cal=null,limits={},expected=null,installedApp=null,installing=false,port=2;
 function showPort(){document.querySelectorAll('[data-port]').forEach(b=>b.classList.toggle('sel',+b.dataset.port===port))}
 document.querySelectorAll('[data-port]').forEach(b=>b.onclick=()=>{port=+b.dataset.port;showPort();showCal()});
 function fromForm(){return {speed:+$('speed').value,motor_signs:[$('flip0').checked?-1:1,$('flip1').checked?-1:1],
-  steer_sign:$('swap').checked?-1:1,steer_channel:port,steer_center:+$('steer_center').value,steer_travel:+$('steer_travel').value}}
+  steer_sign:$('swap').checked?-1:1,steer_channel:port,steer_only:$('steeronly').checked,steer_center:+$('steer_center').value,steer_travel:+$('steer_travel').value}}
 function toForm(c){cal=c;port=c.steer_channel;showPort();$('speed').value=c.speed;$('speed-out').value=c.speed;$('flip0').checked=c.motor_signs[0]<0;$('flip1').checked=c.motor_signs[1]<0;
-  $('swap').checked=c.steer_sign<0;$('steer_center').value=c.steer_center;$('steer_travel').value=c.steer_travel}
+  $('swap').checked=c.steer_sign<0;$('steeronly').checked=!!c.steer_only;$('steer_center').value=c.steer_center;$('steer_travel').value=c.steer_travel}
 function same(a,b){return Object.keys(a).every(k=>JSON.stringify(a[k])===JSON.stringify(b[k]))}
 function showCal(){
   if(installing)return;
@@ -105,7 +109,7 @@ function showCal(){
   const appVer=(installedApp||'').split('|')[0];
   let t,cls;
   if(changed){t='Changed — not installed yet. Install to try it.';cls='warn'}
-  else if(expected&&appVer===expected){t=`Installed: ${appVer}`;cls='ok'}
+  else if(expected&&appVer===expected){t=`Installed: ${appVer}`+(appVer.endsWith('-steertest')?' — steering-only test is ON: the rover cannot turn while driving.':'');cls=appVer.endsWith('-steertest')?'warn':'ok'}
   else if(appVer){t=`Saved but the rover runs ${appVer}. Install to apply.`;cls='warn'}
   else{t='Saved. Start the drive server to see what the rover runs.';cls=''}
   $('cal-status').textContent=t;$('cal-status').className='status '+cls}
@@ -114,7 +118,7 @@ async function loadCal(){try{const r=await getJSON('/drive/calibration');limits=
   catch(e){$('cal-status').textContent='Drive server offline — start it above (transmitter on USB).';$('cal-status').className='status'}}
 document.querySelectorAll('[data-adj]').forEach(b=>b.onclick=()=>{const k=b.dataset.adj,o=$(k),[lo,hi]=limits[k]||[0,180];
   o.value=Math.max(lo,Math.min(hi,+o.value+ +b.dataset.d));showCal()});
-['flip0','flip1','swap'].forEach(id=>$(id).onchange=showCal);
+['flip0','flip1','swap','steeronly'].forEach(id=>$(id).onchange=showCal);
 $('speed').oninput=()=>{$('speed-out').value=$('speed').value;showCal()};
 $('install').onclick=async()=>{installing=true;$('install').disabled=true;armed=false;
   $('cal-status').textContent='Installing on the rover over the radio (10–30 s)… it is disarmed meanwhile.';$('cal-status').className='status';
