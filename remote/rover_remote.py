@@ -6,7 +6,9 @@ left stick up/down = W/S (forward/reverse), right stick left/right = A/D (steeri
 are sent together every 100 ms while held, and the rover app combines a throttle key and a steer
 key that arrive close together, so you can drive and steer at once (the receiver stops 500 ms
 after the last key); letting go sends X until the receiver ACKs. Idle remote sends nothing, so
-it doesn't fight the Mac. 5 minutes idle -> deep sleep like the stock remote (move a stick to wake).
+it doesn't fight the Mac. No auto-sleep: the stock deep sleep wakes on a pin going high, which
+the mid-voltage sticks never do, so the remote looked disconnected until restarted (use the power
+switch). Errors in the loop are logged and the radio re-initialised; the program never exits.
 """
 import time
 
@@ -23,7 +25,7 @@ STEER_SIGN = 1        # +1 if right stick right reads above mid
 THRESHOLD = 600       # of ~±2000 travel; well past the stock 240 deadzone
 SWITCH_DEADZONE = 500
 REPEAT_MS = 100
-IDLE_SLEEP_S = 5 * 60
+REINIT_AFTER_FAILS = 20  # consecutive undelivered frames (~2 s of driving) -> restart the radio
 
 
 def keys_for(ly, rx):
@@ -66,16 +68,21 @@ def main():
             pass
 
     w = network.WLAN(network.STA_IF)
-    w.active(True)
-    w.config(mac=bytes.fromhex(TRANSMITTER_MAC))
-    w.config(channel=CHANNEL)
     e = espnow.ESPNow()
-    e.active(True)
     peer = bytes.fromhex(RECEIVER_MAC)
-    try:
-        e.add_peer(peer)
-    except OSError:
-        pass
+
+    def radio_up():
+        e.active(False)
+        w.active(False)
+        time.sleep_ms(100)
+        w.active(True)
+        w.config(mac=bytes.fromhex(TRANSMITTER_MAC))
+        w.config(channel=CHANNEL)
+        e.active(True)
+        try:
+            e.add_peer(peer)
+        except OSError:
+            pass
 
     def send(key):
         try:
@@ -94,22 +101,35 @@ def main():
                 pass
         return False
 
+    radio_up()
     print('ROVER REMOTE READY')
     led(*((0, 40, 0) if stop_ack() else (40, 0, 0)))
-    driving = None
-    last_active = time.ticks_ms()
+    driving = ''
+    fails = 0
     while True:
-        keys = keys_for(read(PIN_LY), read(PIN_RX))
-        if keys:
-            ok = all([send(k) for k in keys])
-            led(*((0, 0, 60) if ok else (40, 0, 0)))
-            driving = keys
-            last_active = time.ticks_ms()
-        elif driving:
-            led(*((0, 40, 0) if stop_ack() else (40, 0, 0)))
-            driving = None
-        elif time.ticks_diff(time.ticks_ms(), last_active) > IDLE_SLEEP_S * 1000:
-            stop_ack()
-            import rc_main
-            rc_main.sleep_handler()
+        try:
+            keys = keys_for(read(PIN_LY), read(PIN_RX))
+            if keys:
+                ok = all([send(k) for k in keys])
+                fails = 0 if ok else fails + 1
+                led(*((0, 0, 60) if ok else (40, 0, 0)))
+                driving = keys
+            elif driving:
+                ok = stop_ack()
+                fails = 0 if ok else fails + 1
+                led(*((0, 40, 0) if ok else (40, 0, 0)))
+                driving = ''
+            if fails >= REINIT_AFTER_FAILS:
+                print('radio restart')
+                radio_up()
+                fails = 0
+        except KeyboardInterrupt:
+            raise
+        except Exception as error:
+            print('remote loop error:', error)
+            led(40, 0, 0)
+            try:
+                radio_up()
+            except Exception:
+                pass
         time.sleep_ms(REPEAT_MS)

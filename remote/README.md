@@ -19,7 +19,7 @@ steering, so it is car-style: left stick throttle, right stick steering. Speed i
 
 LED: green = receiver ACKed a stop, blue = driving, red = no answer from the receiver.
 The idle remote sends nothing, so it doesn't fight the Mac; while both are on, whichever sent last
-wins. 5 min idle → deep sleep like stock (move a stick to wake).
+wins. No auto-sleep (2026-11-03: the stock deep sleep never woke from the sticks, so the remote seemed to disconnect); switch it off when done. A loop error or ~2 s of undelivered frames restarts the radio instead of stopping the program.
 
 **Back to the Mini-T tank:** power the remote on with the left shoulder 3-position switch away from
 the middle (one boot), or `--restore` (permanent).
