@@ -142,7 +142,11 @@ class Transmitter:
 
     def wire(self, key):
         # A/D only steer on the receiver; the Mac's A/D are forward arcs, so send W with them.
-        self.repl('wire("W");wire(%r)' % key if key in 'AD' else 'wire(%r)' % key)
+        # L/R steer without driving (calibration).
+        if key in 'LR':
+            self.repl('wire(%r)' % {'L': 'A', 'R': 'D'}[key])
+        else:
+            self.repl('wire("W");wire(%r)' % key if key in 'AD' else 'wire(%r)' % key)
 
     def stop(self):
         out = self.repl('print("ACK" if stop_ack() else "NOACK")', timeout=1.5)
@@ -152,8 +156,8 @@ class Transmitter:
     def pulse(self, key, ms, abort=None):
         """Hold `key` for up to `ms` (capped), then stop with ACK. `abort` (threading.Event)
         ends the pulse early."""
-        if key not in 'WASD':
-            raise ValueError('key must be W, A, S or D')
+        if key not in 'WASDLR':
+            raise ValueError('key must be W, A, S, D, L or R')
         ms = max(0, min(int(ms), MAX_PULSE_MS))
         end = time.monotonic() + ms / 1000
         try:

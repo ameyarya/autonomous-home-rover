@@ -28,7 +28,7 @@ input[type=range]{width:100%}
 .step p{font-size:12px;color:var(--dim);margin:0 0 8px;line-height:1.5}
 .check{flex-direction:row;align-items:center;gap:8px;color:var(--fg);font-size:13px}
 input[type=checkbox]{width:18px;height:18px}
-.stepper{display:flex;align-items:center;gap:6px}.stepper button{width:44px;padding:6px}
+.stepper{display:flex;align-items:center;gap:6px}.stepper button{width:48px;padding:6px}
 .stepper output{min-width:64px;text-align:center;font-size:16px;font-variant-numeric:tabular-nums}
 .row button.sel{background:#277b58;border-color:#46a477}
 .install{position:sticky;bottom:0;background:var(--panel);padding-top:12px;border-top:1px solid #354154}
@@ -50,6 +50,9 @@ input[type=checkbox]{width:18px;height:18px}
       <button data-key="A" title="Forward, steering left">A ↖</button><button data-key="S" title="Reverse, steering centred">S ↓</button><button data-key="D" title="Forward, steering right">D ↗</button>
     </div>
     <p class="muted">Click a button for one pulse. Reverse is capped at 400 ms, the others at 600 ms. Holding a key (W/A/S/D or arrows) drives while held.</p>
+    <h3 style="margin-top:14px">Steering only (wheels don't drive)</h3>
+    <div class="row"><button data-hold="L" title="Hold: full left lock (Q)">◀ Hold left</button><button data-hold="R" title="Hold: full right lock (E)">Hold right ▶</button></div>
+    <p class="muted">Hold a button (or Q / E) to turn the servo to full lock; let go and it re-centres.</p>
     <p class="status" id="drive-status">Drive server offline</p>
   </section>
   <section class="card">
@@ -64,16 +67,17 @@ input[type=checkbox]{width:18px;height:18px}
       <div class="row" id="ports"><button data-port="1">S1</button><button data-port="2">S2</button><button data-port="3">S3</button><button data-port="4">S4</button></div>
     </div>
     <div class="step"><h3>2 · Steering direction</h3>
-      <p>Press <b>A</b>. The front wheels should turn <b>left</b>. If they turn right, swap.</p>
+      <p>Hold <b>◀ left</b>. The front wheels should turn <b>left</b>. If they turn right, swap.</p>
       <label class="check"><input type="checkbox" id="swap"> Swap steering left/right</label>
     </div>
     <div class="step"><h3>3 · Steering centre</h3>
-      <p>Press <b>STOP</b> (it centres the steering) and look from above. Nudge until the front wheels point straight.</p>
-      <div class="stepper"><button data-adj="steer_center" data-d="-1">−1°</button><output id="steer_center">90</output><button data-adj="steer_center" data-d="1">+1°</button></div>
+      <p>Press <b>STOP</b> (it centres the steering) and look from above. Nudge until the front wheels point straight, then Install and look again. Try a step one way; if the wheels end up further off, go the other way.</p>
+      <div class="stepper"><button data-adj="steer_center" data-d="-5">−5°</button><button data-adj="steer_center" data-d="-1">−1°</button><output id="steer_center">90</output><button data-adj="steer_center" data-d="1">+1°</button><button data-adj="steer_center" data-d="5">+5°</button></div>
     </div>
     <div class="step"><h3>4 · Steering range</h3>
-      <p>Press <b>A</b> and <b>D</b>. Raise until the wheels reach nearly full lock; lower it if the servo buzzes or strains at the end.</p>
-      <div class="stepper"><button data-adj="steer_travel" data-d="-2">−2°</button><output id="steer_travel">20</output><button data-adj="steer_travel" data-d="2">+2°</button></div>
+      <p>Hold <b>◀ left</b> and <b>right ▶</b>. Raise until the wheels reach full lock on both sides; lower it if the servo buzzes or strains at the end (it's pushing against the linkage). Up to 90° each way, as long as centre ± range stays within the servo's 0–180°.</p>
+      <div class="stepper"><button data-adj="steer_travel" data-d="-5">−5°</button><button data-adj="steer_travel" data-d="-1">−1°</button><output id="steer_travel">20</output><button data-adj="steer_travel" data-d="1">+1°</button><button data-adj="steer_travel" data-d="5">+5°</button></div>
+      <p class="muted" id="servo-span"></p>
     </div>
     <div class="step"><h3>5 · Speed</h3>
       <p>Motor power for every move (of 2048). Indoor dog-following: slow enough to stop well short of him.</p>
@@ -100,6 +104,8 @@ function toForm(c){cal=c;port=c.steer_channel;showPort();$('speed').value=c.spee
   $('swap').checked=c.steer_sign<0;$('steer_center').value=c.steer_center;$('steer_travel').value=c.steer_travel}
 function same(a,b){return Object.keys(a).every(k=>JSON.stringify(a[k])===JSON.stringify(b[k]))}
 function showCal(){
+  {const c=+$('steer_center').value,t=+$('steer_travel').value,lo=c-t,hi=c+t;
+   $('servo-span').textContent=`Servo swings ${lo}° to ${hi}°`+(lo<0||hi>180?' — past the servo\'s 0–180°: lower the range or move the centre.':'');}
   if(installing)return;
   const changed=cal&&!same(fromForm(),cal);
   const appVer=(installedApp||'').split('|')[0];
@@ -152,7 +158,9 @@ document.querySelectorAll('.g button').forEach(b=>b.onclick=()=>pulse(b.dataset.
 function press(key){if(!armed){$('drive-status').textContent='Arm first.';return}if(held===key)return;held=key;
   const send=()=>postJSON('/drive/hold',{key}).catch(e=>{$('drive-status').textContent=e.message;release()});send();clearInterval(holdTimer);holdTimer=setInterval(send,150)}
 function release(){held=null;clearInterval(holdTimer);holdTimer=null}
-const keymap={w:'W',arrowup:'W',a:'A',arrowleft:'A',s:'S',arrowdown:'S',d:'D',arrowright:'D'};
+document.querySelectorAll('[data-hold]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();press(b.dataset.hold)};
+  b.onpointerup=b.onpointerleave=b.onpointercancel=release});
+const keymap={w:'W',arrowup:'W',a:'A',arrowleft:'A',s:'S',arrowdown:'S',d:'D',arrowright:'D',q:'L',e:'R'};
 addEventListener('keydown',e=>{if(e.target.closest('input'))return;const k=e.key.toLowerCase();
   if(k==='escape'||k===' '){e.preventDefault();estop();return}if(keymap[k]){e.preventDefault();press(keymap[k])}});
 addEventListener('keyup',e=>{if(keymap[e.key.toLowerCase()]===held)release()});

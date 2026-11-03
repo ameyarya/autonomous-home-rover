@@ -42,6 +42,22 @@ class DriveStateTest(unittest.TestCase):
             self.s.pulse('W', 100)
         self.assertEqual(self.tx.calls, [])
 
+    def test_steer_only_keys_accepted(self):
+        self.s.arm(True)
+        self.assertEqual(self.s.pulse('L', 5000)['ms'], 2000)
+        with self.assertRaises(ValueError):
+            self.s.pulse('Q', 100)
+
+    def test_transmitter_key_frames(self):
+        import rover_drive
+        tx = rover_drive.Transmitter.__new__(rover_drive.Transmitter)
+        sent = []
+        tx.repl = sent.append
+        for key in 'WADSLR':
+            tx.wire(key)
+        self.assertEqual(sent, ["wire('W')", 'wire("W");wire(\'A\')', 'wire("W");wire(\'D\')', "wire('S')",
+                                "wire('A')", "wire('D')"])
+
     def test_pulse_is_capped(self):
         self.s.arm(True)
         result = self.s.pulse('S', 5000)
@@ -128,7 +144,10 @@ class DriveStateTest(unittest.TestCase):
     def test_calibration_rejects_bad_values(self):
         import calibration
         with self.assertRaises(ValueError):
-            calibration.validate(dict(calibration.load(), steer_travel=90))
+            calibration.validate(dict(calibration.load(), steer_travel=91))
+        with self.assertRaises(ValueError):       # centre ± travel past the servo's 0..180
+            calibration.validate(dict(calibration.load(), steer_center=100, steer_travel=85))
+        self.assertEqual(calibration.validate(dict(calibration.load(), steer_center=90, steer_travel=90))['steer_travel'], 90)
         with self.assertRaises(ValueError):
             calibration.validate(dict(calibration.load(), motor_signs=[1, 0]))
 

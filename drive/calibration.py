@@ -18,7 +18,7 @@ LIMITS = {
     'speed': (200, 1600),          # of 2048
     'steer_channel': (1, 4),
     'steer_center': (45, 135),     # degrees
-    'steer_travel': (0, 45),       # degrees each way
+    'steer_travel': (0, 90),       # degrees each way; centre ± travel must stay within 0..180
 }
 
 
