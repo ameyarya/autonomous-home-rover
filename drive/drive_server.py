@@ -226,6 +226,8 @@ def main():
     tx = Transmitter()
     state = DriveState(tx)
     state.installed = tx.status()
+    if calibration.sync_from_rover(state.installed):   # remote-calibrated centre/range/speed
+        print('calibration.json updated from the rover', flush=True)
     threading.Thread(target=state.watchdog, daemon=True).start()
     server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(state))
     print(f'drive server on http://127.0.0.1:{args.port} (disarmed; receiver app {state.installed})', flush=True)

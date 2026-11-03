@@ -151,6 +151,20 @@ class DriveStateTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             calibration.validate(dict(calibration.load(), motor_signs=[1, 0]))
 
+    def test_live_values_from_rover(self):
+        import calibration
+        self.assertEqual(calibration.live_values('rover-drive-0.5+cabc123 c92 t60 s950|0'),
+                         {'steer_center': 92, 'steer_travel': 60, 'speed': 950, 'unsaved': False})
+        self.assertTrue(calibration.live_values('rover-drive-0.5 c92 t60 s950*|1')['unsaved'])
+        self.assertIsNone(calibration.live_values('rover-drive-0.4+cabc123|0'))
+        original = calibration.CAL_FILE.read_text()
+        try:
+            self.assertFalse(calibration.sync_from_rover('rover-drive-0.5 c99 t50 s700*|0'))   # unsaved
+            self.assertTrue(calibration.sync_from_rover('rover-drive-0.5 c99 t50 s700|0'))
+            self.assertEqual(calibration.load()['steer_center'], 99)
+        finally:
+            calibration.CAL_FILE.write_text(original)
+
     def test_bad_key(self):
         self.s.arm(True)
         with self.assertRaises(ValueError):

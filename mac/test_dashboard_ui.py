@@ -361,49 +361,6 @@ class DashboardUITest(unittest.TestCase):
             dashboard.DOG_WATCHER_URL = old
             watcher.shutdown()
 
-    # ---- calibrate page ----
-
-    def test_calibrate_loads_changes_and_installs(self):
-        self.page.goto(self.url + 'calibrate')
-        expect(self.page.locator('#steer_center')).to_have_text('90')
-        expect(self.page.locator('#cal-status')).to_contain_text('Install to apply')
-        expect(self.page.locator('[data-port="2"]')).to_have_class('sel')
-        self.page.click('[data-port="3"]')
-        self.page.click('[data-adj=steer_center][data-d="1"]')
-        self.page.check('#flip1')
-        expect(self.page.locator('#cal-status')).to_contain_text('Changed')
-        self.page.click('#install')
-        expect(self.page.locator('#cal-status')).to_contain_text('Installed: rover-drive-0.4+c', timeout=10000)
-        self.assertIn(b'STEER_CENTER = 91', self.tx.installed_source)
-        self.assertIn(b'MOTOR_SIGNS = (1, -1)', self.tx.installed_source)
-        self.assertIn(b'STEER_CHANNEL = 3', self.tx.installed_source)
-        self.assertFalse(self.drive_state.armed)
-        saved = json.loads(self.cal_file.read_text())
-        self.assertEqual((saved['steer_center'], saved['motor_signs']), (91, [1, -1]))
-
-    def test_calibrate_pulse_error_stays_visible(self):
-        self.page.goto(self.url + 'calibrate')
-        self.page.click('#arm')
-        expect(self.page.locator('#arm')).to_contain_text('Armed')
-        self.drive_state.manual_until = time.monotonic() + 10      # as right after hold-to-drive
-        self.page.click('.g button[data-key=W]')
-        expect(self.page.locator('#drive-status')).to_contain_text('manual driving')
-        self.page.wait_for_timeout(1500)                            # survives the next status poll
-        expect(self.page.locator('#drive-status')).to_contain_text('manual driving')
-
-    def test_calibrate_pulse_needs_arm_then_sends(self):
-        self.page.goto(self.url + 'calibrate')
-        self.page.click('.g button[data-key=W]')
-        expect(self.page.locator('#drive-status')).to_contain_text('Arm first')
-        self.page.click('#arm')
-        expect(self.page.locator('#arm')).to_contain_text('Armed')
-        self.page.fill('#ms', '200')
-        self.page.click('.g button[data-key=A]')
-        expect(self.page.locator('#drive-status')).to_contain_text('pulse A 200 ms')
-        self.assertIn('A200', self.tx.calls)
-
-    # ---- layout ----
-
     def test_phone_width_has_no_sideways_scroll(self):
         context = self.browser.new_context(viewport={'width': 390, 'height': 844})
         page = context.new_page()

@@ -5,24 +5,36 @@ service instead of the stock RC program, and only obeys ESP-NOW drive frames (W/
 Mini-T USB transmitter's MAC (20:6E:F1:45:0F:1C). So the remote (20:6E:F1:4F:6E:80) runs a small
 program that takes that MAC and sends the same frames as the Mac. Nothing on the receiver changes.
 
-| Stick (Mini-T remote) | Rover |
-| --- | --- |
-| Left stick up / down | W / S: forward / reverse |
-| Right stick left / right | A / D: steering (servo only on its own) |
-| Both | drive and steer together (both keys sent every 100 ms; the rover app combines them) |
-| Let go | X until the receiver ACKs (it also stops by itself 500 ms after the last key) |
+The top-left switch picks the mode (middle = drive; the side that reads 0 = steering calibration,
+the other = speed calibration):
 
-On the Mini-T these sticks drove the left/right tracks (left Y → MOTOR2, right Y → MOTOR1, right
-shoulder stick → turret, left shoulder button → fire). Here the rover has one drive channel plus
-steering, so it is car-style: left stick throttle, right stick steering. Speed is the calibrated one
-(on/off, no proportional throttle). The right Y stick, shoulder stick and buttons do nothing.
+| Control | Drive (middle) | Steering calibration | Speed calibration |
+| --- | --- | --- | --- |
+| Left stick up/down | Forward / reverse | — | Test drive |
+| Left stick left/right | — | Centre −1° / +1° (wheels move at once) | — |
+| Right stick left/right | Steer (servo only on its own) | Full lock (shows the range) | Steer |
+| Top-right lever (flick; hold repeats) | Speed −50 / +50 (saved at once) | Range −5° / +5° | Speed −50 / +50 |
+| Top-left button | STOP | Save | Save |
 
-LED: green = receiver ACKed a stop, blue = driving, red = no answer from the receiver.
+Edits apply on the rover immediately (rover app 0.5 calibration codes: `D A D A` back-to-back plus
+two keys, which driving never produces; code keys never drive). They're saved on the receiver
+(`rover_cal.json`, survives power-off) with the button or when the switch goes back to the middle.
+The rover's version string carries the values (`c130 t45 s900`, `*` = unsaved); the drive server
+copies saved ones into `drive/calibration.json` when it starts. Limits: centre 45–135°, range
+0–90° and centre ± range within the servo's 0–180°, speed 200–1600.
+
+Measured 2026-11-03: button on pin 6 (0 = pressed), switch 0 / ~1800 / 4076, lever up = high,
+left stick up = high, right stick left = low. Left stick left/right direction is assumed (not in
+the recording): if centre goes the wrong way, flip `CENTRE_SIGN`.
+
+LED: green drive, purple steering, yellow speed, blue driving, red no answer, white flash saved.
 The idle remote sends nothing, so it doesn't fight the Mac; while both are on, whichever sent last
-wins. No auto-sleep (2026-11-03: the stock deep sleep never woke from the sticks, so the remote seemed to disconnect); switch it off when done. A loop error or ~2 s of undelivered frames restarts the radio instead of stopping the program.
+wins. No auto-sleep (the stock deep sleep never woke from the sticks, so the remote seemed to
+disconnect); switch it off when done. A loop error or ~2 s of undelivered frames restarts the
+radio instead of stopping the program.
 
-**Back to the Mini-T tank:** power the remote on with the left shoulder 3-position switch away from
-the middle (one boot), or `--restore` (permanent).
+**Back to the Mini-T tank:** hold the top-left button while powering on (one boot), or `--restore`
+(permanent).
 
 ```sh
 python3 remote/install_remote.py --watch      # live stick values + the key they'd send (sends nothing)
@@ -34,12 +46,3 @@ python3 remote/install_remote.py --restore
 Stick reading: value = 4095 − ADC on pins 0–5 (stock order: L shoulder switch, L-x, L-y, R shoulder
 stick, R-x, R-y), checked against the stock `rc_module` readings. The stock `rc_module` isn't used:
 once started it holds the radio (ESP-NOW sends time out, changing the MAC hangs).
-
-Installed 2026-11-03; left stick forward/back confirmed on the rover. Right stick now turns on its
-own (was: only while the left stick was up); its direction (`STEER_SIGN`) still to confirm.
-
-2026-11-03: steering and throttle used to be exclusive (one key at a time); rover app 0.4 combines
-them, which also replaced the steering-only test mode.
-
-The remote can also stand in for the Mac's USB transmitter (`drive/rover_drive.py` looks for either):
-while the drive server holds it on USB, its sticks don't work; stop the drive server and it reboots.

@@ -1,8 +1,9 @@
 """Rover drive calibration: drive/calibration.json -> the constants at the top of
 rover_drive_app.py, installed on the receiver with the signed app update.
 
-The receiver only takes W/A/S/D/X, so calibration can't be sent live: each change is a new app
-version (VERSION gets a short hash of the values, so the installed version shows what's on it).
+The receiver only takes W/A/S/D/X; motor directions and the servo port are app constants (a new
+signed install each). Centre, range and speed are also calibrated live from the remote (app 0.5:
+saved on the receiver, reported in the version string); `sync_from_rover` copies them back here.
 """
 import hashlib
 import json
@@ -12,7 +13,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CAL_FILE = HERE / 'calibration.json'
 APP_FILE = HERE / 'rover_drive_app.py'
-BASE_VERSION = 'rover-drive-0.4'
+BASE_VERSION = 'rover-drive-0.5'
 
 LIMITS = {
     'speed': (200, 1600),          # of 2048
@@ -77,3 +78,26 @@ def render(values, source=None):
             raise ValueError(f'{name} not found in the app source')
     compile(text, 'rover_drive_app.py', 'exec')
     return text.encode()
+
+
+def live_values(installed):
+    """Centre/range/speed from the receiver's version ('... c92 t45 s900[*]|0'), or None.
+    'unsaved' is True while remote edits aren't saved on the rover yet."""
+    m = re.search(r' c(\d+) t(\d+) s(\d+)(\*?)(\||$)', installed or '')
+    if not m:
+        return None
+    return {'steer_center': int(m.group(1)), 'steer_travel': int(m.group(2)), 'speed': int(m.group(3)),
+            'unsaved': bool(m.group(4))}
+
+
+def sync_from_rover(installed):
+    """Save the rover's saved live calibration into calibration.json; returns True if it changed."""
+    live = live_values(installed)
+    if not live or live['unsaved']:
+        return False
+    values = load()
+    new = dict(values, **{k: live[k] for k in ('steer_center', 'steer_travel', 'speed')})
+    if new == values:
+        return False
+    save(new)
+    return True

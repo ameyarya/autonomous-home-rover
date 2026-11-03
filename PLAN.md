@@ -103,7 +103,7 @@ Deliver a confirmed parts list, wiring reference, control-interface decision, an
 
 Implement Mac-to-transmitter USB driving, mount the ESP32 camera/sensor board, and implement Wi-Fi telemetry and manual commissioning controls. Complete when steering, forward/reverse, and stop work repeatably while camera capture is active, without supply-related resets. Test initially with wheels lifted, then on the floor at low speed.
 
-Handheld remote (2026-11-03): the Mini-T remote drives the rover without the Mac by sending the transmitter's W/A/S/D/X frames under its MAC (receiver unchanged); left stick throttle, right stick steering ([remote/README.md](remote/README.md)). Still to confirm: link ACK and stick directions with the receiver on.
+Handheld remote (2026-11-03): the Mini-T remote drives the rover without the Mac by sending the transmitter's W/A/S/D/X frames under its MAC (receiver unchanged); left stick throttle, right stick steering ([remote/README.md](remote/README.md)). Link and sticks confirmed. 2026-11-03: steering and throttle combine (app 0.4); calibration moved from the dashboard page to the remote (app 0.5: top-left switch picks drive / steering / speed calibration, live edits saved on the receiver); remote auto-sleep removed (it never woke, which looked like disconnects).
 
 ### 2. Safe autonomous roaming (Phase 1)
 
