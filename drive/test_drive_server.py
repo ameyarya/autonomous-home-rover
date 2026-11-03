@@ -134,7 +134,7 @@ class DriveStateTest(unittest.TestCase):
             values = dict(calibration.load(), motor_signs=[1, -1], steer_center=95)
             result = self.s.save_calibration(values, install=True)
             self.assertFalse(self.s.armed)
-            self.assertEqual(self.tx.calls[-2:], ['X', 'UPDATE'])
+            self.assertEqual(self.tx.calls[-3:], ['X', 'UPDATE', 'X'])
             self.assertIn(b'MOTOR_SIGNS = (1, -1)', self.tx.installed_source)
             self.assertIn(b'STEER_CENTER = 95', self.tx.installed_source)
             self.assertEqual(result['saved']['steer_center'], 95)

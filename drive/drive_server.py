@@ -144,6 +144,7 @@ class DriveState:
                 try:
                     self.tx.update_app(source)
                     self.installed = self.tx.status()
+                    self.tx.stop()      # the new app only moves the servo on a command: centre it now
                 finally:
                     self.busy = False
         return self.calibration()
