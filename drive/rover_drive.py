@@ -96,7 +96,7 @@ def find_port():
     if os.environ.get('ROVER_TX_PORT'):
         return os.environ['ROVER_TX_PORT']
     ports = {(p.serial_number or '').upper(): p.device for p in serial.tools.list_ports.comports()}
-    for serial_number in (TRANSMITTER_SERIAL, REMOTE_SERIAL):
+    for serial_number in (REMOTE_SERIAL, TRANSMITTER_SERIAL):   # the remote first (owner's choice)
         if serial_number in ports:
             return ports[serial_number]
     raise RuntimeError(f'Neither the transmitter {TRANSMITTER_SERIAL} nor the remote {REMOTE_SERIAL} is on USB; set ROVER_TX_PORT')
