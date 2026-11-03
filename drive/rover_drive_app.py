@@ -12,9 +12,11 @@ Throttle and steering combine: a W/S and an A/D less than MIX_MS apart drive and
 (the sender repeats both), A/D alone only turn the servo, W/S alone drive with the wheels centred.
 The Mac sends W with A/D for its forward arcs.
 
-Live calibration (0.6): the receiver only passes these five keys, so the Mac (Calibrate page,
-through the remote or transmitter) sends edits as a code: D A D A back-to-back (each under
-CODE_GAP_MS apart, which driving never produces) and two code keys. Code keys never drive.
+Live calibration (0.8): the receiver only passes these five keys, so the Mac (Calibrate page,
+through the remote or transmitter) sends edits as a code: X X X X back-to-back (each under
+CODE_GAP_MS apart; a stop retries 120+ ms apart) and three code keys, all A/D: after X there's
+no fresh throttle, so even a missed code can only steer, never drive (0.6's D A D A prefix
+twitched the servo, and its W/S code keys drove when a code was missed).
 Codes (see CODES): centre ±1°, range ±1°, speed ±10, save, revert. Saved values go to CAL_FILE on the receiver and win over the constants below; the
 current values are in the version string ("c92 t45 s900", "*" = unsaved), which the Mac reads.
 """
@@ -23,7 +25,7 @@ import __main__ as receiver
 
 # Calibration: the drive server rewrites these lines from drive/calibration.json when you press
 # "Install on rover" on the dashboard's Calibrate page (http://rover.local:8010/calibrate).
-VERSION = 'rover-drive-0.6'
+VERSION = 'rover-drive-0.8'
 SPEED = 900                 # of 2048; indoor dog-following pace
 MOTOR_SIGNS = (1, 1)        # flip one if that axle drives backwards
 STEER_SIGN = 1              # -1 swaps left/right if A turns the wheels right
@@ -32,10 +34,10 @@ STEER_CENTER = 90
 STEER_TRAVEL = 20           # degrees each way; raise only after checking the linkage limits
 STEER_HOLD_MS = 500         # steering re-centres if no A/D arrives
 MIX_MS = 400                # a throttle key and a steer key this close together combine
-CODE_GAP_MS = 30            # calibration code keys arrive back-to-back
+CODE_GAP_MS = 80            # calibration code keys arrive back-to-back
 CAL_FILE = 'rover_cal.json'
-CODES = {b'WW': ('center', 1), b'WS': ('center', -1), b'AW': ('travel', 1), b'AS': ('travel', -1),
-         b'DW': ('speed', 10), b'DS': ('speed', -10), b'SS': ('save', 0), b'SA': ('revert', 0)}
+CODES = {b'AAA': ('center', 1), b'AAD': ('center', -1), b'ADA': ('travel', 1), b'ADD': ('travel', -1),
+         b'DAA': ('speed', 10), b'DAD': ('speed', -10), b'DDA': ('save', 0), b'DDD': ('revert', 0)}
 LIMITS = {'center': (45, 135), 'travel': (0, 90), 'speed': (200, 1600)}
 
 
@@ -47,7 +49,7 @@ class TankApp:
         self.throttle, self.throttle_at = (0, 0), None
         self.wanted, self.wanted_at = 0, None
         self.recent = []            # (key, ms) of the last keys, for calibration codes
-        self.code = None            # code keys collected after the D A D A prefix
+        self.code = None            # code keys collected after the X X X X prefix
         self.cal = self.load_cal()
         self.dirty = False
         self.apply_cal()
@@ -107,13 +109,16 @@ class TankApp:
                 self.code = None
                 return False
             self.code += key
-            if len(self.code) == 2:
+            if key not in self.steers:          # codes are A/D only
+                self.code = None
+                return False
+            if len(self.code) == 3:
                 code, self.code = self.code, None
                 if code in CODES:
                     self.calibrate(code)
             return True
         keys = b''.join(k for k, _ in self.recent)
-        if keys == b'DADA' and time.ticks_diff(now, self.recent[0][1]) < 3 * CODE_GAP_MS:
+        if keys == b'XXXX' and time.ticks_diff(now, self.recent[0][1]) < 3 * CODE_GAP_MS:
             self.code = b''
         return False
 

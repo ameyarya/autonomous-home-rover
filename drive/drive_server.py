@@ -156,10 +156,12 @@ class DriveState:
             raise RuntimeError('manual driving')
         with self.lock:
             live = calibration.live_values(self.installed)
-            if live is None:
-                raise RuntimeError('the rover app has no live calibration; install it first')
+            if live is None or not (self.installed or '').startswith(calibration.BASE_VERSION + '+'):
+                # Codes for another app version can read as drive keys (0.6's codes reversed 0.7).
+                raise RuntimeError(f'the rover runs {(self.installed or "?").split("|")[0]}, not '
+                                   f'{calibration.BASE_VERSION}: install it first (Wiring -> Install)')
             if action in ('save', 'revert'):
-                self.tx.codes(['SS' if action == 'save' else 'SA'])
+                self.tx.codes([calibration.SAVE_CODE if action == 'save' else calibration.REVERT_CODE])
             elif values:
                 target = calibration.validate(dict(calibration.load(), **{k: v for k, v in values.items()
                                                                            if k in calibration.LIVE_CODES}))

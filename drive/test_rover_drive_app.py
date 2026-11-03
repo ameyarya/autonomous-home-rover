@@ -60,15 +60,15 @@ class AppTest(unittest.TestCase):
         self.assertEqual(self.app.command(b'D'), (0, 0))      # throttle went stale
 
     def test_code_changes_centre_without_driving(self):
-        out = self.keys('DADAWW')
-        self.assertEqual(out[-2:], [(0, 0), (0, 0)])           # code keys W W didn't drive
+        out = self.keys('XXXXAAA')
+        self.assertEqual(out[-3:], [(0, 0)] * 3)               # code keys never drive
         self.assertEqual(self.app.cal['center'], self.ns['STEER_CENTER'] + 1)
         self.assertIn('*', self.app.version)
 
     def test_codes_for_range_speed_and_save(self):
-        self.keys('DADAAW'); clock[0] += 100
-        self.keys('DADADS'); clock[0] += 100
-        self.keys('DADASS')
+        self.keys('XXXXADA'); clock[0] += 100
+        self.keys('XXXXDAD'); clock[0] += 100
+        self.keys('XXXXDDA')
         self.assertEqual(self.app.cal['travel'], self.ns['STEER_TRAVEL'] + 1)
         self.assertEqual(self.app.cal['speed'], self.ns['SPEED'] - 10)
         self.assertNotIn('*', self.app.version)
@@ -77,20 +77,26 @@ class AppTest(unittest.TestCase):
         self.assertEqual(again.throttles[b'W'][0], abs(self.fwd[0]) // self.fwd[0] * (self.ns['SPEED'] - 10))
 
     def test_revert(self):
-        self.keys('DADAWW'); clock[0] += 100
-        self.keys('DADASA')
+        self.keys('XXXXAAA'); clock[0] += 100
+        self.keys('XXXXDDD')
         self.assertEqual(self.app.cal['center'], self.ns['STEER_CENTER'])
 
     def test_slow_keys_are_not_a_code(self):
-        self.keys('DADAWW', gap=100)                          # remote driving pace
+        self.keys('XXXXAAA', gap=120)                          # stop retries / remote pace
         self.assertEqual(self.app.cal['center'], self.ns['STEER_CENTER'])
 
     def test_limits(self):
         for _ in range(200):
-            self.keys('DADAAW'); clock[0] += 100
+            self.keys('XXXXADA'); clock[0] += 100
         c = self.app.cal
         self.assertLessEqual(c['center'] + c['travel'], 180)
         self.assertGreaterEqual(c['center'] - c['travel'], 0)
+
+    def test_missed_code_never_drives(self):
+        self.app.command(b'W')
+        out = self.keys('XXAAA')                               # prefix cut short: plain steering
+        self.assertEqual(out[-3:], [(0, 0)] * 3)
+        self.assertEqual(self.app.cal['center'], self.ns['STEER_CENTER'])
 
     def test_version_fits_the_service(self):
         self.assertLessEqual(len(self.app.version + '*'), 48)

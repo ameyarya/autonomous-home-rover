@@ -33,30 +33,30 @@ input[type=checkbox]{width:18px;height:18px}
 .row button.sel{background:#277b58;border-color:#46a477}
 .savebar{position:sticky;bottom:0;background:var(--panel);padding:12px 0 2px;border-top:1px solid #354154;margin-top:8px}
 .savebar .row button{font-size:15px;padding:12px}
-.big output{font-size:22px;min-width:80px}
+.slider{display:flex;align-items:center;gap:10px}.slider input{flex:1;height:28px}.slider output{font-size:22px;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
 </style><body>
 <header>
   <div><h1>Calibrate drive</h1><div class="muted"><a href="/">← Dashboard</a> · rover app <span id="installed">…</span></div></div>
   <div class="chip"><span class="dot" id="drive-dot"></span>Drive server <b id="drive-chip">…</b><button id="drive-svc" hidden></button></div>
 </header>
-<div class="banner"><b>Lift the rover</b> so the wheels are off the ground. Centre, range and speed change on the rover the moment you click — no install. <b>Save on rover</b> keeps them; <b>Undo</b> goes back to the last save.</div>
+<div class="banner"><b>Lift the rover</b> so the wheels are off the ground. Centre, range and speed change on the rover as you move the sliders — no install. <b>Save on rover</b> keeps them; <b>Undo</b> goes back to the last save.</div>
 <main>
   <section class="card">
     <h2>Steering</h2>
     <div class="step"><h3>Centre</h3>
-      <p>Look at the front wheels from above and nudge until they point straight. The wheels move as you click.</p>
-      <div class="stepper big"><button data-live="steer_center" data-d="-5">−5°</button><button data-live="steer_center" data-d="-1">−1°</button><output id="steer_center">…</output><button data-live="steer_center" data-d="1">+1°</button><button data-live="steer_center" data-d="5">+5°</button></div>
+      <p>Look at the front wheels from above and nudge until they point straight. The wheels follow the slider.</p>
+      <div class="slider"><input type="range" id="steer_center" data-k="steer_center" min="45" max="135" step="1"><output id="steer_center-out">…</output><span class="muted">°</span></div>
     </div>
     <div class="step"><h3>Range (how far it turns)</h3>
-      <p>Hold left / right to see full lock. Raise until the wheels reach their stop on both sides; lower it if the servo buzzes or strains there.</p>
-      <div class="stepper big"><button data-live="steer_travel" data-d="-5">−5°</button><button data-live="steer_travel" data-d="-1">−1°</button><output id="steer_travel">…</output><button data-live="steer_travel" data-d="1">+1°</button><button data-live="steer_travel" data-d="5">+5°</button></div>
+      <p>Hold left / right to see full lock (the wheels stay straight while you slide). Raise until the wheels reach their stop on both sides; lower it if the servo buzzes or strains there.</p>
+      <div class="slider"><input type="range" id="steer_travel" data-k="steer_travel" min="0" max="90" step="1"><output id="steer_travel-out">…</output><span class="muted">° each way</span></div>
       <div class="row" style="margin-top:10px"><button data-hold="L">◀ Hold left</button><button data-hold="R">Hold right ▶</button></div>
       <p class="muted" id="servo-span"></p>
     </div>
     <h2 style="margin-top:8px">Speed</h2>
     <div class="step"><p>Motor power for every move (200–1600 of 2048). Test with the buttons below.</p>
-      <div class="stepper big"><button data-live="speed" data-d="-50">−50</button><button data-live="speed" data-d="-10">−10</button><output id="speed">…</output><button data-live="speed" data-d="10">+10</button><button data-live="speed" data-d="50">+50</button></div>
+      <div class="slider"><input type="range" id="speed" data-k="speed" min="200" max="1600" step="10"><output id="speed-out">…</output><span class="muted">of 2048</span></div>
     </div>
     <div class="savebar">
       <div class="row"><button id="save" class="primary">Save on rover</button><button id="undo">Undo changes</button></div>
@@ -66,7 +66,7 @@ input[type=checkbox]{width:18px;height:18px}
   <section class="card">
     <h2>Test</h2>
     <div class="row"><button id="arm">Arm</button><button id="stop" class="danger">STOP</button></div>
-    <p class="muted">Arm to use the hold and test buttons. Hold a key to drive: W/S forward/back, A/D steer while driving, Q/E steer only. Esc or Space stops.</p>
+    <p class="muted">Arm to use the hold and test buttons. Hold a key: W/S forward/back, A/D or ←/→ steer only (wheels don't drive). Esc or Space stops.</p>
     <div class="row"><button data-hold="W">Hold forward ↑</button><button data-hold="S">Hold reverse ↓</button></div>
     <p class="status" id="drive-status">Drive server offline</p>
     <details style="margin-top:14px"><summary class="muted">Wiring (only after re-plugging motors or the servo)</summary>
@@ -87,12 +87,11 @@ async function getJSON(u){const r=await fetch(u,{cache:'no-store'});let j={};try
 async function postJSON(u,b){const r=await fetch(u,{method:'POST',body:JSON.stringify(b||{})});let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error(j.error||r.status);return j}
 
 // ---- live calibration ----
-let live=null,saved=null,limits={},want=null,busy=false,installing=false,port=1;
-const LIM={steer_center:[45,135],steer_travel:[0,90],speed:[200,1600]};
+let live=null,saved=null,limits={},want=null,busy=false,installing=false,port=1,dragging=null;
 function show(r){if(r.limits)limits=r.limits;saved=r.saved;live=r.live;
   $('installed').textContent=(r.installed||'unknown').split('|')[0];
   if(!live){$('live-status').textContent='This rover app can\'t change live. Install it first (Wiring → Install).';$('live-status').className='status warn';return}
-  for(const k of ['steer_center','steer_travel','speed'])$(k).value=(want&&want[k]!=null?want[k]:live[k]);
+  for(const k of ['steer_center','steer_travel','speed']){const v=(want&&want[k]!=null?want[k]:live[k]);if(dragging!==k)$(k).value=v;$(k+'-out').value=v}
   const c=+$('steer_center').value,t=+$('steer_travel').value;
   $('servo-span').textContent=`Servo swings ${c-t}° to ${c+t}° (its limit is 0–180°)`;
   $('live-status').textContent=busy?'Sending to the rover…':live.unsaved?'Changed on the rover, not saved yet. Save to keep it after a power-off.':'Saved on the rover.';
@@ -103,11 +102,12 @@ async function flush(){if(busy||!want)return;busy=true;const values=want;show({l
   try{const r=await postJSON('/drive/calibration/live',{values});if(want===values)want=null;busy=false;show(r)}
   catch(e){busy=false;want=null;$('live-status').textContent='Not changed: '+e.message;$('live-status').className='status bad'}
   if(want)flush()}
-document.querySelectorAll('[data-live]').forEach(b=>b.onclick=()=>{if(!live)return;const k=b.dataset.live,[lo,hi]=LIM[k];
-  want=Object.assign({},want||{steer_center:live.steer_center,steer_travel:live.steer_travel,speed:live.speed});
-  want[k]=Math.max(lo,Math.min(hi,want[k]+ +b.dataset.d));
-  const room=Math.min(want.steer_center,180-want.steer_center);if(want.steer_travel>room)want.steer_travel=room;
-  $(k).value=want[k];flush()});
+document.querySelectorAll('input[data-k]').forEach(el=>{const k=el.dataset.k;
+  el.onpointerdown=()=>dragging=k;el.onpointerup=el.onchange=()=>{dragging=null};
+  el.oninput=()=>{if(!live)return;want=Object.assign({},want||{steer_center:live.steer_center,steer_travel:live.steer_travel,speed:live.speed});
+    want[k]=+el.value;const room=Math.min(want.steer_center,180-want.steer_center);
+    if(want.steer_travel>room){want.steer_travel=room;$('steer_travel').value=room}
+    $(k+'-out').value=want[k];flush()}});
 async function action(a){busy=true;try{show(await postJSON('/drive/calibration/live',{action:a}))}catch(e){$('live-status').textContent=e.message;$('live-status').className='status bad'}busy=false;load()}
 $('save').onclick=()=>action('save');$('undo').onclick=()=>action('revert');
 
@@ -146,7 +146,8 @@ function press(key){if(!armed){$('drive-status').textContent='Arm first.';return
 function release(){held=null;clearInterval(holdTimer);holdTimer=null}
 document.querySelectorAll('[data-hold]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();press(b.dataset.hold)};
   b.onpointerup=b.onpointerleave=b.onpointercancel=release});
-const keymap={w:'W',arrowup:'W',a:'A',arrowleft:'A',s:'S',arrowdown:'S',d:'D',arrowright:'D',q:'L',e:'R'};
+// Here left/right only steer (the dashboard's A/D drive forward while steering).
+const keymap={w:'W',arrowup:'W',a:'L',arrowleft:'L',s:'S',arrowdown:'S',d:'R',arrowright:'R',q:'L',e:'R'};
 addEventListener('keydown',e=>{if(e.target.closest('input'))return;const k=e.key.toLowerCase();
   if(k==='escape'||k===' '){e.preventDefault();estop();return}if(keymap[k]){e.preventDefault();press(keymap[k])}});
 addEventListener('keyup',e=>{if(keymap[e.key.toLowerCase()]===held)release()});

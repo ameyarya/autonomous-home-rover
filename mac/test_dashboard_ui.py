@@ -121,15 +121,15 @@ class FakeTx:
 
     def codes(self, codes):                 # live calibration, as rover app 0.6 applies them
         self.calls.append('CODES ' + ' '.join(codes))
-        steps = {'WW': ('c', 1), 'WS': ('c', -1), 'AW': ('t', 1), 'AS': ('t', -1), 'DW': ('s', 10), 'DS': ('s', -10)}
+        steps = {'AAA': ('c', 1), 'AAD': ('c', -1), 'ADA': ('t', 1), 'ADD': ('t', -1), 'DAA': ('s', 10), 'DAD': ('s', -10)}
         for code in codes:
             if code in steps:
                 k, d = steps[code]
                 self.live[k] += d
                 self.unsaved = True
-            elif code == 'SS':
+            elif code == 'DDA':
                 self.saved_live, self.unsaved = dict(self.live), False
-            elif code == 'SA':
+            elif code == 'DDD':
                 self.live, self.unsaved = dict(self.saved_live), False
 
     live = {'c': 90, 't': 20, 's': 900}
@@ -137,7 +137,7 @@ class FakeTx:
     unsaved = False
 
     def status(self):
-        v = getattr(self, 'version', 'rover-drive-0.6+c000000')
+        v = getattr(self, 'version', 'rover-drive-0.8+c000000')
         return v + ' c%(c)d t%(t)d s%(s)d' % self.live + ('*' if self.unsaved else '') + '|0'
 
 
@@ -384,16 +384,15 @@ class DashboardUITest(unittest.TestCase):
     def test_calibrate_live_change_save_and_undo(self):
         self.drive_state.installed = self.tx.status()
         self.page.goto(self.url + 'calibrate')
-        expect(self.page.locator('#steer_center')).to_have_text('90')
-        self.page.click('[data-live=steer_center][data-d="1"]')
-        self.page.click('[data-live=steer_center][data-d="1"]')
+        expect(self.page.locator('#steer_center-out')).to_have_text('90')
+        self.page.fill('#steer_center', '92')                    # slider
         expect(self.page.locator('#live-status')).to_contain_text('not saved yet', timeout=5000)
-        expect(self.page.locator('#steer_center')).to_have_text('92')
-        self.assertTrue(any(c.startswith('CODES WW') for c in self.tx.calls))
+        expect(self.page.locator('#steer_center-out')).to_have_text('92')
+        self.assertTrue(any(c.startswith('CODES AAA') for c in self.tx.calls))
         self.page.click('#undo')
-        expect(self.page.locator('#steer_center')).to_have_text('90', timeout=5000)
-        self.page.click('[data-live=speed][data-d="50"]')
-        expect(self.page.locator('#speed')).to_have_text('950', timeout=5000)
+        expect(self.page.locator('#steer_center-out')).to_have_text('90', timeout=5000)
+        self.page.fill('#speed', '950')
+        expect(self.page.locator('#speed-out')).to_have_text('950', timeout=5000)
         self.page.click('#save')
         expect(self.page.locator('#live-status')).to_have_text('Saved on the rover.', timeout=5000)
         self.assertEqual(json.loads(self.cal_file.read_text())['speed'], 950)
