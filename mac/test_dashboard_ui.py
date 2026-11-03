@@ -373,25 +373,13 @@ class DashboardUITest(unittest.TestCase):
         self.page.check('#flip1')
         expect(self.page.locator('#cal-status')).to_contain_text('Changed')
         self.page.click('#install')
-        expect(self.page.locator('#cal-status')).to_contain_text('Installed: rover-drive-0.3+c', timeout=10000)
+        expect(self.page.locator('#cal-status')).to_contain_text('Installed: rover-drive-0.4+c', timeout=10000)
         self.assertIn(b'STEER_CENTER = 91', self.tx.installed_source)
         self.assertIn(b'MOTOR_SIGNS = (1, -1)', self.tx.installed_source)
         self.assertIn(b'STEER_CHANNEL = 3', self.tx.installed_source)
         self.assertFalse(self.drive_state.armed)
         saved = json.loads(self.cal_file.read_text())
         self.assertEqual((saved['steer_center'], saved['motor_signs']), (91, [1, -1]))
-
-    def test_steering_only_test_mode(self):
-        self.page.goto(self.url + 'calibrate')
-        expect(self.page.locator('#steer_center')).not_to_have_text('')
-        self.page.check('#steeronly')
-        self.page.click('#install')
-        expect(self.page.locator('#cal-status')).to_contain_text('steering-only test is ON', timeout=10000)
-        self.assertIn(b'STEER_ONLY = True', self.tx.installed_source)
-        self.page.uncheck('#steeronly')
-        self.page.click('#install')
-        expect(self.page.locator('#cal-status')).not_to_contain_text('steering-only', timeout=10000)
-        self.assertIn(b'STEER_ONLY = False', self.tx.installed_source)
 
     def test_calibrate_pulse_error_stays_visible(self):
         self.page.goto(self.url + 'calibrate')

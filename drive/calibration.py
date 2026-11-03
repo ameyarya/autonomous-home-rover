@@ -12,7 +12,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CAL_FILE = HERE / 'calibration.json'
 APP_FILE = HERE / 'rover_drive_app.py'
-BASE_VERSION = 'rover-drive-0.3'
+BASE_VERSION = 'rover-drive-0.4'
 
 LIMITS = {
     'speed': (200, 1600),          # of 2048
@@ -37,10 +37,6 @@ def validate(values):
     if values.get('steer_sign') not in (1, -1):
         raise ValueError('steer_sign must be 1 or -1')
     out['steer_sign'] = int(values['steer_sign'])
-    steer_only = values.get('steer_only', False)
-    if not isinstance(steer_only, bool):
-        raise ValueError('steer_only must be true or false')
-    out['steer_only'] = steer_only
     if out['steer_center'] - out['steer_travel'] < 0 or out['steer_center'] + out['steer_travel'] > 180:
         raise ValueError('steer_center ± steer_travel must stay within 0..180 degrees')
     return out
@@ -57,9 +53,8 @@ def save(values):
 
 
 def version(values):
-    hashed = {k: v for k, v in values.items() if k != 'steer_only'}   # steer-only shows as the suffix
-    digest = hashlib.sha256(json.dumps(hashed, sort_keys=True).encode()).hexdigest()[:6]
-    return f'{BASE_VERSION}+c{digest}' + ('-steertest' if values.get('steer_only') else '')
+    digest = hashlib.sha256(json.dumps(values, sort_keys=True).encode()).hexdigest()[:6]
+    return f'{BASE_VERSION}+c{digest}'
 
 
 def render(values, source=None):
@@ -74,7 +69,6 @@ def render(values, source=None):
         'STEER_CHANNEL': str(values['steer_channel']),
         'STEER_CENTER': str(values['steer_center']),
         'STEER_TRAVEL': str(values['steer_travel']),
-        'STEER_ONLY': 'True' if values['steer_only'] else 'False',
     }
     for name, value in lines.items():
         text, n = re.subn(rf'^{name} = [^#\n]*?(\s*(#.*)?)$', lambda m: f'{name} = {value}{m.group(1)}', text,

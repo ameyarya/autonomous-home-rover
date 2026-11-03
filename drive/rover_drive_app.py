@@ -4,9 +4,13 @@ Installed over the air (signed) into the service the Mini-T project put on the r
 service keeps its 500 ms hold-to-drive motor watchdog, X+ACK stop, and rollback. The class name
 must stay TankApp (the service loads it by that name).
 
-  W  forward, steering centred        A  forward + steer left
-  S  reverse, steering centred        D  forward + steer right
+  W  forward                          A  steer left
+  S  reverse                          D  steer right
   X  stop, steering centred
+
+Throttle and steering combine: a W/S and an A/D less than MIX_MS apart drive and steer together
+(the sender repeats both), A/D alone only turn the servo, W/S alone drive with the wheels centred.
+The Mac sends W with A/D for its forward arcs.
 
 Calibrate on the bench with the wheels off the ground: motor signs, steering channel, centre
 and travel. Start with small STEER_TRAVEL; a servo forced past the linkage's end stalls.
@@ -16,15 +20,15 @@ import __main__ as receiver
 
 # Calibration: the drive server rewrites these lines from drive/calibration.json when you press
 # "Install on rover" on the dashboard's Calibrate page (http://rover.local:8010/calibrate).
-VERSION = 'rover-drive-0.3'
+VERSION = 'rover-drive-0.4'
 SPEED = 900                 # of 2048; indoor dog-following pace
 MOTOR_SIGNS = (1, 1)        # flip one if that axle drives backwards
 STEER_SIGN = 1              # -1 swaps left/right if A turns the wheels right
 STEER_CHANNEL = 2           # receiver servo port S2
 STEER_CENTER = 90
 STEER_TRAVEL = 20           # degrees each way; raise only after checking the linkage limits
-STEER_ONLY = False          # bench test: A/D turn the servo without driving (never leave on)
-STEER_HOLD_MS = 500         # steering re-centres if no command arrives
+STEER_HOLD_MS = 500         # steering re-centres if no A/D arrives
+MIX_MS = 400                # a throttle key and a steer key this close together combine
 
 
 class TankApp:
@@ -34,19 +38,34 @@ class TankApp:
         self.steer = 0
         self.steer_deadline = time.ticks_ms()
         a, b = MOTOR_SIGNS
-        fwd = (a * SPEED, b * SPEED)
-        rev = (-a * SPEED, -b * SPEED)
-        arc = (0, 0) if STEER_ONLY else fwd
-        self.moves = {b'W': (fwd, 0), b'A': (arc, -1), b'D': (arc, 1), b'S': (rev, 0), b'X': ((0, 0), 0)}
+        self.throttles = {b'W': (a * SPEED, b * SPEED), b'S': (-a * SPEED, -b * SPEED)}
+        self.steers = {b'A': -1, b'D': 1}
+        self.throttle, self.throttle_at = (0, 0), None
+        self.wanted, self.wanted_at = 0, None
+
+    def fresh(self, at, now):
+        return at is not None and time.ticks_diff(now, at) < MIX_MS
 
     def command(self, key):
-        motors, steer = self.moves.get(key, ((0, 0), 0))
+        now = time.ticks_ms()
+        if key in self.throttles:
+            self.throttle, self.throttle_at = self.throttles[key], now
+            motors = self.throttle
+            steer = self.wanted if self.fresh(self.wanted_at, now) else 0
+        elif key in self.steers:
+            self.wanted, self.wanted_at = self.steers[key], now
+            motors = self.throttle if self.fresh(self.throttle_at, now) else (0, 0)
+            steer = self.wanted
+        else:
+            self.throttle_at = self.wanted_at = None
+            motors, steer = (0, 0), 0
         # The service validates candidate apps by calling command(); only touch the servo
         # once this is the active, confirmed app.
         if getattr(receiver, 'app', None) is self and getattr(receiver, 'candidate_id', None) is None:
             self.ensure_servo()
             self.set_steer(steer)
-            self.steer_deadline = time.ticks_add(time.ticks_ms(), STEER_HOLD_MS)
+            if key in self.steers:
+                self.steer_deadline = time.ticks_add(now, STEER_HOLD_MS)
         return motors
 
     def set_steer(self, steer):

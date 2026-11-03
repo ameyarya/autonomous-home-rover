@@ -2,9 +2,10 @@
 
 The rover receiver only obeys ESP-NOW drive frames from the Mini-T USB transmitter's MAC and
 only knows W/A/S/D/X, so the remote takes that MAC and sends the same frames the Mac does:
-left stick up = W (forward), down = S (reverse, straight); right stick left/right = A/D (a
-forward arc: a car can't turn standing still, and the receiver has no steer-only key). Keys repeat every 100 ms while held (the receiver stops 500 ms
-after the last one); letting go sends X until the receiver ACKs. Idle remote sends nothing, so
+left stick up/down = W/S (forward/reverse), right stick left/right = A/D (steering only). Both
+are sent together every 100 ms while held, and the rover app combines a throttle key and a steer
+key that arrive close together, so you can drive and steer at once (the receiver stops 500 ms
+after the last key); letting go sends X until the receiver ACKs. Idle remote sends nothing, so
 it doesn't fight the Mac. 5 minutes idle -> deep sleep like the stock remote (move a stick to wake).
 """
 import time
@@ -25,19 +26,20 @@ REPEAT_MS = 100
 IDLE_SLEEP_S = 5 * 60
 
 
-def key_for(ly, rx):
-    """Stick readings (stock scale) -> 'W'/'A'/'S'/'D' or None (idle)."""
+def keys_for(ly, rx):
+    """Stick readings (stock scale) -> keys to send: throttle ('W'/'S') and/or steer ('A'/'D')."""
     throttle = THROTTLE_SIGN * (ly - MID[PIN_LY])
     steer = STEER_SIGN * (rx - MID[PIN_RX])
-    if throttle <= -THRESHOLD:
-        return 'S'
-    if steer <= -THRESHOLD:
-        return 'A'
-    if steer >= THRESHOLD:
-        return 'D'
+    keys = ''
     if throttle >= THRESHOLD:
-        return 'W'
-    return None
+        keys += 'W'
+    elif throttle <= -THRESHOLD:
+        keys += 'S'
+    if steer <= -THRESHOLD:
+        keys += 'A'
+    elif steer >= THRESHOLD:
+        keys += 'D'
+    return keys
 
 
 def switch_centred(value):
@@ -97,11 +99,11 @@ def main():
     driving = None
     last_active = time.ticks_ms()
     while True:
-        key = key_for(read(PIN_LY), read(PIN_RX))
-        if key:
-            ok = send(key)
+        keys = keys_for(read(PIN_LY), read(PIN_RX))
+        if keys:
+            ok = all([send(k) for k in keys])
             led(*((0, 0, 60) if ok else (40, 0, 0)))
-            driving = key
+            driving = keys
             last_active = time.ticks_ms()
         elif driving:
             led(*((0, 40, 0) if stop_ack() else (40, 0, 0)))

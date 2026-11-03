@@ -7,9 +7,9 @@ program that takes that MAC and sends the same frames as the Mac. Nothing on the
 
 | Stick (Mini-T remote) | Rover |
 | --- | --- |
-| Left stick up | W: forward, steering centred |
-| Right stick left/right (with or without left stick up) | A / D: turn left/right (forward arc; a car can't turn standing still) |
-| Left stick down | S: reverse, straight (the receiver has no reverse with steering) |
+| Left stick up / down | W / S: forward / reverse |
+| Right stick left / right | A / D: steering (servo only on its own) |
+| Both | drive and steer together (both keys sent every 100 ms; the rover app combines them) |
 | Let go | X until the receiver ACKs (it also stops by itself 500 ms after the last key) |
 
 On the Mini-T these sticks drove the left/right tracks (left Y → MOTOR2, right Y → MOTOR1, right
@@ -38,9 +38,8 @@ once started it holds the radio (ESP-NOW sends time out, changing the MAC hangs)
 Installed 2026-11-03; left stick forward/back confirmed on the rover. Right stick now turns on its
 own (was: only while the left stick was up); its direction (`STEER_SIGN`) still to confirm.
 
-Steering-only for now (2026-11-03, owner's request): the rover runs the calibration's steering-only
-mode, so the right stick moves only the servo (A/D don't drive) and the left stick drives straight.
-Untick it on the Calibrate page and Install to get forward arcs back.
+2026-11-03: steering and throttle used to be exclusive (one key at a time); rover app 0.4 combines
+them, which also replaced the steering-only test mode.
 
 The remote can also stand in for the Mac's USB transmitter (`drive/rover_drive.py` looks for either):
 while the drive server holds it on USB, its sticks don't work; stop the drive server and it reboots.

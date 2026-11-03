@@ -84,9 +84,9 @@ def watch(board, seconds):
     print('switch  L-x  L-y  R-sh  R-x  R-y   key   (Ctrl-C to quit)')
     while time.monotonic() < end:
         v = [int(x) for x in board.run('print(*[4095-a.read() for a in A])').split()]
-        key = rover_remote.key_for(v[rover_remote.PIN_LY], v[rover_remote.PIN_RX]) or '-'
+        key = rover_remote.keys_for(v[rover_remote.PIN_LY], v[rover_remote.PIN_RX]) or '-'
         mode = 'rover' if rover_remote.switch_centred(v[0]) else 'Mini-T'
-        print(f'\r{v[0]:5} {v[1]:5} {v[2]:5} {v[3]:5} {v[4]:5} {v[5]:5}   {key}   boot:{mode}   ', end='', flush=True)
+        print(f'\r{v[0]:5} {v[1]:5} {v[2]:5} {v[3]:5} {v[4]:5} {v[5]:5}   {key:2}   boot:{mode}   ', end='', flush=True)
         time.sleep(0.15)
     print()
 

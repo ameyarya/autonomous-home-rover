@@ -141,7 +141,8 @@ class Transmitter:
         return out
 
     def wire(self, key):
-        self.repl('wire(%r)' % key)
+        # A/D only steer on the receiver; the Mac's A/D are forward arcs, so send W with them.
+        self.repl('wire("W");wire(%r)' % key if key in 'AD' else 'wire(%r)' % key)
 
     def stop(self):
         out = self.repl('print("ACK" if stop_ack() else "NOACK")', timeout=1.5)
