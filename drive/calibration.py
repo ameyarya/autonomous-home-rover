@@ -2,8 +2,8 @@
 rover_drive_app.py, installed on the receiver with the signed app update.
 
 The receiver only takes W/A/S/D/X; motor directions and the servo port are app constants (a new
-signed install each). Centre, range and speed are also calibrated live from the remote (app 0.5:
-saved on the receiver, reported in the version string); `sync_from_rover` copies them back here.
+signed install each). Centre, range and speed are also calibrated live (app 0.6 codes from the Calibrate page: saved on
+the receiver, reported in the version string); `sync_from_rover` copies them back here.
 """
 import hashlib
 import json
@@ -13,7 +13,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CAL_FILE = HERE / 'calibration.json'
 APP_FILE = HERE / 'rover_drive_app.py'
-BASE_VERSION = 'rover-drive-0.5'
+BASE_VERSION = 'rover-drive-0.6'
 
 LIMITS = {
     'speed': (200, 1600),          # of 2048
@@ -101,3 +101,17 @@ def sync_from_rover(installed):
         return False
     save(new)
     return True
+
+
+LIVE_CODES = {'steer_center': ('WW', 'WS', 1), 'steer_travel': ('AW', 'AS', 1), 'speed': ('DW', 'DS', 10)}
+
+
+def codes_to(current, target):
+    """Calibration codes that move the rover's live values `current` to `target` (same keys as
+    live_values)."""
+    codes = []
+    for key, (up, down, step) in LIVE_CODES.items():
+        if key in target:
+            n = round((target[key] - current[key]) / step)
+            codes += [up] * n if n > 0 else [down] * -n
+    return codes

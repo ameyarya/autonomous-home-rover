@@ -132,6 +132,7 @@ class DriveState:
     def calibration(self):
         saved = calibration.load()
         return {'saved': saved, 'expected_version': calibration.version(saved), 'installed': self.installed,
+                'live': calibration.live_values(self.installed),
                 'limits': calibration.LIMITS}
 
     def save_calibration(self, values, install):
@@ -147,6 +148,25 @@ class DriveState:
                     self.tx.stop()      # the new app only moves the servo on a command: centre it now
                 finally:
                     self.busy = False
+        return self.calibration()
+
+    def live_calibration(self, values=None, action=None):
+        """Change centre/range/speed on the rover at once (no install), or save/undo them there."""
+        if self.holding:
+            raise RuntimeError('manual driving')
+        with self.lock:
+            live = calibration.live_values(self.installed)
+            if live is None:
+                raise RuntimeError('the rover app has no live calibration; install it first')
+            if action in ('save', 'revert'):
+                self.tx.codes(['SS' if action == 'save' else 'SA'])
+            elif values:
+                target = calibration.validate(dict(calibration.load(), **{k: v for k, v in values.items()
+                                                                           if k in calibration.LIVE_CODES}))
+                self.tx.codes(calibration.codes_to(live, target))
+            self.installed = self.tx.status()
+        if action == 'save':
+            calibration.sync_from_rover(self.installed)
         return self.calibration()
 
     def watchdog(self):
@@ -196,6 +216,9 @@ def make_handler(state):
                 if self.path == '/pulse':
                     b = self.body()
                     return self.reply(200, state.pulse(str(b.get('key', '')).upper(), b.get('ms', 0)))
+                if self.path == '/calibration/live':
+                    b = self.body()
+                    return self.reply(200, state.live_calibration(b.get('values'), b.get('action')))
                 if self.path == '/calibration':
                     b = self.body()
                     return self.reply(200, state.save_calibration(b.get('values') or {}, bool(b.get('install'))))

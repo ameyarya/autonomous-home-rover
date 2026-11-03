@@ -148,6 +148,11 @@ class Transmitter:
         else:
             self.repl('wire("W");wire(%r)' % key if key in 'AD' else 'wire(%r)' % key)
 
+    def codes(self, codes):
+        """Send live calibration codes (rover app 0.6: D A D A + two keys each; they never drive)."""
+        for i in range(0, len(codes), 4):
+            self.repl(';'.join('wire(%r)' % k for code in codes[i:i + 4] for k in 'DADA' + code), timeout=1.0)
+
     def stop(self):
         out = self.repl('print("ACK" if stop_ack() else "NOACK")', timeout=1.5)
         if b'\r\nACK' not in out and not out.startswith(b'ACK'):

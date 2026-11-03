@@ -11,8 +11,8 @@ without logging in. The page is mac/dashboard.html.
 - Drive: Arm (lease renewed by the page), STOP (Esc/Space), hold-to-drive with WASD/arrows.
 - Camera: health from XiaoLink, settings via the XIAO's /config, and an alert whenever the
   XIAO restarts (power drop on the magnetic cable, brownout, crash), with its reset reason.
-- Drive calibration is on the Mini-T remote (remote/README.md); the Calibrate page was removed
-  2026-11-03 (git history has it).
+- Calibrate (/calibrate): centre, range and speed change live on the rover (no install) and are
+  saved there; wiring (motor directions, servo port) is a signed install.
 - Detector check: "Observe" saves a fresh frame and runs the ported Mini-T detector on it.
 """
 import argparse
@@ -364,7 +364,9 @@ def make_handler(dashboard, password):
                         return self.reply(200, response.read(), response.headers.get('Content-Type'))
                 except OSError:
                     return self.reply(503, {'error': 'dog watcher not running'})
-            if path == '/drive/status':
+            if path == '/calibrate':
+                return self.reply(200, (ROOT / 'calibrate.html').read_bytes(), 'text/html; charset=utf-8')
+            if path in ('/drive/status', '/drive/calibration'):
                 try:
                     with urllib.request.urlopen(DRIVE_URL + path[6:], timeout=2) as response:
                         return self.reply(200, response.read())
@@ -404,12 +406,15 @@ def make_handler(dashboard, password):
                     return self.reply(400, {'error': error.read().decode(errors='replace') or str(error)})
                 except OSError as error:
                     return self.reply(503, {'error': f'camera: {error}'})
-            if self.path in ('/drive/arm', '/drive/stop', '/drive/hold', '/drive/pulse'):
+            if self.path in ('/drive/arm', '/drive/stop', '/drive/hold', '/drive/pulse', '/drive/calibration',
+                             '/drive/calibration/live'):
                 size = int(self.headers.get('Content-Length', 0))
                 body = self.rfile.read(size) if size else b'{}'
                 try:
                     req = urllib.request.Request(DRIVE_URL + self.path[6:], body, {'Content-Type': 'application/json'})
-                    with urllib.request.urlopen(req, timeout=5) as response:
+                    # An install is a signed upload over the radio; live codes take a moment too.
+                    timeout = {'/drive/calibration': 120, '/drive/calibration/live': 20}.get(self.path, 5)
+                    with urllib.request.urlopen(req, timeout=timeout) as response:
                         return self.reply(200, response.read())
                 except urllib.error.HTTPError as error:
                     return self.reply(error.code, error.read())

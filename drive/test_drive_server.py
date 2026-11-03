@@ -17,6 +17,9 @@ class FakeTx:
     def wire(self, key):
         self.calls.append(key)
 
+    def codes(self, codes):
+        self.calls.append('CODES ' + ' '.join(codes))
+
     def update_app(self, source):
         self.installed_source = source
         self.calls.append('UPDATE')
@@ -164,6 +167,27 @@ class DriveStateTest(unittest.TestCase):
             self.assertEqual(calibration.load()['steer_center'], 99)
         finally:
             calibration.CAL_FILE.write_text(original)
+
+    def test_live_calibration_sends_codes_and_saves(self):
+        import calibration
+        original = calibration.CAL_FILE.read_text()
+        try:
+            self.s.installed = 'rover-drive-0.6+cabc123 c90 t40 s900|0'
+            self.tx.status = lambda: 'rover-drive-0.6+cabc123 c92 t38 s920*|0'
+            r = self.s.live_calibration({'steer_center': 92, 'steer_travel': 38, 'speed': 920})
+            self.assertEqual(self.tx.calls[-1], 'CODES WW WW AS AS DW DW')
+            self.assertTrue(r['live']['unsaved'])
+            self.tx.status = lambda: 'rover-drive-0.6+cabc123 c92 t38 s920|0'
+            self.s.live_calibration(action='save')
+            self.assertEqual(self.tx.calls[-1], 'CODES SS')
+            self.assertEqual(calibration.load()['steer_center'], 92)
+        finally:
+            calibration.CAL_FILE.write_text(original)
+
+    def test_live_calibration_needs_the_live_app(self):
+        self.s.installed = 'rover-drive-0.4+cabc123|0'
+        with self.assertRaises(RuntimeError):
+            self.s.live_calibration({'steer_center': 92})
 
     def test_bad_key(self):
         self.s.arm(True)

@@ -12,10 +12,10 @@ Throttle and steering combine: a W/S and an A/D less than MIX_MS apart drive and
 (the sender repeats both), A/D alone only turn the servo, W/S alone drive with the wheels centred.
 The Mac sends W with A/D for its forward arcs.
 
-Live calibration (0.5): the receiver only passes these five keys, so the remote sends edits as a
-code: D A D A back-to-back (each under CODE_GAP_MS apart, which driving never produces) and two
-code keys. Code keys never drive. Codes (see CODES): centre ±1°, range ±5°, speed ±50, save,
-revert. Saved values go to CAL_FILE on the receiver and win over the constants below; the
+Live calibration (0.6): the receiver only passes these five keys, so the Mac (Calibrate page,
+through the remote or transmitter) sends edits as a code: D A D A back-to-back (each under
+CODE_GAP_MS apart, which driving never produces) and two code keys. Code keys never drive.
+Codes (see CODES): centre ±1°, range ±1°, speed ±10, save, revert. Saved values go to CAL_FILE on the receiver and win over the constants below; the
 current values are in the version string ("c92 t45 s900", "*" = unsaved), which the Mac reads.
 """
 import time
@@ -23,7 +23,7 @@ import __main__ as receiver
 
 # Calibration: the drive server rewrites these lines from drive/calibration.json when you press
 # "Install on rover" on the dashboard's Calibrate page (http://rover.local:8010/calibrate).
-VERSION = 'rover-drive-0.5'
+VERSION = 'rover-drive-0.6'
 SPEED = 900                 # of 2048; indoor dog-following pace
 MOTOR_SIGNS = (1, 1)        # flip one if that axle drives backwards
 STEER_SIGN = 1              # -1 swaps left/right if A turns the wheels right
@@ -34,8 +34,8 @@ STEER_HOLD_MS = 500         # steering re-centres if no A/D arrives
 MIX_MS = 400                # a throttle key and a steer key this close together combine
 CODE_GAP_MS = 30            # calibration code keys arrive back-to-back
 CAL_FILE = 'rover_cal.json'
-CODES = {b'WW': ('center', 1), b'WS': ('center', -1), b'AW': ('travel', 5), b'AS': ('travel', -5),
-         b'DW': ('speed', 50), b'DS': ('speed', -50), b'SS': ('save', 0), b'SA': ('revert', 0)}
+CODES = {b'WW': ('center', 1), b'WS': ('center', -1), b'AW': ('travel', 1), b'AS': ('travel', -1),
+         b'DW': ('speed', 10), b'DS': ('speed', -10), b'SS': ('save', 0), b'SA': ('revert', 0)}
 LIMITS = {'center': (45, 135), 'travel': (0, 90), 'speed': (200, 1600)}
 
 

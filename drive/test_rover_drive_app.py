@@ -69,12 +69,12 @@ class AppTest(unittest.TestCase):
         self.keys('DADAAW'); clock[0] += 100
         self.keys('DADADS'); clock[0] += 100
         self.keys('DADASS')
-        self.assertEqual(self.app.cal['travel'], self.ns['STEER_TRAVEL'] + 5)
-        self.assertEqual(self.app.cal['speed'], self.ns['SPEED'] - 50)
+        self.assertEqual(self.app.cal['travel'], self.ns['STEER_TRAVEL'] + 1)
+        self.assertEqual(self.app.cal['speed'], self.ns['SPEED'] - 10)
         self.assertNotIn('*', self.app.version)
         again = self.ns['TankApp']()                          # reboot: saved values load
         self.assertEqual(again.cal, self.app.cal)
-        self.assertEqual(again.throttles[b'W'][0], abs(self.fwd[0]) // self.fwd[0] * (self.ns['SPEED'] - 50))
+        self.assertEqual(again.throttles[b'W'][0], abs(self.fwd[0]) // self.fwd[0] * (self.ns['SPEED'] - 10))
 
     def test_revert(self):
         self.keys('DADAWW'); clock[0] += 100
@@ -86,7 +86,7 @@ class AppTest(unittest.TestCase):
         self.assertEqual(self.app.cal['center'], self.ns['STEER_CENTER'])
 
     def test_limits(self):
-        for _ in range(40):
+        for _ in range(200):
             self.keys('DADAAW'); clock[0] += 100
         c = self.app.cal
         self.assertLessEqual(c['center'] + c['travel'], 180)
