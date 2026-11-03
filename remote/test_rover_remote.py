@@ -8,7 +8,6 @@ MID_Y, MID_X, T = r.MID[r.PIN_LY], r.MID[r.PIN_RX], r.THRESHOLD
 class KeyFor(unittest.TestCase):
     def test_centred_sticks_send_nothing(self):
         self.assertIsNone(r.key_for(MID_Y, MID_X))
-        self.assertIsNone(r.key_for(MID_Y + T - 1, MID_X + 2 * T))   # steering alone can't move a car
 
     def test_throttle(self):
         self.assertEqual(r.key_for(MID_Y + T, MID_X), 'W')
@@ -17,6 +16,10 @@ class KeyFor(unittest.TestCase):
     def test_steer_while_forward(self):
         self.assertEqual(r.key_for(MID_Y + T, MID_X - T), 'A')
         self.assertEqual(r.key_for(MID_Y + T, MID_X + T), 'D')
+
+    def test_right_stick_alone_turns(self):
+        self.assertEqual(r.key_for(MID_Y, MID_X - T), 'A')
+        self.assertEqual(r.key_for(MID_Y, MID_X + T), 'D')
 
     def test_reverse_is_straight(self):
         self.assertEqual(r.key_for(MID_Y - T, MID_X - T), 'S')

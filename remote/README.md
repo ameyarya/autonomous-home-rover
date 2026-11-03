@@ -8,7 +8,7 @@ program that takes that MAC and sends the same frames as the Mac. Nothing on the
 | Stick (Mini-T remote) | Rover |
 | --- | --- |
 | Left stick up | W: forward, steering centred |
-| Left stick up + right stick left/right | A / D: forward arc left/right |
+| Right stick left/right (with or without left stick up) | A / D: turn left/right (forward arc; a car can't turn standing still) |
 | Left stick down | S: reverse, straight (the receiver has no reverse with steering) |
 | Let go | X until the receiver ACKs (it also stops by itself 500 ms after the last key) |
 
@@ -35,6 +35,5 @@ Stick reading: value = 4095 − ADC on pins 0–5 (stock order: L shoulder switc
 stick, R-x, R-y), checked against the stock `rc_module` readings. The stock `rc_module` isn't used:
 once started it holds the radio (ESP-NOW sends time out, changing the MAC hangs).
 
-Installed 2026-11-03. The remote's radio was checked (camera on channel 11 ACKed), but the rover
-receiver didn't answer on any channel, so the link and the stick directions (`THROTTLE_SIGN`,
-`STEER_SIGN`) are still to confirm with `--watch` and on the stand.
+Installed 2026-11-03; left stick forward/back confirmed on the rover. Right stick now turns on its
+own (was: only while the left stick was up); its direction (`STEER_SIGN`) still to confirm.

@@ -2,8 +2,8 @@
 
 The rover receiver only obeys ESP-NOW drive frames from the Mini-T USB transmitter's MAC and
 only knows W/A/S/D/X, so the remote takes that MAC and sends the same frames the Mac does:
-left stick up = W (forward), down = S (reverse, straight); right stick left/right while going
-forward = A/D (forward arc). Keys repeat every 100 ms while held (the receiver stops 500 ms
+left stick up = W (forward), down = S (reverse, straight); right stick left/right = A/D (a
+forward arc: a car can't turn standing still, and the receiver has no steer-only key). Keys repeat every 100 ms while held (the receiver stops 500 ms
 after the last one); letting go sends X until the receiver ACKs. Idle remote sends nothing, so
 it doesn't fight the Mac. 5 minutes idle -> deep sleep like the stock remote (move a stick to wake).
 """
@@ -31,11 +31,11 @@ def key_for(ly, rx):
     steer = STEER_SIGN * (rx - MID[PIN_RX])
     if throttle <= -THRESHOLD:
         return 'S'
+    if steer <= -THRESHOLD:
+        return 'A'
+    if steer >= THRESHOLD:
+        return 'D'
     if throttle >= THRESHOLD:
-        if steer <= -THRESHOLD:
-            return 'A'
-        if steer >= THRESHOLD:
-            return 'D'
         return 'W'
     return None
 
