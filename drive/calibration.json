@@ -2,7 +2,7 @@
  "speed": 900,
  "steer_channel": 1,
  "steer_center": 90,
- "steer_travel": 20,
+ "steer_travel": 35,
  "motor_signs": [
   -1,
   -1
