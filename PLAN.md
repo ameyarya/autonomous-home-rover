@@ -103,6 +103,8 @@ Deliver a confirmed parts list, wiring reference, control-interface decision, an
 
 Implement Mac-to-transmitter USB driving, mount the ESP32 camera/sensor board, and implement Wi-Fi telemetry and manual commissioning controls. Complete when steering, forward/reverse, and stop work repeatably while camera capture is active, without supply-related resets. Test initially with wheels lifted, then on the floor at low speed.
 
+Handheld remote (2026-11-03): the Mini-T remote drives the rover without the Mac by sending the transmitter's W/A/S/D/X frames under its MAC (receiver unchanged); left stick throttle, right stick steering ([remote/README.md](remote/README.md)). Still to confirm: link ACK and stick directions with the receiver on.
+
 ### 2. Safe autonomous roaming (Phase 1)
 
 Implement idle, manual, autonomous, and fault states; add the selected obstacle sensors and bounded motion commands. Complete when the rover can roam in the test room and reliably stop for representative obstacles, stale commands, and sensor faults. Validate reset and communication-loss behavior. Record observed failures and test conditions.

@@ -26,3 +26,4 @@ cad/.venv/
 # Simulation
 sim/.venv/
 sim/out/
+remote/backup/

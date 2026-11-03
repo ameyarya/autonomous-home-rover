@@ -20,6 +20,8 @@ Run: `python3 mac/dashboard.py` (http://rover.local:8010/), then start the drive
 `python3 drive/drive_server.py` and `python3 mac/dog_watcher.py` yourself), then Arm (STOP / Esc / Space
 any time; closing the page disarms). While armed, hold WASD/arrows to drive manually.
 
+Handheld: the Mini-T remote can drive too (same frames, same sender MAC): [remote/README.md](../remote/README.md).
+
 Hardware IDs: transmitter 20:6E:F1:45:0F:1C, receiver 20:6E:F1:4D:8D:04. The signing key stays in
 the Mini-T folder (`.tank_update.key`; override with `ROVER_UPDATE_KEY`); it is never copied here.
 
