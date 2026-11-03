@@ -25,6 +25,7 @@ import serial
 import serial.tools.list_ports
 
 TRANSMITTER_SERIAL = '20:6E:F1:45:0F:1C'   # Mini-T USB transmitter
+REMOTE_SERIAL = '20:6E:F1:4F:6E:80'        # Mini-T handheld remote: stands in, using the transmitter's MAC
 RECEIVER_MAC = '206ef14d8d04'              # rover receiver (service installed by the Mini-T truck experiment)
 KEY_PATH = Path(os.environ.get('ROVER_UPDATE_KEY',
                                Path.home() / 'Documents/Projects/ai-driven-mini-t/.tank_update.key'))
@@ -35,6 +36,10 @@ MAX_PULSE_MS = 2000
 BOARD_CODE = '''import espnow
 import network
 import time
+w = network.WLAN(network.STA_IF)
+w.active(True)
+w.config(mac=bytes.fromhex("206ef1450f1c"))
+w.config(channel=1)
 e = espnow.ESPNow()
 e.active(True)
 peer = bytes.fromhex("%s")
@@ -90,10 +95,11 @@ def ota(raw):
 def find_port():
     if os.environ.get('ROVER_TX_PORT'):
         return os.environ['ROVER_TX_PORT']
-    for p in serial.tools.list_ports.comports():
-        if (p.serial_number or '').upper() == TRANSMITTER_SERIAL:
-            return p.device
-    raise RuntimeError(f'Transmitter {TRANSMITTER_SERIAL} not found on USB; set ROVER_TX_PORT')
+    ports = {(p.serial_number or '').upper(): p.device for p in serial.tools.list_ports.comports()}
+    for serial_number in (TRANSMITTER_SERIAL, REMOTE_SERIAL):
+        if serial_number in ports:
+            return ports[serial_number]
+    raise RuntimeError(f'Neither the transmitter {TRANSMITTER_SERIAL} nor the remote {REMOTE_SERIAL} is on USB; set ROVER_TX_PORT')
 
 
 class Transmitter:

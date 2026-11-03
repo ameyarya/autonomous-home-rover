@@ -37,3 +37,10 @@ once started it holds the radio (ESP-NOW sends time out, changing the MAC hangs)
 
 Installed 2026-11-03; left stick forward/back confirmed on the rover. Right stick now turns on its
 own (was: only while the left stick was up); its direction (`STEER_SIGN`) still to confirm.
+
+Steering-only for now (2026-11-03, owner's request): the rover runs the calibration's steering-only
+mode, so the right stick moves only the servo (A/D don't drive) and the left stick drives straight.
+Untick it on the Calibrate page and Install to get forward arcs back.
+
+The remote can also stand in for the Mac's USB transmitter (`drive/rover_drive.py` looks for either):
+while the drive server holds it on USB, its sticks don't work; stop the drive server and it reboots.
