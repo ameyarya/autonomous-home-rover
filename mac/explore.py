@@ -94,6 +94,12 @@ def main():
             print(json.dumps({'step': i, 'sectors': sec, 'move': f'{kind} {amount}', 'ended': out.get('ended'),
                               'error': out.get('error'), 'odometer': out.get('odometer'),
                               'map': d.get('map')}), flush=True)
+            if 'acknowledge stop' in str(out.get('error')):  # a missed radio reply: stop again, go on if it acks
+                again = call(DRIVE + '/stop', {})
+                if not again.get('error') and again.get('armed') is False:
+                    print(f'step {i}: stop ACK missed once, the retry was acknowledged', flush=True)
+                    call(DRIVE + '/arm', {'armed': True})
+                    continue
             if out.get('error') or out.get('aborted') or out.get('ended') not in ('done', None):
                 why = f'move did not finish ({out.get("error") or out.get("ended") or "aborted"})'
                 break
