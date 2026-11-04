@@ -493,6 +493,8 @@ class DashboardUITest(unittest.TestCase):
             expect(self.page.locator('#sec-centre')).to_have_class('blocked')
             expect(self.page.locator('#sec-left')).to_contain_text('clear')
             expect(self.page.locator('#depth-rate')).to_contain_text('9.5 fps')
+            reading['stop_for'] = ['dog']
+            expect(self.page.locator('#depth-status')).to_contain_text('dog in view', timeout=5000)
         finally:
             dashboard.DEPTH_URL = old
             server.shutdown()

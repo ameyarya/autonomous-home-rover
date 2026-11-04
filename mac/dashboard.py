@@ -201,6 +201,8 @@ class Services:
             if name == 'depth':
                 python, extra_env = detector_python()
                 command, env = [str(python), '-u'] + command, dict(os.environ, **extra_env)
+                env.setdefault('YOLO_CONFIG_DIR', str(MINI_T / 'tools/detector-config'))   # as the detector
+                env.setdefault('XDG_CACHE_HOME', str(MINI_T / 'tools/detector-cache'))
             with log.open('ab') as out:
                 out.write(f'\n--- started from dashboard {datetime.datetime.now():%Y-%m-%d %H:%M:%S}\n'.encode())
                 self.processes[name] = subprocess.Popen(command, cwd=REPO, stdout=out, stderr=out, env=env,

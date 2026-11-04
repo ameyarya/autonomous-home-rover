@@ -6,8 +6,12 @@ Each step: pause so the map takes a view, read the smoothed left/centre/right fr
   centre clear (>= FORWARD_CM)              -> forward STEP_CM, heading held by the gyro
   centre >= TURN_CM and a side >= SIDE_CM   -> 15° arc toward the more open side
   otherwise                                 -> back STEP_CM
+Never drives while a dog, cat or person is in view (depth_service "stop_for"): it waits up to
+WAIT_S for them to leave, then gives up. During every move a guard watches ~10 times a second and
+stops the rover at once if one appears or the centre gets nearer than GUARD_CM.
 Stops for good (and disarms) on a bump, the heading stick or depth going stale, a move that didn't
-finish, or the step limit. Recording photos is switched on for the run.
+finish, a turn that barely turned (steering stuck), or the step limit. Recording photos is
+switched on for the run.
 
 Scale check: when the centre reading has a finite distance before and after a straight forward
 move, the drop in the estimate is compared with the distance driven; the ratio corrects the depth
@@ -25,6 +29,9 @@ DRIVE, DEPTH, DASH = 'http://127.0.0.1:8769', 'http://127.0.0.1:8774', 'http://1
 STEP_CM = 25
 FORWARD_CM, TURN_CM, SIDE_CM = 100, 60, 110
 TURN_DEG = 15
+GUARD_CM = 30
+WAIT_S = 30
+STUCK_SHARE = 0.4        # a turn that reached less than this share of its angle: steering stuck
 SETTLE_S = 1.4           # the depth service maps after 0.6 s still; smoothing needs ~5 fresh frames
 MAX_FRAME_AGE_MS = 400
 
@@ -47,6 +54,50 @@ def choose(sec):
     if sec['centre'] >= TURN_CM and max(sec['left'], sec['right']) >= SIDE_CM:
         return ('left' if sec['left'] >= sec['right'] else 'right'), TURN_DEG
     return 'back', STEP_CM
+
+
+class Guard:
+    """Watches the depth service during a move; stops the rover the moment it must."""
+    def __init__(self):
+        self.why = None
+        self.active = threading.Event()
+        self.forward = True
+        threading.Thread(target=self.run, daemon=True).start()
+
+    def run(self):
+        while True:
+            self.active.wait()
+            d = call(DEPTH + '/status', timeout=0.5)
+            why = None
+            if d.get('stop_for'):
+                why = 'saw ' + ', '.join(d['stop_for'])
+            elif self.forward and d.get('ok') and d['sectors']['centre']['cm'] < GUARD_CM:
+                why = f'centre {d["sectors"]["centre"]["cm"]} cm'
+            if why and self.active.is_set():
+                call(DRIVE + '/stop', {})
+                self.why = why
+                self.active.clear()
+            time.sleep(0.1)
+
+    def move(self, kind, amount):
+        self.why, self.forward = None, kind != 'back'
+        self.active.set()
+        try:
+            return call(DRIVE + '/move', {'kind': kind, 'amount': amount})
+        finally:
+            self.active.clear()
+
+
+def wait_for_clear_view():
+    """None once no dog/cat/person is in view, else what is still there after WAIT_S."""
+    end = time.monotonic() + WAIT_S
+    while True:
+        seen = call(DEPTH + '/status').get('stop_for') or []
+        if not seen:
+            return None
+        if time.monotonic() > end:
+            return ', '.join(seen)
+        time.sleep(0.5)
 
 
 def main():
@@ -75,6 +126,7 @@ def main():
     call(DRIVE + '/arm', {'armed': True})              # arming zeroes the heading
     threading.Thread(target=lease, daemon=True).start()
     scale, why = [], 'step limit'
+    guard = Guard()
     try:
         for i in range(args.steps):
             time.sleep(SETTLE_S)
@@ -88,9 +140,20 @@ def main():
             if (g.get('bumps') or 0) > bumps0:
                 why = 'bump'
                 break
+            if d.get('stop_for'):
+                print(f'step {i}: waiting, I see {", ".join(d["stop_for"])}', flush=True)
+                still = wait_for_clear_view()
+                if still:
+                    why = f'{still} stayed in view for {WAIT_S} s'
+                    break
+                continue
             sec = {k: v['cm'] for k, v in d['sectors'].items()}
             kind, amount = choose(sec)
-            out = call(DRIVE + '/move', {'kind': kind, 'amount': amount})
+            out = guard.move(kind, amount)
+            if guard.why:                               # the guard stopped it: re-arm and look again
+                print(f'step {i}: guard stopped the {kind} ({guard.why})', flush=True)
+                call(DRIVE + '/arm', {'armed': True})
+                continue
             print(json.dumps({'step': i, 'sectors': sec, 'move': f'{kind} {amount}', 'ended': out.get('ended'),
                               'error': out.get('error'), 'odometer': out.get('odometer'),
                               'map': d.get('map')}), flush=True)
@@ -100,6 +163,10 @@ def main():
                     print(f'step {i}: stop ACK missed once, the retry was acknowledged', flush=True)
                     call(DRIVE + '/arm', {'armed': True})
                     continue
+            if kind in ('left', 'right') and out.get('ended') == 'timeout' and \
+                    abs(out.get('turned_deg') or 0) < STUCK_SHARE * amount:
+                why = f'steering looks stuck: turned {out.get("turned_deg")}° of {amount}°'
+                break
             if out.get('error') or out.get('aborted') or out.get('ended') not in ('done', None):
                 why = f'move did not finish ({out.get("error") or out.get("ended") or "aborted"})'
                 break
@@ -110,6 +177,7 @@ def main():
                     scale.append(amount / (sec['centre'] - after))
     finally:
         done.set()
+        time.sleep(0.6)                                 # let a renewal in flight land before disarming
         call(DRIVE + '/arm', {'armed': False})
         call(DASH + '/capture', {'on': False})
     print('stopped:', why)

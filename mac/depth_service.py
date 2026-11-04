@@ -7,6 +7,9 @@ Run (the dashboard's Services start it the same way): the Mini-T detector Python
   GET /depth.jpg   camera frame | depth colour map with the floor (green) and obstacles (red)
   GET /map.png     top-down map built from the free floor and the rover's pose (floor_map.py)
   GET /map         map stats;   POST /map/reset   start a new map
+Living things: YOLO11s (COCO, mac/weights/yolo11s.pt) runs every other frame; a dog, cat or person
+seen in the last SEEN_HOLD_S is reported in "stop_for", and the explorer never drives while it isn't
+empty. Boxes are drawn on the depth view.
 The map takes a view only while the rover stands still (pose and picture then agree), at most
 MAP_EVERY_S, and only with the heading stick online.
 
@@ -41,12 +44,16 @@ FLOOR_ROWS = 0.15        # bottom share of the picture assumed to be floor, for 
 TOLERANCE = 0.06         # nearer than the floor line by this share of the visible floor's range = obstacle
 MIN_RUN = 4              # obstacle rows needed in a column (ignores specks)
 SECTORS = ('left', 'centre', 'right')
-BOTTOM_CM = 20.0         # floor distance at the bottom edge of the picture (to measure)
+BOTTOM_CM = 8.5          # floor distance at the bottom edge of the picture. 20 was a guess; the first
+                         # mapping run measured true/estimated = 0.42 over 2 moves -> 8.5 (recheck)
 MAX_CM = 300.0           # "clear to the horizon" is reported as this
 BLOCKED_CM, NEAR_CM = 35.0, 80.0
 MAP_EVERY_S = 0.5
 MAP_SETTLE_S = 0.6       # after a move, wait this long before mapping (picture and pose settle)
 MAP_COLUMNS = 64
+WATCH = {16: 'dog', 15: 'cat', 0: 'person'}   # COCO class ids
+WATCH_CONF = 0.35
+SEEN_HOLD_S = 1.5
 SMOOTH_N = 5             # sectors report the median of this many frames (single-frame glitches seen)
 
 
@@ -121,6 +128,8 @@ class DepthService:
         self.mapped_at = 0.0
         self.moved_at = 0.0
         self.pose = None
+        self.yolo = None
+        self.seen = {}           # name -> (monotonic time, confidence, box)
         self.model = None
         self.reading = {'ok': False, 'why': 'starting'}
         self.image = None
@@ -136,6 +145,22 @@ class DepthService:
         model.load_state_dict(torch.load(WEIGHTS / 'depth_anything_v2_vits.pth', map_location='cpu',
                                          weights_only=True))
         self.model = model.to(self.device).eval()
+        from ultralytics import YOLO
+        self.yolo = YOLO(str(WEIGHTS / 'yolo11s.pt'))
+        self.yolo.predict(np.zeros((480, 640, 3), np.uint8), device=self.device, imgsz=416, verbose=False)
+
+    def watch(self, img):
+        """Dogs, cats and people in view (they stop the explorer)."""
+        result = self.yolo.predict(img, device=self.device, imgsz=416, conf=WATCH_CONF, verbose=False,
+                                   classes=list(WATCH))[0]
+        now = time.monotonic()
+        for box in result.boxes:
+            name = WATCH[int(box.cls)]
+            self.seen[name] = (now, float(box.conf), [int(v) for v in box.xyxy[0].tolist()])
+
+    def stop_for(self):
+        now = time.monotonic()
+        return sorted(n for n, (t, _, _) in self.seen.items() if now - t < SEEN_HOLD_S)
 
     def frame(self):
         with urllib.request.urlopen(self.source, timeout=2) as r:
@@ -145,7 +170,7 @@ class DepthService:
     def loop(self):
         import cv2
         import torch
-        last_seq, times, history = None, [], []
+        last_seq, times, history, n = None, [], [], 0
         while True:
             try:
                 jpeg, seq, age = self.frame()
@@ -157,6 +182,9 @@ class DepthService:
                 t = time.monotonic()
                 with torch.no_grad():
                     disp = self.model.infer_image(img, self.size)
+                n += 1
+                if n % 2 == 0:
+                    self.watch(img)
                 reading, mask, free = analyse(disp, self.bottom_cm)
                 if reading['ok']:
                     history = (history + [{k: v['cm'] for k, v in reading['sectors'].items()}])[-SMOOTH_N:]
@@ -167,7 +195,13 @@ class DepthService:
                 self.ms = round((time.monotonic() - t) * 1000)
                 if reading['ok']:
                     self.map_view(free)
-                out = overlay(img, disp, mask, free, reading.get('horizon_row', 0), self.bottom_cm)
+                shown = img.copy()
+                for name in self.stop_for():
+                    _, conf, (x0, y0, x1, y1) = self.seen[name]
+                    cv2.rectangle(shown, (x0, y0), (x1, y1), (0, 165, 255), 2)
+                    cv2.putText(shown, f'{name} {conf:.2f}', (x0 + 4, y0 + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
+                                (0, 165, 255), 2)
+                out = overlay(shown, disp, mask, free, reading.get('horizon_row', 0), self.bottom_cm)
                 self.image = cv2.imencode('.jpg', out, [cv2.IMWRITE_JPEG_QUALITY, 70])[1].tobytes()
                 self.reading, self.frame_age_ms, self.error = reading, age, None
                 times = [x for x in times + [time.monotonic()] if time.monotonic() - x < 2]
@@ -210,7 +244,9 @@ class DepthService:
     def status(self):
         return {'ready': self.model is not None, 'device': self.device, 'size': self.size, 'fps': self.fps,
                 'model_ms': self.ms, 'frame_age_ms': self.frame_age_ms, 'error': self.error,
-                'map': self.map.stats(), **self.reading}
+                'map': self.map.stats(), 'stop_for': self.stop_for(),
+                'seen': {n: {'ago_s': round(time.monotonic() - t, 1), 'conf': round(c, 2)}
+                         for n, (t, c, _) in self.seen.items()}, **self.reading}
 
 
 def make_handler(service):

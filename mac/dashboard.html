@@ -339,7 +339,9 @@ async function depthPoll(){
       el.className=v?v.state:'';el.querySelector('strong').textContent=v?(v.cm>=300?'clear':v.cm+' cm'):'—'}
     $('depth-rate').textContent=s.fps?`${s.fps} fps · ${s.model_ms} ms`:'';
     $('depth-status').className='status'+(s.error||!s.ok?' warn':'');
-    $('depth-status').textContent=!s.ready?'Loading the depth model…':s.error?s.error:!s.ok?(s.why||''):'Running'+(s.frame_age_ms!=null?` · frame ${s.frame_age_ms} ms old`:'');
+    const living=(s.stop_for||[]).length?`${s.stop_for.join(', ')} in view: no driving · `:'';
+    $('depth-status').className='status'+(s.error||!s.ok||living?' warn':'');
+    $('depth-status').textContent=living+(!s.ready?'Loading the depth model…':s.error?s.error:!s.ok?(s.why||''):'Running'+(s.frame_age_ms!=null?` · frame ${s.frame_age_ms} ms old`:''));
     showView();
     $('map-info').textContent=s.map?`Map: ${s.map.views} views · ${s.map.free_m2} m² free floor seen`:''}
   catch(e){depthOn=false;$('depth-svc').textContent='Start';$('depth-status').className='status';$('depth-status').textContent='Depth service off';
