@@ -69,6 +69,20 @@ input[type=checkbox]{width:18px;height:18px}
     <p class="muted">Arm to use the hold and test buttons. Hold a key: W/S forward/back, A/D or ←/→ steer only (wheels don't drive). Esc or Space stops.</p>
     <div class="row"><button data-hold="W">Hold forward ↑</button><button data-hold="S">Hold reverse ↓</button></div>
     <p class="status" id="drive-status">Drive server offline</p>
+    <h2 style="margin-top:18px">Measure motion</h2>
+    <p class="muted">Once, on the floor with a tape measure, so the rover can do measured moves ("forward 50 cm", "turn 90°"). Arm first; mark where the front wheels start.</p>
+    <div class="step"><h3>1 · Forward speed</h3>
+      <div class="row"><button data-test="test_forward">Drive forward 2 s</button></div>
+      <label class="check" style="margin-top:8px">It went <input id="m-fwd" type="number" min="1" style="width:90px"> cm</label></div>
+    <div class="step"><h3>2 · Reverse speed</h3>
+      <div class="row"><button data-test="test_reverse">Drive back 1.5 s</button></div>
+      <label class="check" style="margin-top:8px">It went <input id="m-rev" type="number" min="1" style="width:90px"> cm</label></div>
+    <div class="step"><h3>3 · Turning circle</h3>
+      <p class="muted">Hold until it has driven a full circle at full left lock, then measure the circle's width (outside wheel track, wall to wall of the circle).</p>
+      <div class="row"><button data-hold="A">Hold: forward + full left ↖</button></div>
+      <label class="check" style="margin-top:8px">Circle width <input id="m-circle" type="number" min="1" style="width:90px"> cm</label></div>
+    <button id="m-save" class="primary" style="width:100%">Save measurements</button>
+    <p class="status" id="m-status">Loading…</p>
     <details style="margin-top:14px"><summary class="muted">Wiring (only after re-plugging motors or the servo)</summary>
       <div class="step" style="margin-top:10px"><h3>Servo port</h3>
         <div class="row" id="ports"><button data-port="1">S1</button><button data-port="2">S2</button><button data-port="3">S3</button><button data-port="4">S4</button></div></div>
@@ -121,6 +135,27 @@ $('install').onclick=async()=>{if(!saved)return;installing=true;$('install').dis
   catch(e){$('install-status').textContent='Install failed: '+e.message+' (the rover keeps its previous app).';$('install-status').className='status bad'}
   installing=false;$('install').disabled=false};
 load();setInterval(()=>{if(!busy&&!installing)load()},3000);
+// ---- measure motion ----
+let mot=null;
+function showMot(r){mot=r;const v=r.values||{},t=r.test_s||{forward:2,reverse:1.5};
+  const known=v.forward_cm_s&&v.reverse_cm_s&&v.turn_radius_cm;
+  $('m-status').textContent=known?`Saved: forward ${v.forward_cm_s} cm/s, reverse ${v.reverse_cm_s} cm/s, turning radius ${v.turn_radius_cm} cm (at speed ${v.power}${v.power!==r.power?`; rover now at ${r.power}: re-measure if it changed a lot`:''}).`:'Not measured yet.';
+  $('m-status').className='status '+(known?'ok':'warn')}
+async function loadMot(){try{showMot(await getJSON('/drive/motion'))}catch(e){}}
+document.querySelectorAll('[data-test]').forEach(b=>b.onclick=async()=>{if(!armed){$('m-status').textContent='Arm first (Test card).';return}
+  b.disabled=true;$('m-status').textContent='Driving…';
+  try{const r=await postJSON('/drive/move',{kind:b.dataset.test});$('m-status').textContent=`Drove ${r.ms} ms. Measure and enter the distance.`}
+  catch(e){$('m-status').textContent='Not driven: '+e.message;$('m-status').className='status bad'}b.disabled=false});
+$('m-save').onclick=async()=>{const t=(mot&&mot.test_s)||{forward:2,reverse:1.5},values={};
+  if(+$('m-fwd').value>0)values.forward_cm_s=+(+$('m-fwd').value/t.forward).toFixed(2);
+  if(+$('m-rev').value>0)values.reverse_cm_s=+(+$('m-rev').value/t.reverse).toFixed(2);
+  if(+$('m-circle').value>0)values.turn_radius_cm=+(+$('m-circle').value/2).toFixed(1);
+  if(!Object.keys(values).length){$('m-status').textContent='Enter at least one measurement.';return}
+  values.power=mot?mot.power:null;
+  try{showMot(await postJSON('/drive/motion',{values}));['m-fwd','m-rev','m-circle'].forEach(id=>$(id).value='')}
+  catch(e){$('m-status').textContent='Not saved: '+e.message;$('m-status').className='status bad'}};
+loadMot();
+
 
 // ---- drive server service ----
 async function svcPoll(){try{const s=(await getJSON('/services')).drive;const b=$('drive-svc');b.hidden=s.running&&!s.managed;

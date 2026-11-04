@@ -202,6 +202,8 @@ class DashboardUITest(unittest.TestCase):
         cls.cal_file.write_text(json.dumps({'speed': 900, 'motor_signs': [1, 1], 'steer_sign': 1, 'steer_channel': 2,
                                             'steer_center': 90, 'steer_travel': 20}))   # fixed start, not the live file
         calibration.CAL_FILE = cls.cal_file            # never touch the real drive/calibration.json
+        import motion
+        motion.MOTION_FILE = Path(cls.cal_dir) / 'motion.json'   # nor drive/motion.json
         cls.camera = serve(FakeCamera)
         cls.tx = FakeTx()
         cls.drive_state = drive_server.DriveState(cls.tx)
@@ -413,6 +415,36 @@ class DashboardUITest(unittest.TestCase):
         self.page.dispatch_event('[data-hold=L]', 'pointerup')
         self.page.wait_for_timeout(600)
         self.assertIn('L', self.tx.calls)
+
+    # ---- measured moves ----
+
+    def test_measured_move_needs_measurements_then_drives_and_counts(self):
+        self.drive_state.motion = {k: None for k in ('forward_cm_s', 'reverse_cm_s', 'turn_radius_cm', 'power')}
+        self.drive_state.odometer.reset()
+        self.open()
+        self.page.click('#arm')
+        expect(self.page.locator('#arm')).to_contain_text('Armed')
+        self.page.click('[data-move=forward][data-amount="25"]')
+        expect(self.page.locator('#move-status')).to_contain_text('measure the forward speed first')
+        self.drive_state.save_motion({'forward_cm_s': 50.0, 'reverse_cm_s': 40.0, 'turn_radius_cm': 40.0, 'power': 900})
+        self.page.click('[data-move=forward][data-amount="25"]')                  # 0.5 s
+        expect(self.page.locator('#move-status')).to_contain_text('drove', timeout=5000)
+        expect(self.page.locator('#odo-dist')).to_have_text('25 cm')
+        self.assertEqual(self.tx.calls[-1], 'X')
+        self.page.click('#odo-reset')
+        expect(self.page.locator('#odo-dist')).to_have_text('0 cm')
+
+    def test_calibrate_measure_motion(self):
+        self.page.goto(self.url + 'calibrate')
+        self.page.click('#arm')
+        expect(self.page.locator('#arm')).to_contain_text('Armed')
+        self.page.click('[data-test=test_reverse]')
+        expect(self.page.locator('#m-status')).to_contain_text('Measure and enter', timeout=5000)
+        self.page.fill('#m-fwd', '100')
+        self.page.fill('#m-rev', '60')
+        self.page.fill('#m-circle', '120')
+        self.page.click('#m-save')
+        expect(self.page.locator('#m-status')).to_contain_text('forward 50 cm/s, reverse 40 cm/s, turning radius 60 cm')
 
     def test_phone_width_has_no_sideways_scroll(self):
         context = self.browser.new_context(viewport={'width': 390, 'height': 844})

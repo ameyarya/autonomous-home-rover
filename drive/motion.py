@@ -95,11 +95,16 @@ class Odometer:
         speed = s['forward'] if throttle > 0 else s['reverse'] if throttle < 0 else 0
         travel = throttle * speed * seconds                     # signed cm
         self.distance_cm += abs(travel)
-        turn = math.degrees(travel / s['radius']) * steer if steer and s['radius'] else 0.0
-        mid = math.radians(self.heading_deg + turn / 2)
-        self.x_cm += travel * math.cos(mid)
-        self.y_cm += travel * math.sin(mid)
-        self.heading_deg = (self.heading_deg + turn + 180) % 360 - 180
+        turn = travel / s['radius'] * steer if steer and s['radius'] else 0.0   # radians, + = left
+        h0 = math.radians(self.heading_deg)
+        if turn:                                                   # exact arc of radius travel/turn
+            r = travel / turn
+            self.x_cm += r * (math.sin(h0 + turn) - math.sin(h0))
+            self.y_cm -= r * (math.cos(h0 + turn) - math.cos(h0))
+        else:
+            self.x_cm += travel * math.cos(h0)
+            self.y_cm += travel * math.sin(h0)
+        self.heading_deg = (self.heading_deg + math.degrees(turn) + 180) % 360 - 180
 
     def as_dict(self):
         return {'distance_cm': round(self.distance_cm, 1), 'x_cm': round(self.x_cm, 1), 'y_cm': round(self.y_cm, 1),

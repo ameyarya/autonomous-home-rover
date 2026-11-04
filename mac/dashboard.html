@@ -61,6 +61,11 @@ details summary{cursor:pointer;color:var(--dim);font-size:13px}
 select,input{font:inherit;color:inherit;background:#0d131c;border:1px solid var(--line2);border-radius:8px;padding:7px;min-width:0}
 input[type=checkbox]{width:16px;height:16px}
 .primary{background:#1d4ed8;border-color:#3b82f6}
+.moves{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.moves button{padding:10px 6px;font-size:13px}
+.odo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px;font-size:13px}
+.odo span{display:block;color:var(--dim2);font-size:11px}.odo strong{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.cardhead{display:flex;justify-content:space-between;align-items:center}.cardhead button{padding:4px 10px;font-size:11px}
 @media(max-width:640px){.wrap{padding:16px}.tele{grid-template-columns:1fr 1fr}.pad{grid-template-columns:repeat(3,64px)}}
 </style></head><body><div class="wrap">
 <header>
@@ -113,6 +118,21 @@ input[type=checkbox]{width:16px;height:16px}
       </div>
       <p class="hint"><kbd>W</kbd><kbd>S</kbd> / <kbd>↑</kbd><kbd>↓</kbd> drive, <kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> steer (wheels only). Hold both to drive and steer. Let go to stop. <kbd>Esc</kbd> or <kbd>Space</kbd> = STOP.</p>
       <p class="status" id="drive-status">Drive server offline</p>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h2 style="margin:0">Measured moves</h2><button id="odo-reset" title="Zero the distance and position">Reset</button></div>
+      <div class="moves" style="margin-top:12px">
+        <button data-move="forward" data-amount="25">↑ 25 cm</button><button data-move="forward" data-amount="50">↑ 50 cm</button><button data-move="forward" data-amount="100">↑ 1 m</button>
+        <button data-move="left" data-amount="45">↶ 45°</button><button data-move="left" data-amount="90">↶ 90°</button><button data-move="back" data-amount="25">↓ 25 cm</button>
+        <button data-move="right" data-amount="45">↷ 45°</button><button data-move="right" data-amount="90">↷ 90°</button><button data-move="back" data-amount="50">↓ 50 cm</button>
+      </div>
+      <div class="odo">
+        <div><span>Travelled</span><strong id="odo-dist">—</strong></div>
+        <div><span>Heading</span><strong id="odo-head">—</strong></div>
+        <div><span>Position</span><strong id="odo-pos">—</strong></div>
+      </div>
+      <p class="hint">Turns are forward arcs at full lock (it can't turn on the spot). Estimates from drive time until the gyro and wheel sensor arrive; measure once on the <a href="/calibrate">Calibrate</a> page.</p>
+      <p class="status" id="move-status"></p>
     </div>
   </aside>
 </main>
@@ -185,7 +205,7 @@ function showArmed(){
   $('stage').classList.toggle('armed',armed);$('armed-badge').hidden=!armed;$('pad').setAttribute('aria-disabled',String(!armed))}
 function showDrive(s){
   if(s.error&&s.armed===undefined){$('drive-status').textContent='Drive server off. Start it above (remote or transmitter on USB).';return}
-  armed=!!s.armed;showArmed();
+  armed=!!s.armed;showArmed();showOdo(s.odometer);
   const last=s.last?(s.last.manual?`manual ${NAMES[s.last.key]||s.last.key}`:s.last.key==='X'?`stopped (${s.last.why||'stop'})`:`pulse ${s.last.key} ${s.last.ms} ms`):'nothing yet';
   $('drive-status').className='status'+(s.error?' warn':'');
   $('drive-status').textContent=(armed?'Armed — the rover can move. ':'Disarmed. ')+`Last: ${last}`+(s.error?` · ${s.error}`:'')}
@@ -219,6 +239,21 @@ document.querySelectorAll('.pad button').forEach(b=>{
   b.onpointerdown=e=>{try{b.setPointerCapture(e.pointerId)}catch(err){}down.add(b.dataset.dir);update()};
   b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>{down.delete(b.dataset.dir);update()}});
 addEventListener('pagehide',()=>{if(armed)navigator.sendBeacon('/drive/stop','{}')});
+
+
+// Measured moves + odometer (estimates from drive time).
+function showOdo(o){if(!o)return;const m=o.distance_cm>=100?(o.distance_cm/100).toFixed(2)+' m':Math.round(o.distance_cm)+' cm';
+  $('odo-dist').textContent=m;$('odo-head').textContent=Math.round(o.heading_deg)+'°';
+  $('odo-pos').textContent=`${Math.round(o.x_cm)}, ${Math.round(o.y_cm)}`;$('odo-pos').title='x, y in cm from where you last pressed Reset (x = the way it faced then)'}
+let moving=false;
+document.querySelectorAll('[data-move]').forEach(b=>b.onclick=async()=>{
+  if(!armed){$('move-status').textContent='Arm first to move.';return}if(moving)return;moving=true;
+  document.querySelectorAll('[data-move]').forEach(x=>x.disabled=true);$('move-status').textContent=`${b.textContent}…`;
+  try{const r=await postJSON('/drive/move',{kind:b.dataset.move,amount:+b.dataset.amount});showOdo(r.odometer);
+    $('move-status').textContent=`${b.textContent}: drove ${r.ms} ms`+(r.aborted?' (stopped early)':'')}
+  catch(e){$('move-status').textContent='Not moved: '+e.message}
+  moving=false;document.querySelectorAll('[data-move]').forEach(x=>x.disabled=false)});
+$('odo-reset').onclick=async()=>{try{showOdo((await postJSON('/drive/odometer/reset')).odometer)}catch(e){}};
 
 // Camera settings.
 async function loadCfg(){try{const c=await getJSON('/cam/config');

@@ -2,7 +2,7 @@
 
 Working list, one item at a time, simplest first (details and reasoning: [PLAN.md](PLAN.md#autonomy-roadmap-2026-11-03-replaces-the-dog-companion-goal)).
 
-- [ ] 1. **Measured moves** — "forward N cm", "turn X°" from timed drives calibrated with a tape measure; distance-travelled counter (estimate). *In progress 2026-11-03.*
+- [ ] 1. **Measured moves** — "forward N cm", "turn X°" from timed drives calibrated with a tape measure; distance-travelled counter (estimate). *Built 2026-11-03 (dashboard Measured moves card, Calibrate → Measure motion); waiting on the floor measurements, then check how close 50 cm / 90° land.*
 - [ ] 2. **Snapshot task v0** — "take a picture of my dog" when he's in view: find, centre, approach, save the best frame to a gallery.
 - [ ] 3. **Gyro heading** — IMU (~US$3) on the XIAO's I2C; turns by angle, straight driving.
 - [ ] 4. **Front distance** — ToF sensor (VL53L1X, ~US$8); stop before obstacles, wall following.

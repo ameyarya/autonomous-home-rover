@@ -9,6 +9,11 @@ Run: python3 drive/drive_server.py        (HTTP on 127.0.0.1:8769)
   POST /hold   {"key": "W"}        manual hold-to-drive: drives while renewed every ~150 ms, stops with
                                    ACK HOLD_S after the last renewal; refused (403) unless armed
   POST /stop                       abort any pulse or hold, disarm, stop with ACK
+  POST /move   {"kind": "forward"|"back", "amount": cm}  or  {"kind": "left"|"right", "amount": deg}
+                                   measured move (timed from drive/motion.json; refused unless armed);
+                                   {"kind": "test_forward"|"test_reverse"} = the timed run for measuring
+  GET  /motion                     measured speeds/turning circle, odometer (estimates)
+  POST /motion {values}            save measurements;  POST /odometer/reset
   GET  /calibration                saved calibration, the app version it makes, the installed app
   POST /calibration {values, install}   save (validated); install=true disarms, then installs the
                                    calibrated app on the receiver with the signed update
@@ -28,6 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import calibration  # noqa: E402
+import motion  # noqa: E402
 
 LEASE_S = 3.0
 PULSE_LIMITS_MS = {'W': 600, 'S': 400, 'A': 600, 'D': 600, 'L': 2000, 'R': 2000, 'Z': 400, 'C': 400}
@@ -51,6 +57,8 @@ class DriveState:
         self.manual_until = 0.0
         self.holding = False
         self.installed = None         # receiver app|running, refreshed after installs
+        self.motion = motion.load()
+        self.odometer = motion.Odometer()
 
     @property
     def armed(self):
@@ -74,6 +82,56 @@ class DriveState:
                 self.error = f'stop failed: {error}'
         self.last = {'key': 'X', 'why': why, 't': time.time()}
 
+    def power(self):
+        live = calibration.live_values(self.installed)
+        return live['speed'] if live else calibration.load()['speed']
+
+    def count(self, key, seconds):
+        self.odometer.add(key, seconds, self.motion, self.power())
+
+    def move(self, kind, amount=None):
+        """A measured move: drive `key` for the planned time, then stop with ACK."""
+        if not self.armed:
+            raise PermissionError('not armed')
+        if time.monotonic() < self.manual_until or self.holding:
+            raise RuntimeError('manual driving')
+        if kind in ('test_forward', 'test_reverse'):
+            key, seconds = ('W', motion.TEST_S['forward']) if kind == 'test_forward' else ('S', motion.TEST_S['reverse'])
+        else:
+            if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
+                raise ValueError('amount must be a positive number (cm or degrees)')
+            key, seconds = motion.plan(kind, amount, self.motion, self.power())
+        with self.lock:
+            if not self.armed or self.abort.is_set():
+                raise PermissionError('not armed')
+            self.busy = True
+            started = time.monotonic()
+            try:
+                while not self.abort.is_set():
+                    self.tx.wire(key)
+                    remaining = seconds - (time.monotonic() - started)
+                    if remaining <= 0:
+                        break
+                    self.abort.wait(min(REPEAT_S, remaining))
+            finally:
+                driven = min(time.monotonic() - started, seconds)
+                try:
+                    self.tx.stop()
+                finally:
+                    self.busy = False
+                    self.count(key, driven)
+        self.last = {'key': key, 'move': kind, 'amount': amount, 'ms': round(driven * 1000), 't': time.time(),
+                     'aborted': self.abort.is_set()}
+        return dict(self.last, odometer=self.odometer.as_dict())
+
+    def motion_status(self):
+        return {'values': self.motion, 'power': self.power(), 'test_s': motion.TEST_S, 'max_move_s': motion.MAX_MOVE_S,
+                'odometer': self.odometer.as_dict()}
+
+    def save_motion(self, values):
+        self.motion = motion.save(values)
+        return self.motion_status()
+
     def pulse(self, key, ms):
         if not self.armed:
             raise PermissionError('not armed')
@@ -91,6 +149,7 @@ class DriveState:
                 self.tx.pulse(key, ms, abort=self.abort)
             finally:
                 self.busy = False
+                self.count(key, min(time.monotonic() - started, ms / 1000))
         took = round((time.monotonic() - started) * 1000)
         self.last = {'key': key, 'ms': ms, 'stopped_after_ms': took, 't': time.time()}
         return self.last
@@ -116,11 +175,19 @@ class DriveState:
             with self.lock:
                 self.busy = True
                 try:
+                    sent = None
                     while (self.armed and not self.abort.is_set()
                            and time.monotonic() < self.hold_until):
-                        self.tx.wire(self.hold_key)
-                        self.last = {'key': self.hold_key, 'manual': True, 't': time.time()}
+                        key = self.hold_key
+                        self.tx.wire(key)
+                        now = time.monotonic()
+                        if sent:                    # odometer: time since the previous frame
+                            self.count(sent[0], min(now - sent[1], 2 * REPEAT_S))
+                        sent = (key, now)
+                        self.last = {'key': key, 'manual': True, 't': time.time()}
                         self.abort.wait(REPEAT_S)
+                    if sent:
+                        self.count(sent[0], min(time.monotonic() - sent[1], 2 * REPEAT_S))
                 finally:
                     try:
                         self.tx.stop()
@@ -184,7 +251,8 @@ class DriveState:
     def status(self):
         return {'armed': self.armed, 'busy': self.busy, 'holding': self.hold_key if self.holding else None,
                 'installed': self.installed,
-                'last': self.last, 'error': self.error, 'lease_s': LEASE_S, 'pulse_limits_ms': PULSE_LIMITS_MS}
+                'last': self.last, 'error': self.error, 'lease_s': LEASE_S, 'pulse_limits_ms': PULSE_LIMITS_MS,
+                'odometer': self.odometer.as_dict()}
 
 
 def make_handler(state):
@@ -206,6 +274,8 @@ def make_handler(state):
                 return self.reply(200, state.status())
             if self.path == '/calibration':
                 return self.reply(200, state.calibration())
+            if self.path == '/motion':
+                return self.reply(200, state.motion_status())
             self.reply(404, {'error': 'not found'})
 
         def do_POST(self):
@@ -219,6 +289,14 @@ def make_handler(state):
                 if self.path == '/pulse':
                     b = self.body()
                     return self.reply(200, state.pulse(str(b.get('key', '')).upper(), b.get('ms', 0)))
+                if self.path == '/move':
+                    b = self.body()
+                    return self.reply(200, state.move(str(b.get('kind', '')), b.get('amount')))
+                if self.path == '/motion':
+                    return self.reply(200, state.save_motion(self.body().get('values') or {}))
+                if self.path == '/odometer/reset':
+                    state.odometer.reset()
+                    return self.reply(200, state.motion_status())
                 if self.path == '/calibration/live':
                     b = self.body()
                     return self.reply(200, state.live_calibration(b.get('values'), b.get('action')))
