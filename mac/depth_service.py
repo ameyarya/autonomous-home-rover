@@ -98,6 +98,9 @@ def analyse(disp):
         for r in range(h - 1, horizon, -1):
             run = run + 1 if mask[r, x] else 0
             if run >= MIN_RUN:
+                # (Tried: placing the distance at the floor row matching the obstacle's depth. It fixed
+                # rendered sim images, 47 cm read 100 -> 70, but made real ones read about half the true
+                # distance, so it's out: tune on real frames, not renders.)
                 free_cm[x] = min(MAX_CM, floor_cm(r + MIN_RUN - 1, h, horizon))
                 break
     sectors = {}

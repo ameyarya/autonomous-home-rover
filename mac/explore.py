@@ -179,7 +179,8 @@ def main():
         for i in range(args.steps):
             time.sleep(SETTLE_S)
             d, g = call(DEPTH + '/status'), call(DRIVE + '/imu')
-            if d.get('error') or not d.get('ok') or (d.get('frame_age_ms') or 10 ** 6) > MAX_FRAME_AGE_MS:
+            age = d.get('frame_age_ms')
+            if d.get('error') or not d.get('ok') or age is None or age > MAX_FRAME_AGE_MS:
                 why = f'depth not usable ({d.get("why") or d.get("error") or d.get("frame_age_ms")})'
                 break
             if not g.get('online'):

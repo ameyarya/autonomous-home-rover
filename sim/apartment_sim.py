@@ -5,6 +5,12 @@ Run:  sim/.venv/bin/python sim/apartment_sim.py [--seed 1] [--start x,y,heading]
                                          with a simulated transmitter and heading stick
   camera         http://127.0.0.1:9010/live.jpg   rendered rover camera (X-Frame-Seq, X-Frame-Age-Ms)
   truth          http://127.0.0.1:9010/truth      true pose, collisions, path, closest approach
+                 POST :9010/place {"x", "y", "heading"}   put the rover somewhere (tests, batch runs)
+  exact depth    http://127.0.0.1:9775/status     the depth service's left/centre/right reading, but
+                 exact: 64 MuJoCo rays across the camera's view, 3 cm above the floor (over rugs).
+                 Point the explorer's --depth here to test driving decisions without the depth model
+                 (rendered images fool it differently from real ones; perception is tested on real
+                 photos instead).
 Then point the real depth service and explorer at it:
   <detector python> mac/depth_service.py --port 9774 --source http://127.0.0.1:9010/live.jpg \\
       --drive http://127.0.0.1:9769
@@ -48,23 +54,21 @@ SERVO_TAU_S = 0.15
 PLAY_RAD = math.radians(2.0)            # front-wheel play: steering offset wanders within this
 CAM_H_M, CAM_PITCH_DEG, HFOV_DEG = 0.075, 3.8, 62.0
 FPS = 15
+RAY_COLUMNS, RAY_Z_M, MAX_CM = 64, 0.03, 300.0
 DT = 0.01
 
 SCENE = """<mujoco model="apartment_rover">
   <visual><global offwidth="640" offheight="480"/><quality shadowsize="2048"/>
+    <map znear=".002"/>
     <headlight ambient=".45 .45 .45" diffuse=".5 .5 .5" specular="0 0 0"/></visual>
-  <asset>
-    <texture name="floor" type="2d" builtin="checker" rgb1=".66 .58 .48" rgb2=".62 .54 .44" width="512" height="512"/>
-    <material name="floor" texture="floor" texrepeat="40 40"/>
-    <material name="wall" rgba=".88 .87 .84 1"/>
-    <material name="blinds" rgba=".97 .96 .92 1"/>
-  </asset>
+  <compiler texturedir="apartment"/>
+  <include file="apartment/apartment_assets.xml"/>
   <worldbody>
     <light pos="4 4 2.3" dir="0 0 -1" diffuse=".5 .5 .5"/>
     <include file="apartment/apartment.xml"/>
     <body name="rover" mocap="true" pos="1 1 0">
       <geom type="box" size=".115 .07 .012" pos="0 0 .055" rgba=".92 .92 .9 1" contype="0" conaffinity="0"/>
-      <camera name="cam" pos=".11 0 {cam_h}" xyaxes="0 -1 0 {sp} 0 {cp}" fovy="{fovy}"/>
+      <camera name="cam" pos=".125 0 {cam_h}" xyaxes="0 -1 0 {sp} 0 {cp}" fovy="{fovy}"/>
     </body>
   </worldbody>
 </mujoco>"""
@@ -235,6 +239,8 @@ class Sim:
         self.model = mujoco.MjModel.from_xml_path(str(HERE / '.scene.xml'))
         self.data = mujoco.MjData(self.model)
         self.frame, self.frame_seq, self.frame_t = None, 0, 0.0
+        self.ray_data, self.ray_lock = mujoco.MjData(self.model), threading.Lock()
+        self.rover_body = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, 'rover')
 
     def physics(self):
         last = time.monotonic()
@@ -256,6 +262,30 @@ class Sim:
             Image.fromarray(renderer.render()).save(buf, 'JPEG', quality=80)
             self.frame, self.frame_seq, self.frame_t = buf.getvalue(), self.frame_seq + 1, time.monotonic()
             time.sleep(1 / FPS)
+
+    def exact_depth(self):
+        """Forward distance (cm) to the first thing in each of RAY_COLUMNS directions, as sectors."""
+        with self.ray_lock:
+            r = self.rover
+            self.ray_data.mocap_pos[0] = [r.x, r.y, 0]
+            self.ray_data.mocap_quat[0] = [math.cos(r.yaw / 2), 0, 0, math.sin(r.yaw / 2)]
+            mujoco.mj_kinematics(self.model, self.ray_data)
+            cam = np.array([r.x + 0.125 * math.cos(r.yaw), r.y + 0.125 * math.sin(r.yaw), RAY_Z_M])
+            f = 0.5 / math.tan(math.radians(HFOV_DEG) / 2)
+            cols, geom = [], np.zeros(1, np.int32)
+            for u in (np.arange(RAY_COLUMNS) + 0.5) / RAY_COLUMNS - 0.5:
+                bearing = -math.atan2(u, f)
+                a = r.yaw + bearing
+                d = mujoco.mj_ray(self.model, self.ray_data, cam, np.array([math.cos(a), math.sin(a), 0.0]),
+                                  None, 1, self.rover_body, geom)
+                forward = d * math.cos(bearing) * 100 if d >= 0 else MAX_CM
+                cols.append(min(MAX_CM, forward))
+        sectors = {}
+        for name, part in zip(('left', 'centre', 'right'), np.array_split(np.array(cols), 3)):
+            cm = float(np.percentile(part, 10))
+            sectors[name] = {'cm': round(cm), 'state': 'blocked' if cm < 35 else 'near' if cm < 80 else 'clear'}
+        return {'ready': True, 'ok': True, 'frame_age_ms': 0, 'error': None, 'stop_for': [], 'sectors': sectors,
+                'raw': sectors, 'map': None, 'source': 'exact (sim rays)'}
 
     def truth(self):
         r = self.rover
@@ -287,6 +317,35 @@ def camera_handler(sim):
                 return self.reply(200, sim.truth())
             self.reply(404, {'error': 'not found'})
 
+        def do_POST(self):
+            if self.path == '/place':
+                b = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
+                r = sim.rover
+                with r.lock:
+                    r.x, r.y, r.yaw = float(b['x']), float(b['y']), math.radians(float(b['heading']))
+                    r.collisions, r.pushing_s, r.path_m = 0, 0.0, 0.0
+                    r.min_clear = sim.walls.clearance(r.x, r.y)
+                return self.reply(200, sim.truth())
+            self.reply(404, {'error': 'not found'})
+
+        def log_message(self, *a):
+            pass
+    return H
+
+
+def exact_depth_handler(sim):
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps(sim.exact_depth() if self.path == '/status' else {}).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self):
+            self.do_GET()
+
         def log_message(self, *a):
             pass
     return H
@@ -298,14 +357,18 @@ def main():
     ap.add_argument('--start', default='2.0,4.5,90', help='x,y in metres and heading in degrees (90 = up the plan)')
     ap.add_argument('--drive-port', type=int, default=9769)
     ap.add_argument('--camera-port', type=int, default=9010)
+    ap.add_argument('--exact-depth-port', type=int, default=9775)
+    ap.add_argument('--no-camera', action='store_true', help='skip rendering (exact depth only; faster batch runs)')
     args = ap.parse_args()
     sim = Sim([float(v) for v in args.start.split(',')], args.seed)
     state = drive_server.DriveState(SimTx(sim.rover), sim.imu)
     state.installed = 'rover-drive-0.9+sim c130 t50 s1200|0'
-    for target in (sim.physics, sim.camera, state.watchdog):
+    for target in (sim.physics, state.watchdog) + (() if args.no_camera else (sim.camera,)):
         threading.Thread(target=target, daemon=True).start()
     cam = ThreadingHTTPServer(('127.0.0.1', args.camera_port), camera_handler(sim))
     threading.Thread(target=cam.serve_forever, daemon=True).start()
+    exact = ThreadingHTTPServer(('127.0.0.1', args.exact_depth_port), exact_depth_handler(sim))
+    threading.Thread(target=exact.serve_forever, daemon=True).start()
     drive = ThreadingHTTPServer(('127.0.0.1', args.drive_port), drive_server.make_handler(state))
     print(f'sim: drive http://127.0.0.1:{args.drive_port}  camera http://127.0.0.1:{args.camera_port}/live.jpg',
           flush=True)
