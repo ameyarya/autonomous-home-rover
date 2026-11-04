@@ -89,3 +89,16 @@ If USB flashing fails to connect, hold BOOT while plugging in USB.
 - Multi-client (shared capture task): three simultaneous streams each ~28 fps plus a 68 ms `/capture.jpg`; added after a browser on the bench page starved the Mac link of frames.
 
 Not yet verified: running on the rover chassis and behaviour while the motors run.
+
+## Full-flash backups (local only, `backups/`, not in git)
+
+The XIAO is shared with the peephole door-cam project. Whole 8 MB images (firmware + Wi-Fi
+settings) live in `backups/` with `.sha256` files: `xiao-rover-cam-0295d75-8MB.bin` (this
+firmware) and `xiao-doorbell-before-rover-restore-8MB.bin` (the door-cam firmware, read before the
+rover image was restored on 2026-11-03). Restore either:
+
+```sh
+shasum -a 256 -c backups/<image>.bin.sha256
+esptool --chip esp32s3 -p /dev/cu.usbmodem<port> -b 921600 write-flash 0 backups/<image>.bin
+```
+
