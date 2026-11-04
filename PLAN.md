@@ -45,6 +45,36 @@ Roadmap framing (2026-10-16): the Mini-T was the proof of concept; Phase 1 repli
 3. UWB tag + rover UWB module (e.g. Qorvo DWM3000, ~US$50–100): ~10 cm ranging, and bearing with a two-antenna angle-of-arrival module, so the rover can head straight to him.
 First step (free, no firmware change): log AirTag RSSI from the Mac with the tag on his collar, with him at the desk, across the room, and in another room, to check it advertises reliably at home and whether RSSI separates rooms. Use any tracker as a coarse hint that hands over to the camera once he is in view.
 
+## Autonomy roadmap (2026-11-03, replaces the dog-companion goal)
+
+Owner's direction: drop dog following/tracking; go for an autonomous rover that maps the
+apartment, knows where it is (live location, distance travelled) and does simple tasks ("take a
+picture of my dog"). Ordered by complexity; each step builds on the ones before it.
+
+Hardware today, and why it shapes the order: one XIAO camera (~15 fps, ~130 ms late, over Wi-Fi),
+no wheel sensors, no IMU, no range sensor; drive is on/off keys at a fixed speed. A single laggy
+camera alone is the hardest way to know position, so cheap sensors (~US$20 total) come early.
+
+| # | Item | Needs | Complexity |
+| --- | --- | --- | --- |
+| 1 | **Measured moves:** "forward N cm", "turn X°" from timed pulses, calibrated with a tape measure; distance-travelled counter on the dashboard (estimate) | nothing new | low |
+| 2 | **Snapshot task v0:** "take a picture of my dog" when he's in view: detector finds him, rover centres and approaches, saves the best frame to a gallery on the dashboard | existing detector | low–medium |
+| 3 | **Gyro heading:** IMU (MPU-6050/BMI160 class, ~US$3) on the XIAO's I2C, heading in the telemetry; turns by angle, heading-corrected straight driving | IMU + firmware | low–medium |
+| 4 | **Front distance:** ToF sensor (VL53L1X, ~US$8) on the same I2C bus; stop before walls/furniture, simple wall-following | ToF + firmware | low–medium |
+| 5 | **Wheel odometry:** slotted printed disc + IR interrupter on one wheel (~US$3) for real distance travelled | encoder + mounting | medium |
+| 6 | **Dead-reckoning pose:** gyro + odometry → x, y, heading; live position trace on the dashboard (drifts over time) | 3 + 5 | medium |
+| 7 | **Landmarks fix the drift:** printed AprilTags at known spots (doorways, walls); seeing one snaps the pose; a filter fuses tags + odometry + gyro, so the rover **knows where it is** | camera + 6 | medium |
+| 8 | **Apartment map:** floor plan (measured or drawn once) as an occupancy grid, rooms named; rover shown live on it | 7 | medium |
+| 9 | **Go to a place:** "go to the kitchen": path planning on the map (A*, Mini-T sim has one) with ToF safety stops; return home | 4 + 8 | medium–high |
+| 10 | **Tasks on the map:** "find the dog and take a picture": visit rooms in order, look around, detector + snapshot (2), come back | 2 + 9 | high |
+| 11 | **Build the map by itself:** exploration (frontier search) filling the grid from ToF + camera; camera-only visual SLAM (ORB-SLAM3 class on the Mac) tried as an experiment, expected to struggle with this camera | 4 + 7 | high |
+| 12 | **Docking and unattended runs:** marker-guided return to a charging dock, scheduled tasks, health checks | 9 + dock hardware | high |
+| 13 | **Full stack:** 2D LiDAR (LDS02RR, ~US$20), Raspberry Pi onboard, ROS 2 + slam_toolbox + Nav2; Tailscale for remote use | big hardware step | very high |
+
+Dropped 2026-11-03: dog following (Phase 1's dog-companion done-criterion), the collar tracker
+and WaveSight motion zones (both were for finding the dog). The dog watcher code stays in `mac/`
+unused; its detector is reused for the snapshot task.
+
 ## Integration gate
 
 Note (2026-10-14): the build is the OpenFrame Two 4WD, so the guide findings below (OpenFrame One) must be re-checked against the Two's guide. The OpenFrame One assembly guide V1.0 has been reviewed (materials page 3 and electronics pages 25-27). Its photographs show two drive motors labeled M1/M2, a steering servo, battery, controller assembly, and lighting connections labeled LED1/LED2. Exact component models, electrical ratings, and an autonomous command interface are not established by this guide. Before implementing the selected Mac-to-transmitter integration:
@@ -146,23 +176,12 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 Status 2026-11-03: chassis assembled; manual driving works from the dashboard (throttle and
 steering decoupled) and from the Mini-T handheld remote; live calibration page (centre 130°,
 range 50°, speed 1200, saved on the rover); camera back on rover firmware (OTA), VGA q16 ≈ 15 fps /
-~130 ms over this Wi-Fi. Done from the old list: chassis printed and assembled, electronics list
-and bearings, command interface (signed app on the stock receiver), XIAO housing (cam-dock),
-drive-and-see prototype.
+~130 ms over this Wi-Fi. Phase 1 build items are done; the dog-companion goal is dropped in favour
+of the [autonomy roadmap](#autonomy-roadmap-2026-11-03-replaces-the-dog-companion-goal).
 
-1. **First real dog-follow run (Phase 1 done-criterion).** Floor test at low speed with the dog:
-   start the dog watcher, arm, watch it follow / back off / search / park. The dashboard redesign
-   dropped the watcher pane, so first add a compact "Follow dog" on/off and its current state to
-   the new dashboard (or watch :8768 directly).
-2. **Measure the real rover:** speed at the calibrated power, turn radius at 50° range, stop
-   latency; feed them into `sim/` `RoverParams` and rerun the scenarios.
-3. **Check stuck detection on the real camera:** watch the `blocked` timeline events; tune the
-   `ViewChange` factors (simulator-tuned 2.6× / 2.4× noise) if moves are misread.
-4. **Stop tests still owed:** remote/transmitter USB unplug and power-off mid-drive (the receiver's
-   500 ms watchdog should stop it).
-5. Fine-tune steering centre/range on the Calibrate page once driving on the floor.
-6. Then Phase 2 study items below (encoders/IMU, ranging, LiDAR, Pi, Tailscale, WaveSight, collar
-   tracker); no purchases until Phase 1 is done.
+1. Roadmap item 1 (measured moves) and 2 (snapshot task v0): software only, start here.
+2. Decide on the ~US$20 sensor order for items 3–5 (IMU, ToF, IR encoder) and check free XIAO pins.
+3. Stop tests still owed: remote/transmitter USB unplug and power-off mid-drive.
 
 ## Camera board shortlist
 
