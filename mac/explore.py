@@ -123,7 +123,7 @@ def main():
         while not done.is_set():
             call(DRIVE + '/arm', {'armed': True, 'renew': True}, timeout=2)
             done.wait(0.5)
-    call(DRIVE + '/arm', {'armed': True})              # arming zeroes the heading
+    call(DRIVE + '/arm', {'armed': True, 'fresh': True})              # arming zeroes the heading
     threading.Thread(target=lease, daemon=True).start()
     scale, why = [], 'step limit'
     guard = Guard()
@@ -152,7 +152,7 @@ def main():
             out = guard.move(kind, amount)
             if guard.why:                               # the guard stopped it: re-arm and look again
                 print(f'step {i}: guard stopped the {kind} ({guard.why})', flush=True)
-                call(DRIVE + '/arm', {'armed': True})
+                call(DRIVE + '/arm', {'armed': True, 'fresh': True})
                 continue
             print(json.dumps({'step': i, 'sectors': sec, 'move': f'{kind} {amount}', 'ended': out.get('ended'),
                               'error': out.get('error'), 'odometer': out.get('odometer'),
@@ -161,7 +161,7 @@ def main():
                 again = call(DRIVE + '/stop', {})
                 if not again.get('error') and again.get('armed') is False:
                     print(f'step {i}: stop ACK missed once, the retry was acknowledged', flush=True)
-                    call(DRIVE + '/arm', {'armed': True})
+                    call(DRIVE + '/arm', {'armed': True, 'fresh': True})
                     continue
             if kind in ('left', 'right') and out.get('ended') == 'timeout' and \
                     abs(out.get('turned_deg') or 0) < STUCK_SHARE * amount:

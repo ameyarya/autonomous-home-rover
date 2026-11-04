@@ -266,7 +266,7 @@ async function lease(){
   catch(e){armed=false;showArmed();$('drive-status').textContent='Drive server offline. Start it above (remote or transmitter on USB).'}
   setTimeout(lease,1000)}
 lease();
-$('arm').onclick=async()=>{try{mine=!armed;showDrive(await postJSON('/drive/arm',{armed:!armed}))}catch(e){$('drive-status').textContent=e.message}};
+$('arm').onclick=async()=>{try{mine=!armed;showDrive(await postJSON('/drive/arm',{armed:!armed,fresh:true}))}catch(e){$('drive-status').textContent=e.message}};
 async function estop(){down.clear();update();armed=false;showArmed();try{showDrive(await postJSON('/drive/stop'))}catch(e){}}
 $('stop').onclick=estop;
 function update(){

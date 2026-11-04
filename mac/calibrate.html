@@ -181,7 +181,7 @@ function showDrive(s){if(s.armed===undefined){$('drive-status').textContent='Dri
   $('drive-status').textContent=(armed?'ARMED. ':'Disarmed. ')+'Last: '+last+(s.busy?' · busy':'')+(s.error?' · '+s.error:'')+(Date.now()<noteUntil?' · '+note:'')}
 async function lease(){if(!installing){try{showDrive(armed&&mine?await postJSON('/drive/arm',{armed:true,renew:true}):await getJSON('/drive/status'))}catch(e){armed=false;$('arm').textContent='Arm';$('arm').className='';$('drive-status').textContent='Drive server offline'}}setTimeout(lease,1000)}
 lease();
-$('arm').onclick=async()=>{try{mine=!armed;showDrive(await postJSON('/drive/arm',{armed:!armed}))}catch(e){$('drive-status').textContent=e.message}};
+$('arm').onclick=async()=>{try{mine=!armed;showDrive(await postJSON('/drive/arm',{armed:!armed,fresh:true}))}catch(e){$('drive-status').textContent=e.message}};
 async function estop(){release();armed=false;try{showDrive(await postJSON('/drive/stop'))}catch(e){}}
 $('stop').onclick=estop;
 function press(key){if(!armed){$('drive-status').textContent='Arm first.';return}if(held===key)return;held=key;

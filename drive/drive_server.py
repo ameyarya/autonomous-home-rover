@@ -3,7 +3,8 @@
 Run: python3 drive/drive_server.py        (HTTP on 127.0.0.1:8769)
 
   GET  /status                     armed, busy, last pulse, receiver app
-  POST /arm    {"armed": true}     arm (expires after LEASE_S without renewal)
+  POST /arm    {"armed": true, "fresh": true}   arm (expires after LEASE_S without renewal); an arm
+                                   without "fresh" or "renew" is refused (an old page re-arming after a stop)
   POST /arm    {"armed": true, "renew": true}   renew only: refused once disarmed or stopped, so a
                                    page or script that is still renewing can't undo a stop
   POST /arm    {"armed": false}    disarm and stop
@@ -384,6 +385,8 @@ def make_handler(state):
             try:
                 if self.path == '/arm':
                     b = self.body()
+                    if b.get('armed') and not (b.get('fresh') or b.get('renew')):
+                        return self.reply(409, {'error': 'reload the page (old arm request)'})
                     state.arm(bool(b.get('armed')), renew=bool(b.get('renew')))
                     return self.reply(200, state.status())
                 if self.path == '/stop':
