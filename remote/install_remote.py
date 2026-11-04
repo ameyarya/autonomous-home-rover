@@ -18,9 +18,21 @@ import serial
 import serial.tools.list_ports
 
 HERE = Path(__file__).resolve().parent
-REMOTE_SERIAL = '20:6E:F1:4F:6E:80'   # Mini-T handheld remote
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent / 'drive'))
+import devices  # noqa: E402
 import rover_remote  # noqa: E402
+
+DEV = devices.load()                  # drive/devices.json (gitignored)
+REMOTE_SERIAL = DEV['remote_serial']  # Mini-T handheld remote
+
+
+def remote_source():
+    """rover_remote.py with this rover's MACs in place of the placeholders."""
+    src = (HERE / 'rover_remote.py').read_text()
+    src = src.replace(f"TRANSMITTER_MAC = '{rover_remote.TRANSMITTER_MAC}'", f"TRANSMITTER_MAC = '{devices.hexmac(DEV['transmitter_serial'])}'")
+    src = src.replace(f"RECEIVER_MAC = '{rover_remote.RECEIVER_MAC}'", f"RECEIVER_MAC = '{devices.hexmac(DEV['receiver_mac'])}'")
+    return src.encode()
 
 
 def find_port():
@@ -101,7 +113,7 @@ def install(board):
         backup.write_bytes(stock)
         board.write_file('/boot_stock.py', stock)
         print(f'stock boot.py saved to {backup} and /boot_stock.py')
-    board.write_file('/rover_remote.py', (HERE / 'rover_remote.py').read_bytes())
+    board.write_file('/rover_remote.py', remote_source())
     board.write_file('/boot.py', (HERE / 'boot.py').read_bytes())
     print('installed; rebooting into rover mode')
     board.reset()
@@ -117,8 +129,8 @@ def restore(board):
 
 def link(board):
     code = ("import network,espnow;w=network.WLAN(network.STA_IF);w.active(True);"
-            f"w.config(mac=bytes.fromhex({rover_remote.TRANSMITTER_MAC!r}));w.config(channel={rover_remote.CHANNEL});"
-            f"e=espnow.ESPNow();e.active(True);p=bytes.fromhex({rover_remote.RECEIVER_MAC!r})")
+            f"w.config(mac=bytes.fromhex({devices.hexmac(DEV['transmitter_serial'])!r}));w.config(channel={rover_remote.CHANNEL});"
+            f"e=espnow.ESPNow();e.active(True);p=bytes.fromhex({devices.hexmac(DEV['receiver_mac'])!r})")
     board.run(code)
     board.run('p in [x[0] for x in e.get_peers()] or e.add_peer(p)')
     out = board.run("r=[e.send(p,b'cbdrive1:X') for i in range(3)];m=e.recv(300);print(r,m[1])")

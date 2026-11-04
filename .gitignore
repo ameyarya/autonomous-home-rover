@@ -27,3 +27,4 @@ cad/.venv/
 sim/.venv/
 sim/out/
 remote/backup/
+drive/devices.json

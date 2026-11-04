@@ -22,7 +22,7 @@ Python 3 standard library only; the detector runs in its own environment (below)
 ## Run
 
 ```sh
-python3 mac/dashboard.py                    # or --host 192.168.1.194 if mDNS is slow; start the rest from its header
+python3 mac/dashboard.py                    # or --host <camera-ip> if mDNS is slow; start the rest from its header
 python3 mac/xiao_link.py --seconds 10       # link stats only
 cd mac && python3 -m unittest test_xiao_link
 ```

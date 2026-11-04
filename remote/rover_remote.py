@@ -19,8 +19,9 @@ are logged and the radio re-initialised; the program never exits.
 """
 import time
 
-TRANSMITTER_MAC = '206ef1450f1c'   # the receiver only accepts this sender
-RECEIVER_MAC = '206ef14d8d04'
+# Filled in from drive/devices.json (gitignored) by install_remote.py when it copies this file.
+TRANSMITTER_MAC = 'aabbcc000001'   # the receiver only accepts this sender
+RECEIVER_MAC = 'aabbcc000003'
 CHANNEL = 1
 DRIVE = b'cbdrive1:'
 

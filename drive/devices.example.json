@@ -1,0 +1,6 @@
+{
+ "_note": "Copy to devices.json (gitignored) and fill in your boards. USB serials as `python3 -m serial.tools.list_ports -v` shows them; the receiver MAC is printed on its USB serial number too.",
+ "transmitter_serial": "AA:BB:CC:00:00:01",
+ "remote_serial": "AA:BB:CC:00:00:02",
+ "receiver_mac": "AA:BB:CC:00:00:03"
+}

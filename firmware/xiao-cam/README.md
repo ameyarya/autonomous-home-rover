@@ -66,7 +66,7 @@ idf.py -p /dev/cu.usbmodem* erase-flash flash monitor
 After that, over Wi-Fi from this directory:
 
 ```sh
-./ota.sh                    # or ./ota.sh 192.168.1.194 if mDNS is slow
+./ota.sh                    # or ./ota.sh <camera-ip> if mDNS is slow
 ```
 
 If USB flashing fails to connect, hold BOOT while plugging in USB.

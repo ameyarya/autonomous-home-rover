@@ -24,9 +24,13 @@ from pathlib import Path
 import serial
 import serial.tools.list_ports
 
-TRANSMITTER_SERIAL = '20:6E:F1:45:0F:1C'   # Mini-T USB transmitter
-REMOTE_SERIAL = '20:6E:F1:4F:6E:80'        # Mini-T handheld remote: stands in, using the transmitter's MAC
-RECEIVER_MAC = '206ef14d8d04'              # rover receiver (service installed by the Mini-T truck experiment)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import devices  # noqa: E402
+
+_DEV = devices.load()                                  # drive/devices.json (gitignored)
+TRANSMITTER_SERIAL = _DEV['transmitter_serial']        # Mini-T USB transmitter
+REMOTE_SERIAL = _DEV['remote_serial']                  # Mini-T handheld remote: stands in, using the transmitter's MAC
+RECEIVER_MAC = devices.hexmac(_DEV['receiver_mac'])    # rover receiver (service installed by the Mini-T truck experiment)
 KEY_PATH = Path(os.environ.get('ROVER_UPDATE_KEY',
                                Path.home() / 'Documents/Projects/ai-driven-mini-t/.tank_update.key'))
 PREFIX = b'CBU1'
@@ -38,7 +42,7 @@ import network
 import time
 w = network.WLAN(network.STA_IF)
 w.active(True)
-w.config(mac=bytes.fromhex("206ef1450f1c"))
+w.config(mac=bytes.fromhex("%s"))
 w.config(channel=1)
 e = espnow.ESPNow()
 e.active(True)
@@ -89,7 +93,7 @@ def ota(raw):
    return
   time.sleep_ms(2)
  print("OTA NONE")
-''' % RECEIVER_MAC
+''' % (devices.hexmac(TRANSMITTER_SERIAL), RECEIVER_MAC)
 
 
 def find_port():

@@ -22,7 +22,7 @@ any time; closing the page disarms). While armed, hold WASD/arrows to drive manu
 
 Handheld: the Mini-T remote can drive too (same frames, same sender MAC), and can stand in for the USB transmitter here (`find_port` takes either; the board code sets the transmitter's MAC): [remote/README.md](../remote/README.md).
 
-Hardware IDs: transmitter 20:6E:F1:45:0F:1C, receiver 20:6E:F1:4D:8D:04. The signing key stays in
+Hardware IDs (USB serials / radio MACs) live in `drive/devices.json` (gitignored; copy `devices.example.json`). The signing key stays in
 the Mini-T folder (`.tank_update.key`; override with `ROVER_UPDATE_KEY`); it is never copied here.
 
 Assembled 2026-10-29: steering servo on port S1 (set on the Calibrate page).

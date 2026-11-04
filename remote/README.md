@@ -2,7 +2,7 @@
 
 The stock CyberBrick pairing can't reach the rover: its receiver runs the Mini-T signed wireless
 service instead of the stock RC program, and only obeys ESP-NOW drive frames (W/A/S/D/X) from the
-Mini-T USB transmitter's MAC (20:6E:F1:45:0F:1C). So the remote (20:6E:F1:4F:6E:80) runs a small
+Mini-T USB transmitter's MAC. So the remote runs a small
 program that takes that MAC and sends the same frames as the Mac. Nothing on the receiver changes.
 
 | Control | Rover |
