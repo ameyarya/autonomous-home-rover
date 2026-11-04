@@ -545,6 +545,19 @@ class DashboardUITest(unittest.TestCase):
             expect(self.page.locator('#status')).to_contain_text('Saved')
             saved = json.loads((tmp / 'furniture.json').read_text())
             self.assertAlmostEqual((saved['boxes'][0]['x0'] + saved['boxes'][0]['x1']) / 2, 2.5)
+            self.page.fill('#f-y', '2.0')                    # autosaves within a second, no Save click
+            self.page.dispatch_event('#f-y', 'change')
+            for _ in range(50):
+                saved = json.loads((tmp / 'furniture.json').read_text())
+                if abs((saved['boxes'][0]['y0'] + saved['boxes'][0]['y1']) / 2 - 2.0) < 1e-6:
+                    break
+                time.sleep(0.1)
+            self.assertAlmostEqual((saved['boxes'][0]['y0'] + saved['boxes'][0]['y1']) / 2, 2.0)
+            self.assertTrue(list((tmp / 'history').glob('furniture-*.json')))      # a version was kept
+            self.page.reload()                                                     # survives a reload
+            expect(self.page.locator('#status')).to_contain_text('1 pieces')
+            self.page.locator('#list div').first.click()
+            expect(self.page.locator('#f-y')).to_have_value('2')
             self.page.on('dialog', lambda d: d.accept('dining_table'))
             self.page.locator('#list div').first.dblclick()
             expect(self.page.locator('#list div').first).to_contain_text('dining_table')

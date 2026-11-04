@@ -133,8 +133,12 @@ def sim_data():
             'furniture': {k: furn.get(k, []) for k in ('boxes', 'cylinders', 'rugs', 'carpet')}}
 
 
-def save_furniture(furn):
-    """Validate the editor's layout, write furniture.json and rebuild the simulator's apartment."""
+HISTORY_KEEP = 50
+HISTORY_EVERY_S = 60
+
+
+def clean_furniture(furn):
+    """The editor's layout, validated, with unique names."""
     def num(v, lo=-1.0, hi=20.0):
         v = float(v)
         if not lo <= v <= hi:
@@ -159,9 +163,44 @@ def save_furniture(furn):
             while o['name'] in seen:
                 o['name'], n = f'{base}_{n}', n + 1
             seen.add(o['name'])
-    (SIM_DIR / 'furniture.json').write_text(json.dumps(clean, indent=1))
-    subprocess.run(SIM_BUILD, check=True, capture_output=True, timeout=60)
-    return sim_data()
+    return clean
+
+
+def write_furniture(furn, rebuild=False):
+    """Write furniture.json (the permanent layout) and, at most once a minute, a timestamped copy in
+    history/ (last HISTORY_KEEP kept); rebuild the simulator's apartment when asked."""
+    clean = clean_furniture(furn)
+    text = json.dumps(clean, indent=1)
+    path = SIM_DIR / 'furniture.json'
+    if not path.exists() or path.read_text() != text:
+        history = SIM_DIR / 'history'
+        history.mkdir(exist_ok=True)
+        copies = sorted(history.glob('furniture-*.json'))
+        if not copies or time.time() - copies[-1].stat().st_mtime > HISTORY_EVERY_S:
+            (history / f'furniture-{datetime.datetime.now():%Y%m%d-%H%M%S}.json').write_text(text)
+            for old in sorted(history.glob('furniture-*.json'))[:-HISTORY_KEEP]:
+                old.unlink()
+        tmp = path.with_suffix('.json.tmp')
+        tmp.write_text(text)
+        tmp.replace(path)                      # atomic: a crash mid-write never leaves half a file
+    if rebuild:
+        subprocess.run(SIM_BUILD, check=True, capture_output=True, timeout=60)
+    return dict(sim_data(), saved_at=datetime.datetime.now().strftime('%H:%M:%S'))
+
+
+def save_furniture(furn):
+    return write_furniture(furn, rebuild=True)
+
+
+def sim_versions():
+    return sorted((p.stem[len('furniture-'):] for p in (SIM_DIR / 'history').glob('furniture-*.json')), reverse=True)
+
+
+def restore_version(stamp):
+    path = SIM_DIR / 'history' / f'furniture-{stamp}.json'
+    if not stamp.replace('-', '').isdigit() or not path.exists():
+        raise ValueError('no such version')
+    return write_furniture(json.loads(path.read_text()))
 
 
 def dashboard_password():
@@ -426,6 +465,8 @@ def make_handler(dashboard, password):
                     return self.reply(200, sim_data())
                 except (OSError, ValueError) as error:
                     return self.reply(404, {'error': f'build the sim apartment first ({error})'})
+            if path == '/sim/versions':
+                return self.reply(200, {'versions': sim_versions()})
             if path == '/sim/floorplan.png':
                 try:
                     return self.reply(200, (SIM_DIR / 'floorplan.png').read_bytes(), 'image/png')
@@ -471,10 +512,13 @@ def make_handler(dashboard, password):
                 size = int(self.headers.get('Content-Length', 0))
                 body = json.loads(self.rfile.read(size) or b'{}') if size else {}
                 return self.reply(200, dashboard.recorder.set(body.get('on')))
-            if self.path == '/sim/furniture':
+            if self.path in ('/sim/furniture', '/sim/autosave', '/sim/restore'):
                 size = int(self.headers.get('Content-Length', 0))
                 try:
-                    return self.reply(200, save_furniture(json.loads(self.rfile.read(size) or b'{}')))
+                    body = json.loads(self.rfile.read(size) or b'{}')
+                    if self.path == '/sim/restore':
+                        return self.reply(200, restore_version(str(body.get('version', ''))))
+                    return self.reply(200, write_furniture(body, rebuild=self.path == '/sim/furniture'))
                 except (ValueError, TypeError, KeyError) as error:
                     return self.reply(400, {'error': str(error)})
                 except (OSError, subprocess.SubprocessError) as error:

@@ -36,7 +36,9 @@ input,select{font:inherit;color:inherit;background:#0d131c;border:1px solid var(
   <button id="v2d" class="on">Plan</button><button id="v3d">3D</button>
   <label style="flex-direction:row;align-items:center;gap:6px;color:var(--dim)"><input type="checkbox" id="showplan" checked style="width:auto">floor plan</label>
   <button id="undo" title="Undo (Cmd/Ctrl+Z)">Undo</button>
-  <button id="save" class="primary">Save &amp; rebuild</button>
+  <select id="versions" title="Saved versions (a copy is kept at most once a minute)" style="width:auto"><option value="">Versions…</option></select>
+  <span id="saved" class="sub">…</span>
+  <button id="save" class="primary" title="Changes save automatically; this also rebuilds the simulator's apartment">Rebuild sim</button>
   <a class="linkbtn" href="/">Dashboard</a>
 </header>
 <main>
@@ -58,7 +60,7 @@ input,select{font:inherit;color:inherit;background:#0d131c;border:1px solid var(
     <div class="row"><button id="add-box">+ Box</button><button id="add-cyl">+ Round</button><button id="add-rug">+ Rug</button></div>
     <div><h2>Furniture</h2></div>
     <div class="list" id="list"></div>
-    <p class="hint">x runs east, y north, from the plan's bottom-left corner. Rugs and the bedroom carpet are flat (the rover drives over them); everything else blocks it. Save writes the layout on this Mac (not the public repo) and rebuilds the simulator's apartment.</p>
+    <p class="hint">x runs east, y north, from the plan's bottom-left corner. Rugs and the bedroom carpet are flat (the rover drives over them); everything else blocks it. Every change saves itself to <code>sim/apartment/furniture.json</code> on this Mac (not the public repo) within a second, with a copy in <code>history/</code> at most once a minute; Rebuild sim makes the simulator use it.</p>
     <div id="status"></div>
   </aside>
 </main>
@@ -74,7 +76,42 @@ function items() {
   return [...data.furniture.boxes.map(o => ({kind: 'box', o})), ...data.furniture.cylinders.map(o => ({kind: 'cyl', o})),
           ...data.furniture.rugs.map(o => ({kind: 'rug', o}))];
 }
-function snapshot() { history.push(JSON.stringify(data.furniture)); if (history.length > 100) history.shift(); dirty = true; }
+function snapshot() { history.push(JSON.stringify(data.furniture)); if (history.length > 100) history.shift(); dirty = true; changedAt = Date.now(); }
+let changedAt = 0, saving = false;
+async function autosave() {          // a second after the last change, not mid-drag
+  if (!dirty || saving || drag || Date.now() - changedAt < 800) return;
+  saving = true; dirty = false; $('saved').textContent = 'saving…';
+  try {
+    const r = await fetch('/sim/autosave', {method: 'POST', body: JSON.stringify(data.furniture)});
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+    fixNames(j.furniture);
+    $('saved').textContent = `saved ${j.saved_at}`; $('saved').style.color = ''; loadVersions();
+  } catch (e) { dirty = true; $('saved').textContent = 'not saved: ' + e.message; $('saved').style.color = 'var(--warn)'; }
+  saving = false;
+}
+setInterval(autosave, 400);
+function fixNames(saved) {            // the server makes duplicate names unique; mirror that here
+  for (const k of ['boxes', 'cylinders', 'rugs'])
+    (data.furniture[k] || []).forEach((o, i) => { if (saved[k] && saved[k][i]) o.name = saved[k][i].name; });
+  list();
+}
+async function loadVersions() {
+  try {
+    const v = (await (await fetch('/sim/versions', {cache: 'no-store'})).json()).versions;
+    const fmt = t => `${t.slice(0, 4)}-${t.slice(4, 6)}-${t.slice(6, 8)} ${t.slice(9, 11)}:${t.slice(11, 13)}:${t.slice(13, 15)}`;
+    $('versions').innerHTML = '<option value="">Versions…</option>' + v.map(t => `<option value="${t}">${fmt(t)}</option>`).join('');
+  } catch (e) {}
+}
+$('versions').onchange = async e => {
+  const v = e.target.value; if (!v) return;
+  if (!confirm('Go back to the layout saved at ' + e.target.selectedOptions[0].text + '? (What you have now stays in the versions list.)')) { e.target.value = ''; return; }
+  try {
+    const r = await fetch('/sim/restore', {method: 'POST', body: JSON.stringify({version: v})});
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+    data = j; sel = null; history = []; dirty = false; draw(); status('Restored ' + e.target.selectedOptions[0].text, 'ok'); loadVersions();
+  } catch (err) { status('Not restored: ' + err.message, 'warn'); }
+  e.target.value = '';
+};
 function round(v) { return Math.round(v * 100) / 100; }
 function geom(it) {        // centre, size
   const o = it.o;
@@ -225,15 +262,15 @@ addEventListener('keydown', e => {
 });
 $('showplan').onchange = draw;
 $('save').onclick = async () => {
-  $('save').disabled = true; status('Saving and rebuilding the simulator…');
+  $('save').disabled = true; status('Saving and rebuilding the simulator…'); dirty = false;
   try {
     const r = await fetch('/sim/furniture', {method: 'POST', body: JSON.stringify(data.furniture)});
     const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
-    data = j; dirty = false; history = []; status('Saved. The simulator uses it from its next start.', 'ok'); draw(); if (view === '3d') build3d();
+    fixNames(j.furniture); $('saved').textContent = `saved ${j.saved_at}`; status('Saved and rebuilt. The simulator uses it from its next start.', 'ok'); draw(); loadVersions(); if (view === '3d') build3d();
   } catch (e) { status('Not saved: ' + e.message, 'warn'); }
   $('save').disabled = false;
 };
-addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+addEventListener('pagehide', () => { if (dirty) navigator.sendBeacon('/sim/autosave', JSON.stringify(data.furniture)); });
 addEventListener('resize', () => view === '2d' ? draw() : resize3d());
 
 // ---- 3D view (three.js) ----
@@ -273,7 +310,8 @@ $('v2d').onclick = () => show('2d'); $('v3d').onclick = () => show('3d');
 (async () => {
   try { const r = await fetch('/sim/data', {cache: 'no-store'}); data = await r.json(); if (!r.ok) throw new Error(data.error);
         for (const k of ['boxes', 'cylinders', 'rugs']) data.furniture[k] = data.furniture[k] || [];
-        draw(); status(`${items().length} pieces · apartment ${data.size.map(v => v.toFixed(1)).join(' × ')} m`); }
+        draw(); loadVersions(); $('saved').textContent = 'saved';
+        status(`${items().length} pieces · apartment ${data.size.map(v => v.toFixed(1)).join(' × ')} m`); }
   catch (e) { status('No sim apartment yet: ' + e.message, 'warn'); }
 })();
 </script>
