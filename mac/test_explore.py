@@ -14,7 +14,8 @@ class ChooseTest(unittest.TestCase):
         self.assertEqual(explore.choose({'left': 300, 'centre': 300, 'right': 300}), ('forward', 25))
         self.assertEqual(explore.choose({'left': 300, 'centre': 80, 'right': 40}), ('left', 15))
         self.assertEqual(explore.choose({'left': 40, 'centre': 80, 'right': 200}), ('right', 15))
-        self.assertEqual(explore.choose({'left': 40, 'centre': 40, 'right': 40}), ('back', 25))
+        self.assertEqual(explore.choose({'left': 40, 'centre': 40, 'right': 90}), ('turn_right', 75))
+        self.assertEqual(explore.choose({'left': 95, 'centre': 80, 'right': 40}), ('turn_left', 75))
 
 
 class GuardTest(unittest.TestCase):
@@ -60,6 +61,37 @@ class GuardTest(unittest.TestCase):
         g = explore.Guard()
         self.assertEqual(g.move('forward', 25)['ended'], 'done')
         self.assertNotIn('stop', self.calls)
+
+    def test_multi_point_turn_alternates_and_stops_when_turned(self):
+        moves = []
+        real_move = explore.Guard.move
+        explore.Guard.move = lambda g, kind, amount: (moves.append(kind), {'ended': 'done', 'turned_deg': 20})[1]
+        explore.SETTLE_S, settle = 0, explore.SETTLE_S
+        self.depth['sectors'] = sectors(50, 70, 120)          # room for a forward arc, not straight on
+        try:
+            done, why = explore.multi_point_turn(explore.Guard(), 'right', 75)
+        finally:
+            explore.Guard.move, explore.SETTLE_S = real_move, settle
+        self.assertEqual(moves, ['reverse_right', 'right', 'reverse_right', 'right'])
+        self.assertEqual(why, 'turned 80°')
+
+    def test_multi_point_turn_only_reverses_when_blocked_ahead(self):
+        moves = []
+        real_move = explore.Guard.move
+        explore.Guard.move = lambda g, kind, amount: (moves.append(kind), {'ended': 'done', 'turned_deg': 20})[1]
+        explore.SETTLE_S, settle = 0, explore.SETTLE_S
+        self.depth['sectors'] = sectors(40, 40, 40)
+        try:
+            explore.multi_point_turn(explore.Guard(), 'left', 75)
+        finally:
+            explore.Guard.move, explore.SETTLE_S = real_move, settle
+        self.assertEqual(set(moves), {'reverse_left'})
+
+    def test_reverse_turns_are_not_stopped_for_what_is_ahead(self):
+        self.depth['sectors'] = sectors(300, 20, 300)
+        g = explore.Guard()
+        g.move('reverse_left', 20)
+        self.assertIsNone(g.why)
 
     def test_waits_for_the_dog_to_leave(self):
         self.depth['stop_for'] = ['dog']

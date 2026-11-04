@@ -143,6 +143,20 @@ class GyroMoveTest(unittest.TestCase):
         self.s.move('right', 30)
         self.assertAlmostEqual(self.g.y, -30, delta=8)
 
+    def test_reverse_turn_turns_the_heading_the_named_way(self):
+        self.g.drift = 0
+        self.g.turn_dps = 22
+        self.s.motion['turn_radius_cm'] = 120
+        out = self.s.move('reverse_left', 20)
+        self.assertEqual(out['ended'], 'done')
+        self.assertEqual(set(self.tx.calls[:-1]), {'C'})
+        self.assertAlmostEqual(self.g.y, 20, delta=6)
+        self.tx.calls.clear()
+        self.g.y = 0
+        self.s.move('reverse_right', 20)
+        self.assertEqual(set(self.tx.calls[:-1]), {'Z'})
+        self.assertAlmostEqual(self.g.y, -20, delta=6)
+
     def test_turn_gives_up_when_not_turning(self):
         self.g.drift, self.g.turn_dps = 0, 0
         self.s.motion['turn_radius_cm'] = 5                # planned 0.03 s for 10 deg

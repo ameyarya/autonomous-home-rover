@@ -5,7 +5,12 @@ Run: python3 mac/explore.py [--steps 30]     (drive server, depth service and he
 Each step: pause so the map takes a view, read the smoothed left/centre/right free floor, then
   centre clear (>= FORWARD_CM)              -> forward STEP_CM, heading held by the gyro
   centre >= TURN_CM and a side >= SIDE_CM   -> 15° arc toward the more open side
-  otherwise                                 -> back STEP_CM
+  otherwise                                 -> multi-point turn toward the more open side: reverse
+                                               arcs (heading swinging that way, over floor it just
+                                               drove) and forward arcs where the camera says there's
+                                               room, until it has turned TURN_AROUND_DEG or the way
+                                               ahead is clear (a 2.65 m turning circle can't turn in
+                                               a hallway any other way; it rocked back and forth before)
 Never drives while a dog, cat or person is in view (depth_service "stop_for"): it waits up to
 WAIT_S for them to leave, then gives up. During every move a guard watches ~10 times a second and
 stops the rover at once if one appears or the centre gets nearer than GUARD_CM.
@@ -30,6 +35,9 @@ STEP_CM = 25
 FORWARD_CM, TURN_CM, SIDE_CM = 100, 60, 110
 TURN_DEG = 15
 GUARD_CM = 30
+TURN_AROUND_DEG = 75
+REVERSE_DEG = 20
+TURN_MOVES = 6
 WAIT_S = 30
 STUCK_SHARE = 0.4        # a turn that reached less than this share of its angle: steering stuck
 SETTLE_S = 1.4           # the depth service maps after 0.6 s still; smoothing needs ~5 fresh frames
@@ -53,7 +61,41 @@ def choose(sec):
         return 'forward', STEP_CM
     if sec['centre'] >= TURN_CM and max(sec['left'], sec['right']) >= SIDE_CM:
         return ('left' if sec['left'] >= sec['right'] else 'right'), TURN_DEG
-    return 'back', STEP_CM
+    return 'turn_' + ('left' if sec['left'] >= sec['right'] else 'right'), TURN_AROUND_DEG
+
+
+def finished(out):
+    return not out.get('error') and not out.get('aborted') and out.get('ended') in ('done', None)
+
+
+def multi_point_turn(guard, side, target):
+    """Reverse and forward arcs turning the heading toward `side`. Returns (moves, why it stopped)."""
+    turned, moves = 0.0, []
+    for k in range(TURN_MOVES):
+        forward = k % 2 == 1
+        if forward:
+            time.sleep(SETTLE_S)
+            d = call(DEPTH + '/status')
+            if d.get('stop_for'):
+                return moves, 'saw ' + ', '.join(d['stop_for'])
+            sec = {n: v['cm'] for n, v in (d.get('sectors') or {}).items()}
+            if not sec:
+                return moves, 'depth not usable'
+            if sec['centre'] >= FORWARD_CM:
+                return moves, 'facing open floor'
+            if sec['centre'] < TURN_CM:
+                continue                                # no room ahead: reverse again
+        kind = side if forward else 'reverse_' + side
+        out = guard.move(kind, TURN_DEG if forward else REVERSE_DEG)
+        moves.append((kind, out.get('turned_deg'), out.get('ended') or out.get('error')))
+        if guard.why:
+            return moves, f'guard: {guard.why}'
+        if not finished(out):
+            return moves, f'{kind} did not finish ({out.get("error") or out.get("ended")})'
+        turned += abs(out.get('turned_deg') or 0)
+        if turned >= target:
+            return moves, f'turned {turned:.0f}°'
+    return moves, f'turned {turned:.0f}° in {TURN_MOVES} moves' 
 
 
 class Guard:
@@ -80,7 +122,7 @@ class Guard:
             time.sleep(0.1)
 
     def move(self, kind, amount):
-        self.why, self.forward = None, kind != 'back'
+        self.why, self.forward = None, kind in ('forward', 'left', 'right')
         self.active.set()
         try:
             return call(DRIVE + '/move', {'kind': kind, 'amount': amount})
@@ -149,6 +191,17 @@ def main():
                 continue
             sec = {k: v['cm'] for k, v in d['sectors'].items()}
             kind, amount = choose(sec)
+            if kind.startswith('turn_'):
+                moves, ended = multi_point_turn(guard, kind[5:], amount)
+                print(json.dumps({'step': i, 'sectors': sec, 'move': f'{kind} {amount}', 'parts': moves,
+                                  'ended': ended, 'odometer': call(DRIVE + '/status').get('odometer')}), flush=True)
+                if ended.startswith(('saw', 'guard')):
+                    call(DRIVE + '/arm', {'armed': True, 'fresh': True})
+                    continue
+                if 'did not finish' in ended or 'not usable' in ended:
+                    why = ended
+                    break
+                continue
             out = guard.move(kind, amount)
             if guard.why:                               # the guard stopped it: re-arm and look again
                 print(f'step {i}: guard stopped the {kind} ({guard.why})', flush=True)
@@ -158,9 +211,15 @@ def main():
                               'error': out.get('error'), 'odometer': out.get('odometer'),
                               'map': d.get('map')}), flush=True)
             if 'acknowledge stop' in str(out.get('error')):  # a missed radio reply: stop again, go on if it acks
-                again = call(DRIVE + '/stop', {'from': 'explorer'})
-                if not again.get('error') and again.get('armed') is False:
-                    print(f'step {i}: stop ACK missed once, the retry was acknowledged', flush=True)
+                acked = False
+                for _ in range(3):
+                    again = call(DRIVE + '/stop', {'from': 'explorer retry'})
+                    if not again.get('error') and again.get('armed') is False:
+                        acked = True
+                        break
+                    time.sleep(0.3)
+                if acked:
+                    print(f'step {i}: stop ACK missed, a retry was acknowledged', flush=True)
                     call(DRIVE + '/arm', {'armed': True, 'fresh': True})
                     continue
             if kind in ('left', 'right') and out.get('ended') == 'timeout' and \

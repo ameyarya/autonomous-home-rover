@@ -14,6 +14,8 @@ Run: python3 drive/drive_server.py        (HTTP on 127.0.0.1:8769)
   POST /stop                       abort any pulse or hold, disarm, stop with ACK
   POST /move   {"kind": "forward"|"back", "amount": cm}  or  {"kind": "left"|"right", "amount": deg}
                                    measured move (timed from drive/motion.json; refused unless armed);
+                                   {"kind": "reverse_left"|"reverse_right", "amount": deg} backs up turning the
+                                   heading that way (for multi-point turns);
                                    {"kind": "test_forward"|"test_reverse"|"test_arc"} = the timed run for measuring
                                    With the heading stick online (and hold on): forward/back steer to keep the
                                    starting heading; left/right turn until the stick has turned that many degrees.
@@ -120,8 +122,8 @@ class DriveState:
     def _gyro_move(self, kind, amount, key, seconds, g):
         """Closed loop on the stick's heading. Returns (driven s, how it ended)."""
         throttle, _ = motion.KEYS[key]
-        turning = kind in ('left', 'right')
-        sign = 1 if kind == 'left' else -1
+        turning = kind in ('left', 'right', 'reverse_left', 'reverse_right')
+        sign = 1 if kind in ('left', 'reverse_left') else -1
         limit = seconds * TURN_TIMEOUT if turning else seconds
         start = prev_yaw = g.yaw()
         started = prev_t = time.monotonic()
@@ -178,7 +180,7 @@ class DriveState:
                 raise PermissionError('not armed')
             self.busy = True
             started = time.monotonic()
-            g = self.gyro() if kind in ('forward', 'back', 'left', 'right') else None
+            g = self.gyro() if kind in ('forward', 'back', 'left', 'right', 'reverse_left', 'reverse_right') else None
             start_yaw = g.yaw() if g else None
             ended = 'done'
             self.gyro_end = None

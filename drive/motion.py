@@ -85,7 +85,10 @@ def scaled(m, power):
 
 
 def plan(kind, amount, m, power):
-    """('forward'|'back', cm) or ('left'|'right', degrees) -> (key, seconds)."""
+    """('forward'|'back', cm) or ('left'|'right'|'reverse_left'|'reverse_right', degrees) -> (key, seconds).
+    reverse_left/right: back up while steering so the heading turns left/right (the front swings that
+    way): reversing with the wheels steered right (C) turns the heading left. Timed from the reverse
+    speed and the full-lock radius; with the gyro they stop at the angle."""
     s = scaled(m, power)
     if kind in ('forward', 'back'):
         speed = s['forward'] if kind == 'forward' else s['reverse']
@@ -96,8 +99,12 @@ def plan(kind, amount, m, power):
         if not (s['arc'] and s['radius']):
             raise ValueError('measure the turning circle (and forward speed) first')
         key, seconds = ('A' if kind == 'left' else 'D'), s['radius'] * math.radians(abs(amount)) / s['arc']
+    elif kind in ('reverse_left', 'reverse_right'):
+        if not (s['reverse'] and s['radius']):
+            raise ValueError('measure the turning circle and reverse speed first')
+        key, seconds = ('C' if kind == 'reverse_left' else 'Z'), s['radius'] * math.radians(abs(amount)) / s['reverse']
     else:
-        raise ValueError('kind must be forward, back, left or right')
+        raise ValueError('kind must be forward, back, left, right, reverse_left or reverse_right')
     if seconds > MAX_MOVE_S:
         raise ValueError(f'that move would take {seconds:.1f} s; the limit is {MAX_MOVE_S:.0f} s')
     return key, seconds
