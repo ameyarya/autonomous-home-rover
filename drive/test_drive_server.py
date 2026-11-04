@@ -77,6 +77,15 @@ class DriveStateTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             tx.repl("wire('X')")
 
+    def test_renewal_cannot_undo_a_stop(self):
+        self.s.arm(True)
+        self.assertTrue(self.s.arm(True, renew=True))
+        self.s.stop('stop requested')
+        self.assertFalse(self.s.arm(True, renew=True))
+        self.assertFalse(self.s.armed)
+        self.s.arm(True)                                   # pressing Arm again does arm
+        self.assertTrue(self.s.armed)
+
     def test_pulse_is_capped(self):
         self.s.arm(True)
         result = self.s.pulse('S', 5000)

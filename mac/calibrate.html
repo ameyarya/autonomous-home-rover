@@ -174,14 +174,14 @@ $('drive-svc').onclick=async e=>{e.target.disabled=true;try{await postJSON(`/ser
 svcPoll();
 
 // ---- arm / stop / pulses / hold ----
-let armed=false,held=null,holdTimer=null,note='',noteUntil=0;
+let armed=false,mine=false,held=null,holdTimer=null,note='',noteUntil=0;   // mine: this page armed it
 function showDrive(s){if(s.armed===undefined){$('drive-status').textContent='Drive server offline';return}
-  armed=!!s.armed;$('arm').textContent=armed?'Armed · click to disarm':'Arm';$('arm').className=armed?'armed':'';
+  armed=!!s.armed;if(!armed)mine=false;$('arm').textContent=armed?'Armed · click to disarm':'Arm';$('arm').className=armed?'armed':'';
   const l=s.last;const last=l?(l.manual?`held ${l.key}`:l.key==='X'?`stopped (${l.why||'stop'})`:`pulse ${l.key} ${l.ms} ms, stop ACKed after ${l.stopped_after_ms} ms`):'nothing yet';
   $('drive-status').textContent=(armed?'ARMED. ':'Disarmed. ')+'Last: '+last+(s.busy?' · busy':'')+(s.error?' · '+s.error:'')+(Date.now()<noteUntil?' · '+note:'')}
-async function lease(){if(!installing){try{showDrive(armed?await postJSON('/drive/arm',{armed:true}):await getJSON('/drive/status'))}catch(e){armed=false;$('arm').textContent='Arm';$('arm').className='';$('drive-status').textContent='Drive server offline'}}setTimeout(lease,1000)}
+async function lease(){if(!installing){try{showDrive(armed&&mine?await postJSON('/drive/arm',{armed:true,renew:true}):await getJSON('/drive/status'))}catch(e){armed=false;$('arm').textContent='Arm';$('arm').className='';$('drive-status').textContent='Drive server offline'}}setTimeout(lease,1000)}
 lease();
-$('arm').onclick=async()=>{try{showDrive(await postJSON('/drive/arm',{armed:!armed}))}catch(e){$('drive-status').textContent=e.message}};
+$('arm').onclick=async()=>{try{mine=!armed;showDrive(await postJSON('/drive/arm',{armed:!armed}))}catch(e){$('drive-status').textContent=e.message}};
 async function estop(){release();armed=false;try{showDrive(await postJSON('/drive/stop'))}catch(e){}}
 $('stop').onclick=estop;
 function press(key){if(!armed){$('drive-status').textContent='Arm first.';return}if(held===key)return;held=key;

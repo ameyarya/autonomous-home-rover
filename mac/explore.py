@@ -70,7 +70,7 @@ def main():
 
     def lease():
         while not done.is_set():
-            call(DRIVE + '/arm', {'armed': True}, timeout=2)
+            call(DRIVE + '/arm', {'armed': True, 'renew': True}, timeout=2)
             done.wait(0.5)
     call(DRIVE + '/arm', {'armed': True})              # arming zeroes the heading
     threading.Thread(target=lease, daemon=True).start()

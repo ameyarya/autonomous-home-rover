@@ -243,7 +243,8 @@ svcPoll();
 
 // Drive: arm lease, STOP, hold-to-drive. Throttle (up/down) and steering (left/right) are
 // independent: left/right alone only turn the wheels; held together they drive and steer.
-let armed=false,held=null,holdTimer=null;const down=new Set();
+// mine: this page armed it (only then does it renew the lease)
+let armed=false,mine=false,held=null,holdTimer=null;const down=new Set();
 const NAMES={W:'Forward',S:'Reverse',L:'Steer left',R:'Steer right',A:'Forward · left',D:'Forward · right',Z:'Reverse · left',C:'Reverse · right'};
 function keyFor(){
   const t=down.has('up')&&!down.has('down')?'up':down.has('down')&&!down.has('up')?'down':null;
@@ -256,16 +257,16 @@ function showArmed(){
   $('stage').classList.toggle('armed',armed);$('armed-badge').hidden=!armed;$('pad').setAttribute('aria-disabled',String(!armed))}
 function showDrive(s){
   if(s.error&&s.armed===undefined){$('drive-status').textContent='Drive server off. Start it above (remote or transmitter on USB).';return}
-  armed=!!s.armed;showArmed();showOdo(s.odometer);
+  armed=!!s.armed;if(!armed)mine=false;showArmed();showOdo(s.odometer);
   const last=s.last?(s.last.manual?`manual ${NAMES[s.last.key]||s.last.key}`:s.last.key==='X'?`stopped (${s.last.why||'stop'})`:`pulse ${s.last.key} ${s.last.ms} ms`):'nothing yet';
   $('drive-status').className='status'+(s.error?' warn':'');
   $('drive-status').textContent=(armed?'Armed — the rover can move. ':'Disarmed. ')+`Last: ${last}`+(s.error?` · ${s.error}`:'')}
 async function lease(){
-  try{showDrive(armed?await postJSON('/drive/arm',{armed:true}):await getJSON('/drive/status'))}
+  try{showDrive(armed&&mine?await postJSON('/drive/arm',{armed:true,renew:true}):await getJSON('/drive/status'))}
   catch(e){armed=false;showArmed();$('drive-status').textContent='Drive server offline. Start it above (remote or transmitter on USB).'}
   setTimeout(lease,1000)}
 lease();
-$('arm').onclick=async()=>{try{showDrive(await postJSON('/drive/arm',{armed:!armed}))}catch(e){$('drive-status').textContent=e.message}};
+$('arm').onclick=async()=>{try{mine=!armed;showDrive(await postJSON('/drive/arm',{armed:!armed}))}catch(e){$('drive-status').textContent=e.message}};
 async function estop(){down.clear();update();armed=false;showArmed();try{showDrive(await postJSON('/drive/stop'))}catch(e){}}
 $('stop').onclick=estop;
 function update(){

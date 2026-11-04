@@ -516,6 +516,14 @@ class DashboardUITest(unittest.TestCase):
         expect(self.page.locator('#rec-text')).to_have_text('Record', timeout=5000)
         self.assertFalse(self.dash.recorder.on)
 
+    def test_page_does_not_keep_someone_elses_arm_alive(self):
+        self.open()
+        self.drive_state.arm(True)                          # a script arms it
+        expect(self.page.locator('#arm')).to_contain_text('Armed', timeout=5000)
+        time.sleep(drive_server.LEASE_S + 1.5)              # the page sees it but doesn't renew it
+        self.assertFalse(self.drive_state.armed)
+        expect(self.page.locator('#arm')).to_contain_text('Arm to drive', timeout=5000)
+
     def test_heading_card_offline(self):
         self.open()
         expect(self.page.locator('#imu-info')).to_contain_text('offline')

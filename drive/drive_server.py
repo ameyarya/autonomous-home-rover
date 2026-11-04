@@ -3,7 +3,9 @@
 Run: python3 drive/drive_server.py        (HTTP on 127.0.0.1:8769)
 
   GET  /status                     armed, busy, last pulse, receiver app
-  POST /arm    {"armed": true}     arm, or renew the lease (expires after LEASE_S without renewal)
+  POST /arm    {"armed": true}     arm (expires after LEASE_S without renewal)
+  POST /arm    {"armed": true, "renew": true}   renew only: refused once disarmed or stopped, so a
+                                   page or script that is still renewing can't undo a stop
   POST /arm    {"armed": false}    disarm and stop
   POST /pulse  {"key": "W", "ms": 300}   bounded pulse; refused (403) unless armed, (409) during manual driving
   POST /hold   {"key": "W"}        manual hold-to-drive: drives while renewed every ~150 ms, stops with
@@ -74,7 +76,9 @@ class DriveState:
     def armed(self):
         return time.monotonic() < self.armed_until
 
-    def arm(self, on):
+    def arm(self, on, renew=False):
+        if on and renew and not self.armed:
+            return False
         if on:
             if not self.armed and self.imu:          # arming (not a lease renewal): heading = 0 here
                 self.imu.zero()
@@ -82,6 +86,7 @@ class DriveState:
             self.abort.clear()
         else:
             self.stop('disarmed')
+        return True
 
     def stop(self, why='stop'):
         self.armed_until = 0.0
@@ -378,7 +383,8 @@ def make_handler(state):
         def do_POST(self):
             try:
                 if self.path == '/arm':
-                    state.arm(bool(self.body().get('armed')))
+                    b = self.body()
+                    state.arm(bool(b.get('armed')), renew=bool(b.get('renew')))
                     return self.reply(200, state.status())
                 if self.path == '/stop':
                     state.stop('stop requested')
