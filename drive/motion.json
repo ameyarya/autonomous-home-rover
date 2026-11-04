@@ -2,5 +2,7 @@
  "forward_cm_s": 25.0,
  "reverse_cm_s": 43.33,
  "turn_radius_cm": 132.5,
- "power": 1200.0
+ "power": 1200.0,
+ "arc_forward_cm": 70.0,
+ "arc_sideways_cm": 20.0
 }

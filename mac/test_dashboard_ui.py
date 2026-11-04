@@ -446,6 +446,9 @@ class DashboardUITest(unittest.TestCase):
         self.page.fill('#m-arc-s', '20')                                          # R = (1600+400)/40 = 50
         self.page.click('#m-save')
         expect(self.page.locator('#m-status')).to_contain_text('forward 50 cm/s, reverse 40 cm/s, turning radius 50 cm')
+        self.page.reload()                                                       # saved values show again
+        expect(self.page.locator('#m-fwd')).to_have_value('100')
+        expect(self.page.locator('#m-arc-s')).to_have_value('20')
 
     def test_phone_width_has_no_sideways_scroll(self):
         context = self.browser.new_context(viewport={'width': 390, 'height': 844})

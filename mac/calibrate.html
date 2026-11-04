@@ -138,6 +138,11 @@ load();setInterval(()=>{if(!busy&&!installing)load()},3000);
 // ---- measure motion ----
 let mot=null;
 function showMot(r){mot=r;const v=r.values||{},t=r.test_s||{forward:2,reverse:1.5};
+  // Show what was last saved in the boxes (distances as measured, not speeds).
+  if(v.forward_cm_s)$('m-fwd').value=Math.round(v.forward_cm_s*t.forward*10)/10;
+  if(v.reverse_cm_s)$('m-rev').value=Math.round(v.reverse_cm_s*t.reverse*10)/10;
+  if(v.arc_forward_cm!=null)$('m-arc-f').value=v.arc_forward_cm;
+  if(v.arc_sideways_cm!=null)$('m-arc-s').value=v.arc_sideways_cm;
   const known=v.forward_cm_s&&v.reverse_cm_s&&v.turn_radius_cm;
   $('m-status').textContent=known?`Saved: forward ${v.forward_cm_s} cm/s, reverse ${v.reverse_cm_s} cm/s, turning radius ${v.turn_radius_cm} cm (at speed ${v.power}${v.power!==r.power?`; rover now at ${r.power}: re-measure if it changed a lot`:''}).`:'Not measured yet.';
   $('m-status').className='status '+(known?'ok':'warn')}
@@ -150,10 +155,12 @@ $('m-save').onclick=async()=>{const t=(mot&&mot.test_s)||{forward:2,reverse:1.5}
   if(+$('m-fwd').value>0)values.forward_cm_s=+(+$('m-fwd').value/t.forward).toFixed(2);
   if(+$('m-rev').value>0)values.reverse_cm_s=+(+$('m-rev').value/t.reverse).toFixed(2);
   const af=+$('m-arc-f').value,as=+$('m-arc-s').value;
-  if(as>0)values.turn_radius_cm=+((af*af+as*as)/(2*as)).toFixed(1);
+  if(as>0){values.turn_radius_cm=+((af*af+as*as)/(2*as)).toFixed(1);values.arc_forward_cm=af;values.arc_sideways_cm=as}
   if(!Object.keys(values).length){$('m-status').textContent='Enter at least one measurement.';return}
+  const v0=(mot&&mot.values)||{};for(const k of Object.keys(values))if(values[k]===v0[k])delete values[k];
+  if(!Object.keys(values).length){$('m-status').textContent='Nothing changed.';return}
   values.power=mot?mot.power:null;
-  try{showMot(await postJSON('/drive/motion',{values}));['m-fwd','m-rev','m-arc-f','m-arc-s'].forEach(id=>$(id).value='')}
+  try{showMot(await postJSON('/drive/motion',{values}))}
   catch(e){$('m-status').textContent='Not saved: '+e.message;$('m-status').className='status bad'}};
 loadMot();
 

@@ -16,7 +16,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 MOTION_FILE = HERE / 'motion.json'
-FIELDS = ('forward_cm_s', 'reverse_cm_s', 'turn_radius_cm', 'power')
+FIELDS = ('forward_cm_s', 'reverse_cm_s', 'turn_radius_cm', 'power', 'arc_forward_cm', 'arc_sideways_cm')
+# arc_*: the raw short-arc measurement, kept so the Calibrate page can show what was entered
 MAX_MOVE_S = 8.0
 TEST_S = {'forward': 2.0, 'reverse': 1.5, 'arc': 2.0}   # timed runs for measuring speed and turning
 # key -> (throttle: +1 forward / -1 reverse / 0, steer: +1 left / -1 right / 0)
