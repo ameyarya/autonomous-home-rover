@@ -130,7 +130,7 @@ def sim_data():
     furn = json.loads((SIM_DIR / 'furniture.json').read_text()) if (SIM_DIR / 'furniture.json').exists() else {}
     walls = [w for w in apt['walls'] if w['kind'] != 'furniture']
     return {'size': apt['size_m'], 'walls': walls, 'floorplan': apt.get('floorplan'),
-            'furniture': {k: furn.get(k, []) for k in ('boxes', 'cylinders', 'rugs', 'carpet')}}
+            'furniture': {k: furn.get(k, []) for k in ('boxes', 'cylinders', 'rugs', 'carpet', 'barriers')}}
 
 
 HISTORY_KEEP = 50
@@ -146,7 +146,8 @@ def clean_furniture(furn):
         return round(v, 3)
     clean = {'note': 'Furniture for the simulator, edited on the dashboard Sim page. Local only.'}
     for kind, fields in (('boxes', ('x0', 'y0', 'x1', 'y1', 'h')), ('cylinders', ('x', 'y', 'r', 'h')),
-                         ('rugs', ('x0', 'y0', 'x1', 'y1')), ('carpet', ('x0', 'y0', 'x1', 'y1'))):
+                         ('rugs', ('x0', 'y0', 'x1', 'y1')), ('carpet', ('x0', 'y0', 'x1', 'y1')),
+                         ('barriers', ('x0', 'y0', 'x1', 'y1'))):
         out = []
         for i, item in enumerate(furn.get(kind, [])):
             row = {f: num(item[f]) for f in fields}
@@ -154,10 +155,10 @@ def clean_furniture(furn):
                 raise ValueError(f'{kind} {i}: zero or negative size')
             name = ''.join(c if c.isalnum() or c in '_-' else '_' for c in str(item.get('name', f'{kind}{i}')))[:40]
             rgb = [num(c, 0, 1) for c in item.get('rgb', [0.6, 0.6, 0.6])][:3]
-            out.append({'name': name or f'{kind}{i}', **row, **({'rgb': rgb} if kind != 'carpet' else {})})
+            out.append({'name': name or f'{kind}{i}', **row, **({'rgb': rgb} if kind not in ('carpet', 'barriers') else {})})
         clean[kind] = out
     seen = set()                     # duplicate names get _2, _3 ... (the simulator needs unique names)
-    for k in ('boxes', 'cylinders', 'rugs'):
+    for k in ('boxes', 'cylinders', 'rugs', 'barriers'):
         for o in clean[k]:
             base, n = o['name'], 2
             while o['name'] in seen:

@@ -81,6 +81,8 @@ def vfov(hfov_deg, aspect=4 / 3):
 class Walls:
     def __init__(self, rects):
         self.rects = [(r['x0'], r['y0'], r['x1'], r['y1']) for r in rects]
+        self.kinds = [r.get('kind', 'wall') for r in rects]
+        self.last_kind = None
 
     def corners(self, x, y, yaw):
         c, s = math.cos(yaw), math.sin(yaw)
@@ -91,9 +93,10 @@ class Walls:
     def hits(self, x, y, yaw):
         pts = self.corners(x, y, yaw)
         edge = [((pts[i][0] + pts[(i + 1) % 4][0]) / 2, (pts[i][1] + pts[(i + 1) % 4][1]) / 2) for i in range(4)]
-        for x0, y0, x1, y1 in self.rects:
+        for (x0, y0, x1, y1), kind in zip(self.rects, self.kinds):
             for px, py in pts + edge + [(x, y)]:
                 if x0 <= px <= x1 and y0 <= py <= y1:
+                    self.last_kind = kind
                     return True
         return False
 
@@ -116,6 +119,7 @@ class SimRover:
         self.last_cmd = self.steer_at = -1e9
         self.lock = threading.Lock()
         self.collisions, self.pushing_s, self.path_m = 0, 0.0, 0.0
+        self.barrier_hits = 0
         self.min_clear = walls.clearance(x, y)
         self.touching = False
         self.yaw_rate = 0.0
@@ -155,7 +159,10 @@ class SimRover:
         nyaw = self.yaw + rate * dt
         if v and self.walls.hits(nx, ny, nyaw):
             if not self.touching:
-                self.collisions += 1
+                if self.walls.last_kind == 'barrier':
+                    self.barrier_hits += 1
+                else:
+                    self.collisions += 1
             self.touching = True
             self.pushing_s += dt
             self.yaw_rate = 0.0
@@ -290,7 +297,8 @@ class Sim:
     def truth(self):
         r = self.rover
         return {'x_m': round(r.x, 3), 'y_m': round(r.y, 3), 'heading_deg': round(math.degrees(r.yaw), 1),
-                'collisions': r.collisions, 'pushing_s': round(r.pushing_s, 2), 'path_m': round(r.path_m, 2),
+                'collisions': r.collisions, 'barrier_hits': r.barrier_hits, 'pushing_s': round(r.pushing_s, 2),
+                'path_m': round(r.path_m, 2),
                 'min_clearance_m': round(r.min_clear, 3), 'touching': r.touching}
 
 

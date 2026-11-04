@@ -57,10 +57,10 @@ input,select{font:inherit;color:inherit;background:#0d131c;border:1px solid var(
       </div>
       <div class="row" style="margin-top:10px"><button id="rot">Rotate 90°</button><button id="dup">Duplicate</button><button id="del">Delete</button></div>
     </div>
-    <div class="row"><button id="add-box">+ Box</button><button id="add-cyl">+ Round</button><button id="add-rug">+ Rug</button></div>
+    <div class="row"><button id="add-box">+ Box</button><button id="add-cyl">+ Round</button><button id="add-rug">+ Rug</button><button id="add-door" title="A no-go line across a doorway: the simulated rover can't cross it and steers clear">+ Door</button></div>
     <div><h2>Furniture</h2></div>
     <div class="list" id="list"></div>
-    <p class="hint">x runs east, y north, from the plan's bottom-left corner. Rugs and the bedroom carpet are flat (the rover drives over them); everything else blocks it. Every change saves itself to <code>sim/apartment/furniture.json</code> on this Mac (not the public repo) within a second, with a copy in <code>history/</code> at most once a minute; Rebuild sim makes the simulator use it.</p>
+    <p class="hint">x runs east, y north, from the plan's bottom-left corner. Rugs and the bedroom carpet are flat (the rover drives over them); everything else blocks it. Doors (red dashed) are no-go lines: draw one across a doorway to keep the rover out; it's invisible to the simulated camera, like a robot vacuum's virtual wall. Every change saves itself to <code>sim/apartment/furniture.json</code> on this Mac (not the public repo) within a second, with a copy in <code>history/</code> at most once a minute; Rebuild sim makes the simulator use it.</p>
     <div id="status"></div>
   </aside>
 </main>
@@ -74,8 +74,9 @@ const svg = $('plan');
 function status(t, cls = '') { $('status').textContent = t; $('status').className = cls; }
 function items() {
   return [...data.furniture.boxes.map(o => ({kind: 'box', o})), ...data.furniture.cylinders.map(o => ({kind: 'cyl', o})),
-          ...data.furniture.rugs.map(o => ({kind: 'rug', o}))];
+          ...data.furniture.rugs.map(o => ({kind: 'rug', o})), ...data.furniture.barriers.map(o => ({kind: 'door', o}))];
 }
+const KIND_KEY = {box: 'boxes', cyl: 'cylinders', rug: 'rugs', door: 'barriers'};
 function snapshot() { history.push(JSON.stringify(data.furniture)); if (history.length > 100) history.shift(); dirty = true; changedAt = Date.now(); }
 let changedAt = 0, saving = false;
 async function autosave() {          // a second after the last change, not mid-drag
@@ -91,7 +92,7 @@ async function autosave() {          // a second after the last change, not mid-
 }
 setInterval(autosave, 400);
 function fixNames(saved) {            // the server makes duplicate names unique; mirror that here
-  for (const k of ['boxes', 'cylinders', 'rugs'])
+  for (const k of ['boxes', 'cylinders', 'rugs', 'barriers'])
     (data.furniture[k] || []).forEach((o, i) => { if (saved[k] && saved[k][i]) o.name = saved[k][i].name; });
   list();
 }
@@ -153,13 +154,14 @@ function draw() {
   for (const it of items()) {
     const g = geom(it), isSel = sel && sel.o === it.o;
     const [cx, cy] = px(g.x, g.y);
-    const fill = color(it.o.rgb || [.6, .6, .6], it.kind === 'rug' ? .45 : .85);
+    const fill = it.kind === 'door' ? 'rgba(239,68,68,.35)' : color(it.o.rgb || [.6, .6, .6], it.kind === 'rug' ? .45 : .85);
+    const extra = it.kind === 'door' ? {stroke: '#ef4444', 'stroke-width': 2, 'stroke-dasharray': '6 4'} : {};
     const node = it.kind === 'cyl'
       ? el('circle', {cx, cy, r: g.w / 2 * S, fill, class: 'item' + (isSel ? ' sel' : '')})
-      : el('rect', {x: cx - g.w / 2 * S, y: cy - g.d / 2 * S, width: g.w * S, height: g.d * S, fill, class: 'item' + (isSel ? ' sel' : ''), rx: it.kind === 'rug' ? 6 : 2});
+      : el('rect', {x: cx - g.w / 2 * S, y: cy - g.d / 2 * S, width: Math.max(3, g.w * S), height: Math.max(3, g.d * S), fill, class: 'item' + (isSel ? ' sel' : ''), rx: it.kind === 'rug' ? 6 : 2, ...extra});
     node.addEventListener('pointerdown', e => startDrag(e, it, 'move'));
     node.addEventListener('dblclick', e => { e.stopPropagation(); rename(it); });
-    const t = el('text', {x: cx, y: cy + 4, 'text-anchor': 'middle', 'font-size': 11, fill: '#0b0f15', 'pointer-events': 'none'});
+    const t = el('text', {x: cx, y: it.kind === 'door' ? cy - 6 : cy + 4, 'text-anchor': 'middle', 'font-size': 11, fill: it.kind === 'door' ? '#fca5a5' : '#0b0f15', 'pointer-events': 'none'});
     t.textContent = it.o.name;
     if (isSel) {
       const [hx, hy] = px(g.x + g.w / 2, g.y - g.d / 2);
@@ -196,7 +198,7 @@ function panel() {
   $('edit').hidden = !sel; $('none').hidden = !!sel;
   if (!sel) return;
   const g = geom(sel);
-  $('f-name').value = sel.o.name; $('f-h').value = sel.o.h ?? ''; $('f-h').disabled = sel.kind === 'rug';
+  $('f-name').value = sel.o.name; $('f-h').value = sel.o.h ?? ''; $('f-h').disabled = sel.kind === 'rug' || sel.kind === 'door';
   $('f-x').value = round(g.x); $('f-y').value = round(g.y); $('f-w').value = round(g.w); $('f-d').value = round(g.d);
   $('l-w').firstChild.textContent = sel.kind === 'cyl' ? 'Diameter (m)' : 'Width x (m)';
   $('l-d').hidden = sel.kind === 'cyl'; $('rot').disabled = sel.kind === 'cyl';
@@ -204,7 +206,7 @@ function panel() {
 for (const id of ['f-name', 'f-h', 'f-x', 'f-y', 'f-w', 'f-d']) $(id).addEventListener('change', () => {
   if (!sel) return; snapshot();
   sel.o.name = $('f-name').value.replace(/[^\w-]/g, '_') || 'item';
-  if (sel.kind !== 'rug') sel.o.h = Math.max(0.02, +$('f-h').value || 0.5);
+  if (sel.kind !== 'rug' && sel.kind !== 'door') sel.o.h = Math.max(0.02, +$('f-h').value || 0.5);
   const w = Math.max(0.05, +$('f-w').value), d = sel.kind === 'cyl' ? w : Math.max(0.05, +$('f-d').value);
   setGeom(sel, {x: +$('f-x').value, y: +$('f-y').value, w, d}); draw();
 });
@@ -231,24 +233,25 @@ function list() {
 $('rot').onclick = () => { if (!sel || sel.kind === 'cyl') return; snapshot(); const g = geom(sel); setGeom(sel, {...g, w: g.d, d: g.w}); draw(); };
 $('del').onclick = () => {
   if (!sel) return; snapshot();
-  for (const k of ['boxes', 'cylinders', 'rugs']) data.furniture[k] = data.furniture[k].filter(o => o !== sel.o);
+  for (const k of Object.values(KIND_KEY)) data.furniture[k] = data.furniture[k].filter(o => o !== sel.o);
   sel = null; draw();
 };
 $('dup').onclick = () => {
   if (!sel) return; snapshot();
   const o = JSON.parse(JSON.stringify(sel.o)); o.name += '_2';
   const it = {kind: sel.kind, o}; const g = geom(it); setGeom(it, {...g, x: g.x + 0.3, y: g.y - 0.3});
-  data.furniture[{box: 'boxes', cyl: 'cylinders', rug: 'rugs'}[sel.kind]].push(o); sel = it; draw();
+  data.furniture[KIND_KEY[sel.kind]].push(o); sel = it; draw();
 };
 function add(kind) {
   snapshot();
   const [W, H] = data.size, n = items().length + 1;
-  const o = kind === 'cyl' ? {name: `round${n}`, x: W / 2, y: H / 2, r: 0.25, h: 0.8, rgb: [.5, .5, .5]}
+  const o = kind === 'door' ? {name: `door${n}`, x0: W / 2 - .45, y0: H / 2 - .03, x1: W / 2 + .45, y1: H / 2 + .03}
+        : kind === 'cyl' ? {name: `round${n}`, x: W / 2, y: H / 2, r: 0.25, h: 0.8, rgb: [.5, .5, .5]}
         : kind === 'rug' ? {name: `rug${n}`, x0: W / 2 - .6, y0: H / 2 - .4, x1: W / 2 + .6, y1: H / 2 + .4, rgb: [.6, .6, .7]}
         : {name: `box${n}`, x0: W / 2 - .3, y0: H / 2 - .3, x1: W / 2 + .3, y1: H / 2 + .3, h: 0.8, rgb: [.6, .55, .5]};
-  data.furniture[{box: 'boxes', cyl: 'cylinders', rug: 'rugs'}[kind]].push(o); sel = {kind, o}; draw();
+  data.furniture[KIND_KEY[kind]].push(o); sel = {kind, o}; draw();
 }
-$('add-box').onclick = () => add('box'); $('add-cyl').onclick = () => add('cyl'); $('add-rug').onclick = () => add('rug');
+$('add-door').onclick = () => add('door'); $('add-box').onclick = () => add('box'); $('add-cyl').onclick = () => add('cyl'); $('add-rug').onclick = () => add('rug');
 function undo() { if (!history.length) return; data.furniture = JSON.parse(history.pop()); sel = null; draw(); }
 $('undo').onclick = undo;
 addEventListener('keydown', e => {
@@ -296,6 +299,7 @@ async function build3d() {
     else if (w.kind === 'wall') box(w.x0, w.y0, w.x1, w.y1, 2.4, 0xe9e4da, 0, 0.55);
   }
   for (const b of data.furniture.boxes) box(b.x0, b.y0, b.x1, b.y1, b.h, new THREE.Color(...b.rgb));
+  for (const b of data.furniture.barriers) box(b.x0, b.y0, b.x1, b.y1, 1.0, 0xef4444, 0, 0.35);
   for (const c of data.furniture.cylinders) { const m = new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r, c.h, 24), new THREE.MeshLambertMaterial({color: new THREE.Color(...c.rgb)})); m.rotation.x = Math.PI / 2; m.position.set(c.x, c.y, c.h / 2); scene.add(m); }
   resize3d();
 }
@@ -309,7 +313,7 @@ $('v2d').onclick = () => show('2d'); $('v3d').onclick = () => show('3d');
 
 (async () => {
   try { const r = await fetch('/sim/data', {cache: 'no-store'}); data = await r.json(); if (!r.ok) throw new Error(data.error);
-        for (const k of ['boxes', 'cylinders', 'rugs']) data.furniture[k] = data.furniture[k] || [];
+        for (const k of ['boxes', 'cylinders', 'rugs', 'barriers']) data.furniture[k] = data.furniture[k] || [];
         draw(); loadVersions(); $('saved').textContent = 'saved';
         status(`${items().length} pieces · apartment ${data.size.map(v => v.toFixed(1)).join(' × ')} m`); }
   catch (e) { status('No sim apartment yet: ' + e.message, 'warn'); }

@@ -79,12 +79,13 @@ def main():
         results = list(pool.map(lambda a: run_one(a[0], a[1], args.steps, args.seed), enumerate(starts)))
     (HERE / 'out').mkdir(exist_ok=True)
     (HERE / 'out/batch.json').write_text(json.dumps(results, indent=1))
-    print(f'{"run":>3} {"start":>18} {"steps":>5} {"turns":>5} {"path m":>6} {"hits":>4} {"push s":>6} {"closest":>7}  stopped')
+    print(f'{"run":>3} {"start":>18} {"steps":>5} {"turns":>5} {"path m":>6} {"hits":>4} {"doors":>5} {"push s":>6} {"closest":>7}  stopped')
     for r in results:
         print(f'{r["run"]:>3} {str(r["start"]):>18} {r["steps"]:>5} {r["turns"]:>5} {r["path_m"]:>6} {r["collisions"]:>4} '
-              f'{r["pushing_s"]:>6} {r["min_clearance_m"]:>7}  {r["stopped"]}')
+              f'{r.get("barrier_hits", 0):>5} {r["pushing_s"]:>6} {r["min_clearance_m"]:>7}  {r["stopped"]}')
     hits = sum(r['collisions'] for r in results)
-    print(f'\n{len(results)} runs: {hits} collisions, {sum(r["path_m"] for r in results):.1f} m driven, '
+    doors = sum(r.get('barrier_hits', 0) for r in results)
+    print(f'\n{len(results)} runs: {hits} collisions, {doors} virtual-door touches, {sum(r["path_m"] for r in results):.1f} m driven, '
           f'closest approach {min(r["min_clearance_m"] for r in results):.2f} m')
 
 

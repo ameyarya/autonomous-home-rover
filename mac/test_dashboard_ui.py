@@ -570,6 +570,14 @@ class DashboardUITest(unittest.TestCase):
             self.page.evaluate("document.querySelectorAll('#list div')[2].dispatchEvent(new MouseEvent('click'))")
             self.page.click('#save')
             expect(self.page.locator('#status')).to_contain_text('Saved')
+            self.page.click('#add-door')
+            for _ in range(50):
+                saved = json.loads((tmp / 'furniture.json').read_text())
+                if saved.get('barriers'):
+                    break
+                time.sleep(0.1)
+            self.assertEqual(len(saved['barriers']), 1)                   # a virtual door, autosaved
+            self.assertNotIn('rgb', saved['barriers'][0])
             boxes = json.loads((tmp / 'furniture.json').read_text())['boxes']
             self.assertEqual([b['name'] for b in boxes][0], 'dining_table')
             self.assertEqual(len({b['name'] for b in boxes}), 3)          # all distinct after saving

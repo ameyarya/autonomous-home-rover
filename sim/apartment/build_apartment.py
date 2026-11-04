@@ -6,7 +6,9 @@ balcony slider, drawn as thin double lines) is added by hand: the slider is its 
 blinds' look, since the real rover drove into those blinds (2026-11-04). The patio is left out.
 
 Scale: the bedroom is drawn as a 12' x 12' square, 157 px across -> 13.1 px per foot.
-Furniture: furniture.json (from photos; boxes, cylinders, rugs and the bedroom carpet), and floor
+Furniture: furniture.json (from photos; boxes, cylinders, rugs, the bedroom carpet, and virtual
+doors: no-go lines the simulated rover can't cross and its exact-depth rays treat as walls, while
+the rendered camera doesn't see them), and floor
 textures cut from the photos (tex_wood.png, tex_carpet.png) and a slatted tex_blinds.png, when
 present. All of these are personal and stay local (gitignored).
 Output: apartment.xml (worldbody geoms) and apartment_assets.xml (textures, materials) included by
@@ -113,6 +115,11 @@ def main():
         geoms.append(f'    <geom name="{c["name"]}" type="cylinder" size="{c["r"]} {c["h"] / 2:.3f}" '
                      f'pos="{c["x"]} {c["y"]} {c["h"] / 2:.3f}" material="m_{c["name"]}"/>')
         tints.append((c['name'], c['rgb']))
+    for b in furniture.get('barriers', []):         # virtual doors: no-go lines, not real objects
+        rects.append({k: b[k] for k in ('name', 'x0', 'y0', 'x1', 'y1')} | {'kind': 'barrier'})
+        geoms.append(f'    <geom name="{b["name"]}" type="box" size="{(b["x1"] - b["x0"]) / 2:.3f} '
+                     f'{(b["y1"] - b["y0"]) / 2:.3f} .5" pos="{(b["x0"] + b["x1"]) / 2:.3f} '
+                     f'{(b["y0"] + b["y1"]) / 2:.3f} .5" group="3" rgba="1 0 0 0" contype="0" conaffinity="0"/>')
     flat = [(r, 'rug', 'material="rug"') for r in furniture.get('rugs', [])]
     flat += [(r, 'carpet', 'material="carpet"') for r in furniture.get('carpet', [])]
     for i, (r, kind, look) in enumerate(flat):      # drawn on the floor, no collision
