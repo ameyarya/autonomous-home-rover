@@ -59,7 +59,7 @@ camera alone is the hardest way to know position, so cheap sensors (~US$20 total
 | --- | --- | --- | --- |
 | 1 | **Measured moves:** "forward N cm", "turn X°" from timed pulses, calibrated with a tape measure; distance-travelled counter on the dashboard (estimate) | nothing new | low |
 | 2 | **Snapshot task v0:** "take a picture of my dog" when he's in view: detector finds him, rover centres and approaches, saves the best frame to a gallery on the dashboard | existing detector | low–medium |
-| 3 | **Gyro heading:** IMU (MPU-6050/BMI160 class, ~US$3) on the XIAO's I2C, heading in the telemetry; turns by angle, heading-corrected straight driving | IMU + firmware | low–medium |
+| 3 | **Gyro heading:** the M5StickS3 (BMI270) on the rover streams heading over Wi-Fi (UDP); turns by angle, heading-corrected straight driving. Built 2026-11-03; road test pending. | M5StickS3 | low–medium |
 | 4 | **Front distance:** ToF sensor (VL53L1X, ~US$8) on the same I2C bus; stop before walls/furniture, simple wall-following | ToF + firmware | low–medium |
 | 5 | **Wheel odometry:** slotted printed disc + IR interrupter on one wheel (~US$3) for real distance travelled | encoder + mounting | medium |
 | 6 | **Dead-reckoning pose:** gyro + odometry → x, y, heading; live position trace on the dashboard (drifts over time) | 3 + 5 | medium |
@@ -189,8 +189,9 @@ range 50°, speed 1200, saved on the rover); camera back on rover firmware (OTA)
 of the [autonomy roadmap](#autonomy-roadmap-2026-11-03-replaces-the-dog-companion-goal).
 
 1. Roadmap item 1 (measured moves): done and calibrated 2026-11-03 (see ROADMAP.md). Next: item 2 (snapshot task v0).
-2. Decide on the ~US$20 sensor order for items 3–5 (IMU, ToF, IR encoder) and check free XIAO pins.
-3. Stop tests still owed: remote/transmitter USB unplug and power-off mid-drive.
+2. Item 3 (gyro): built on the M5StickS3 2026-11-03. Next: mount it on the rover, check angles, test heading hold and 90° turns.
+3. Decide on the sensor order for items 4–5 (ToF, IR encoder); the IMU is covered by the stick.
+4. Stop tests still owed: remote/transmitter USB unplug and power-off mid-drive.
 
 ## Camera board shortlist
 

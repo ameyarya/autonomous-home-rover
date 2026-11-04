@@ -110,7 +110,8 @@ class Odometer:
         self.x_cm = self.y_cm = 0.0
         self.heading_deg = 0.0
 
-    def add(self, key, seconds, m, power):
+    def add(self, key, seconds, m, power, turn_deg=None):
+        """turn_deg: the heading change the gyro measured over this step (else modelled from the key)."""
         if key not in KEYS or seconds <= 0:
             return
         throttle, steer = KEYS[key]
@@ -118,9 +119,12 @@ class Odometer:
         speed = (s['arc'] if steer else s['forward']) if throttle > 0 else s['reverse'] if throttle < 0 else 0
         travel = throttle * speed * seconds                     # signed cm
         self.distance_cm += abs(travel)
-        turn = travel / s['radius'] * steer if steer and s['radius'] else 0.0   # radians, + = left
+        if turn_deg is not None:
+            turn = math.radians(turn_deg)
+        else:
+            turn = travel / s['radius'] * steer if steer and s['radius'] else 0.0   # radians, + = left
         h0 = math.radians(self.heading_deg)
-        if turn:                                                   # exact arc of radius travel/turn
+        if abs(turn) > 1e-6 and travel:                            # exact arc of radius travel/turn
             r = travel / turn
             self.x_cm += r * (math.sin(h0 + turn) - math.sin(h0))
             self.y_cm -= r * (math.cos(h0 + turn) - math.cos(h0))

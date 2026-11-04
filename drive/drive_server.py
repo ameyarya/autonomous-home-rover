@@ -12,6 +12,10 @@ Run: python3 drive/drive_server.py        (HTTP on 127.0.0.1:8769)
   POST /move   {"kind": "forward"|"back", "amount": cm}  or  {"kind": "left"|"right", "amount": deg}
                                    measured move (timed from drive/motion.json; refused unless armed);
                                    {"kind": "test_forward"|"test_reverse"|"test_arc"} = the timed run for measuring
+                                   With the heading stick online (and hold on): forward/back steer to keep the
+                                   starting heading; left/right turn until the stick has turned that many degrees
+  GET  /imu                        heading stick: online, heading, turn rate, bumps, battery; hold on/off
+  POST /imu    {"hold": bool}      heading hold on/off;   POST /imu/zero   heading = 0 here
   GET  /motion                     measured speeds/turning circle, odometer (estimates)
   POST /motion {values}            save measurements;  POST /odometer/reset
   GET  /calibration                saved calibration, the app version it makes, the installed app
@@ -33,6 +37,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import calibration  # noqa: E402
+import imu as heading  # noqa: E402
 import motion  # noqa: E402
 
 LEASE_S = 3.0
@@ -41,11 +46,15 @@ PULSE_LIMITS_MS = {'W': 600, 'S': 400, 'A': 600, 'D': 600, 'L': 2000, 'R': 2000,
 HOLD_S = 0.35                 # manual drive stops this long after the last /hold renewal
 MANUAL_QUIET_S = 2.0          # autonomous pulses refused this long after manual driving
 REPEAT_S = 0.15               # resend the key this often (receiver watchdog is 500 ms)
+TICK_S = 0.1                  # heading-hold control step
+TURN_TIMEOUT = 1.6            # gyro turns give up after this many times the planned time
 
 
 class DriveState:
-    def __init__(self, tx):
+    def __init__(self, tx, imu=None):
         self.tx = tx
+        self.imu = imu
+        self.heading_hold = True
         self.lock = threading.Lock()          # serial access
         self.abort = threading.Event()
         self.armed_until = 0.0
@@ -86,8 +95,49 @@ class DriveState:
         live = calibration.live_values(self.installed)
         return live['speed'] if live else calibration.load()['speed']
 
-    def count(self, key, seconds):
-        self.odometer.add(key, seconds, self.motion, self.power())
+    def count(self, key, seconds, turn_deg=None):
+        self.odometer.add(key, seconds, self.motion, self.power(), turn_deg)
+
+    def gyro(self):
+        """The heading stick, when it's online and heading hold is on."""
+        return self.imu if self.imu and self.heading_hold and self.imu.fresh() else None
+
+    def imu_status(self):
+        base = self.imu.status() if self.imu else {'online': False, 'error': 'no heading stick configured'}
+        return dict(base, hold=self.heading_hold)
+
+    def _gyro_move(self, kind, amount, key, seconds, g):
+        """Closed loop on the stick's heading. Returns (driven s, how it ended)."""
+        throttle, _ = motion.KEYS[key]
+        turning = kind in ('left', 'right')
+        sign = 1 if kind == 'left' else -1
+        limit = seconds * TURN_TIMEOUT if turning else seconds
+        start = prev_yaw = g.yaw()
+        started = prev_t = time.monotonic()
+        sent, ended = key, 'done'
+        while True:
+            if self.abort.is_set():
+                ended = 'aborted'
+                break
+            if not g.fresh():
+                ended = 'heading stick lost'
+                break
+            now, yaw, rate = time.monotonic(), g.yaw(), g.rate()
+            self.count(sent, now - prev_t, yaw - prev_yaw)
+            prev_t, prev_yaw = now, yaw
+            if turning:
+                if sign * (yaw - start) + max(0.0, sign * rate) * heading.LEAD_S >= amount:
+                    break
+                sent = key
+            else:
+                sent = heading.steer_key(throttle, start - yaw, rate)
+            if now - started >= limit:
+                ended = 'timeout' if turning else 'done'
+                break
+            self.tx.wire(sent)
+            self.abort.wait(TICK_S)
+        self.gyro_end = (sent, prev_t, prev_yaw, g)
+        return time.monotonic() - started, ended
 
     def move(self, kind, amount=None):
         """A measured move: drive `key` for the planned time, then stop with ACK."""
@@ -107,22 +157,37 @@ class DriveState:
                 raise PermissionError('not armed')
             self.busy = True
             started = time.monotonic()
+            g = self.gyro() if kind in ('forward', 'back', 'left', 'right') else None
+            start_yaw = g.yaw() if g else None
+            ended = 'done'
+            self.gyro_end = None
             try:
-                while not self.abort.is_set():
-                    self.tx.wire(key)
-                    remaining = seconds - (time.monotonic() - started)
-                    if remaining <= 0:
-                        break
-                    self.abort.wait(min(REPEAT_S, remaining))
+                if g:
+                    driven, ended = self._gyro_move(kind, amount, key, seconds, g)
+                else:
+                    while not self.abort.is_set():
+                        self.tx.wire(key)
+                        remaining = seconds - (time.monotonic() - started)
+                        if remaining <= 0:
+                            break
+                        self.abort.wait(min(REPEAT_S, remaining))
+                    driven = min(time.monotonic() - started, seconds)
             finally:
-                driven = min(time.monotonic() - started, seconds)
                 try:
                     self.tx.stop()
                 finally:
                     self.busy = False
-                    self.count(key, driven)
+                    if g:                               # the last step, with the heading the stick saw
+                        sent, t, yaw, _ = self.gyro_end or (key, started, start_yaw, g)
+                        end_yaw = g.yaw() if g.fresh() else yaw
+                        self.count(sent, max(0.0, time.monotonic() - t), end_yaw - yaw)
+                    else:
+                        self.count(key, min(time.monotonic() - started, seconds))
         self.last = {'key': key, 'move': kind, 'amount': amount, 'ms': round(driven * 1000), 't': time.time(),
-                     'aborted': self.abort.is_set()}
+                     'aborted': self.abort.is_set(), 'gyro': bool(g), 'ended': ended}
+        if g and g.fresh():
+            moved = g.yaw() - start_yaw
+            self.last['turned_deg'] = round(moved, 1)
         return dict(self.last, odometer=self.odometer.as_dict())
 
     def motion_status(self):
@@ -253,7 +318,7 @@ class DriveState:
         return {'armed': self.armed, 'busy': self.busy, 'holding': self.hold_key if self.holding else None,
                 'installed': self.installed,
                 'last': self.last, 'error': self.error, 'lease_s': LEASE_S, 'pulse_limits_ms': PULSE_LIMITS_MS,
-                'odometer': self.odometer.as_dict()}
+                'odometer': self.odometer.as_dict(), 'imu': self.imu_status()}
 
 
 def make_handler(state):
@@ -277,6 +342,8 @@ def make_handler(state):
                 return self.reply(200, state.calibration())
             if self.path == '/motion':
                 return self.reply(200, state.motion_status())
+            if self.path == '/imu':
+                return self.reply(200, state.imu_status())
             self.reply(404, {'error': 'not found'})
 
         def do_POST(self):
@@ -295,6 +362,13 @@ def make_handler(state):
                     return self.reply(200, state.move(str(b.get('kind', '')), b.get('amount')))
                 if self.path == '/motion':
                     return self.reply(200, state.save_motion(self.body().get('values') or {}))
+                if self.path == '/imu':
+                    state.heading_hold = bool(self.body().get('hold', True))
+                    return self.reply(200, state.imu_status())
+                if self.path == '/imu/zero':
+                    if state.imu:
+                        state.imu.zero()
+                    return self.reply(200, state.imu_status())
                 if self.path == '/odometer/reset':
                     state.odometer.reset()
                     return self.reply(200, state.motion_status())
@@ -326,10 +400,11 @@ def make_handler(state):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--port', type=int, default=8769)
+    parser.add_argument('--imu-host', default='rover-imu.local', help="heading stick ('' = none)")
     args = parser.parse_args()
     from rover_drive import Transmitter
     tx = Transmitter()
-    state = DriveState(tx)
+    state = DriveState(tx, heading.Imu(args.imu_host).start() if args.imu_host else None)
     state.installed = tx.status()
     if calibration.sync_from_rover(state.installed):   # remote-calibrated centre/range/speed
         print('calibration.json updated from the rover', flush=True)

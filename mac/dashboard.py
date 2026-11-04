@@ -368,7 +368,7 @@ def make_handler(dashboard, password):
                     return self.reply(503, {'error': 'dog watcher not running'})
             if path == '/calibrate':
                 return self.reply(200, (ROOT / 'calibrate.html').read_bytes(), 'text/html; charset=utf-8')
-            if path in ('/drive/status', '/drive/calibration', '/drive/motion'):
+            if path in ('/drive/status', '/drive/calibration', '/drive/motion', '/drive/imu'):
                 try:
                     with urllib.request.urlopen(DRIVE_URL + path[6:], timeout=2) as response:
                         return self.reply(200, response.read())
@@ -409,7 +409,8 @@ def make_handler(dashboard, password):
                 except OSError as error:
                     return self.reply(503, {'error': f'camera: {error}'})
             if self.path in ('/drive/arm', '/drive/stop', '/drive/hold', '/drive/pulse', '/drive/calibration',
-                             '/drive/calibration/live', '/drive/move', '/drive/motion', '/drive/odometer/reset'):
+                             '/drive/calibration/live', '/drive/move', '/drive/motion', '/drive/odometer/reset',
+                             '/drive/imu', '/drive/imu/zero'):
                 size = int(self.headers.get('Content-Length', 0))
                 body = self.rfile.read(size) if size else b'{}'
                 try:

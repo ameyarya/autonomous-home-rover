@@ -434,6 +434,41 @@ class DashboardUITest(unittest.TestCase):
         self.page.click('#odo-reset')
         expect(self.page.locator('#odo-dist')).to_have_text('0 cm')
 
+    def test_heading_card_shows_the_stick_and_toggles_hold(self):
+        class Stick:
+            zeroed = False
+            def status(self):
+                return {'online': True, 'calibrated': True, 'heading_deg': 30.4, 'yaw_deg': 30.4, 'rate_dps': 1.0,
+                        'still': True, 'bumps': 2, 'battery': 88, 'age_ms': 20}
+            def fresh(self):
+                return False                     # moves stay timed in this test
+            def zero(self):
+                Stick.zeroed = True
+        self.drive_state.imu = Stick()
+        try:
+            self.open()
+            expect(self.page.locator('#imu-head')).to_have_text('+30°')
+            expect(self.page.locator('#imu-info')).to_contain_text('battery 88%')
+            self.page.click('#imu-hold')
+            for _ in range(50):
+                if not self.drive_state.heading_hold:
+                    break
+                time.sleep(0.05)
+            self.assertFalse(self.drive_state.heading_hold)
+            self.page.click('#imu-zero')
+            for _ in range(50):
+                if Stick.zeroed:
+                    break
+                time.sleep(0.05)
+            self.assertTrue(Stick.zeroed)
+        finally:
+            self.drive_state.imu = None
+            self.drive_state.heading_hold = True
+
+    def test_heading_card_offline(self):
+        self.open()
+        expect(self.page.locator('#imu-info')).to_contain_text('offline')
+
     def test_calibrate_measure_motion(self):
         self.page.goto(self.url + 'calibrate')
         self.page.click('#arm')
