@@ -120,7 +120,8 @@ class Odometer:
             return
         throttle, steer = KEYS[key]
         s = scaled(m, power)
-        speed = (s['arc'] if steer else s['forward']) if throttle > 0 else s['reverse'] if throttle < 0 else 0
+        # the measured arc speed is for full lock; gentle steering drives at about straight speed
+        speed = (s['arc'] if abs(steer) == 1 else s['forward']) if throttle > 0 else s['reverse'] if throttle < 0 else 0
         travel = throttle * speed * seconds                     # signed cm
         self.distance_cm += abs(travel)
         if turn_deg is not None:

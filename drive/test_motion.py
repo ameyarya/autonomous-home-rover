@@ -112,5 +112,14 @@ class Moves(unittest.TestCase):
             self.s.move('left', -5)
 
 
+class GentleKeysTest(unittest.TestCase):
+    def test_gentle_steering_counts_at_straight_speed(self):
+        m = {'forward_cm_s': 25, 'reverse_cm_s': 40, 'turn_radius_cm': 130, 'power': 1200,
+             'arc_forward_cm': 70, 'arc_sideways_cm': 20}
+        o = motion.Odometer()
+        o.add('a', 1.0, m, 1200, turn_deg=0.0)
+        self.assertAlmostEqual(o.distance_cm, 25.0)
+
+
 if __name__ == '__main__':
     unittest.main()

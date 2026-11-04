@@ -5,6 +5,10 @@ Run (the dashboard's Services start it the same way): the Mini-T detector Python
 
   GET /status      fps, model ms, frame age, and the latest per-sector reading
   GET /depth.jpg   camera frame | depth colour map with the floor (green) and obstacles (red)
+  GET /map.png     top-down map built from the free floor and the rover's pose (floor_map.py)
+  GET /map         map stats;   POST /map/reset   start a new map
+The map takes a view only while the rover stands still (pose and picture then agree), at most
+MAP_EVERY_S, and only with the heading stick online.
 
 The model gives relative inverse depth with an unknown scale and offset, so this doesn't trust
 its numbers directly. It assumes the bottom of the picture is floor and fits how floor depth changes
@@ -29,6 +33,8 @@ from pathlib import Path
 
 import numpy as np
 
+import floor_map
+
 ROOT = Path(__file__).resolve().parent
 WEIGHTS = ROOT / 'weights'
 FLOOR_ROWS = 0.15        # bottom share of the picture assumed to be floor, for the fit
@@ -38,6 +44,9 @@ SECTORS = ('left', 'centre', 'right')
 BOTTOM_CM = 20.0         # floor distance at the bottom edge of the picture (to measure)
 MAX_CM = 300.0           # "clear to the horizon" is reported as this
 BLOCKED_CM, NEAR_CM = 35.0, 80.0
+MAP_EVERY_S = 0.5
+MAP_SETTLE_S = 0.6       # after a move, wait this long before mapping (picture and pose settle)
+MAP_COLUMNS = 64
 SMOOTH_N = 5             # sectors report the median of this many frames (single-frame glitches seen)
 
 
@@ -104,8 +113,14 @@ def overlay(frame, disp, mask, free_cm, horizon, bottom_cm=BOTTOM_CM):
 
 
 class DepthService:
-    def __init__(self, source, size, device, bottom_cm=BOTTOM_CM):
-        self.source, self.size, self.device, self.bottom_cm = source, size, device, bottom_cm
+    def __init__(self, source, size, device, bottom_cm=BOTTOM_CM, drive='http://127.0.0.1:8769'):
+        self.source, self.size, self.device, self.bottom_cm, self.drive = source, size, device, bottom_cm, drive
+        self.map = floor_map.FloorMap()
+        self.map_lock = threading.Lock()
+        self.map_png = None
+        self.mapped_at = 0.0
+        self.moved_at = 0.0
+        self.pose = None
         self.model = None
         self.reading = {'ok': False, 'why': 'starting'}
         self.image = None
@@ -150,6 +165,8 @@ class DepthService:
                 else:
                     history = []
                 self.ms = round((time.monotonic() - t) * 1000)
+                if reading['ok']:
+                    self.map_view(free)
                 out = overlay(img, disp, mask, free, reading.get('horizon_row', 0), self.bottom_cm)
                 self.image = cv2.imencode('.jpg', out, [cv2.IMWRITE_JPEG_QUALITY, 70])[1].tobytes()
                 self.reading, self.frame_age_ms, self.error = reading, age, None
@@ -159,9 +176,41 @@ class DepthService:
                 self.error = f'{type(error).__name__}: {error}'
                 time.sleep(0.5)
 
+    def map_view(self, free_cm):
+        """Add this frame to the map if the rover is standing still with a good heading."""
+        now = time.monotonic()
+        try:
+            with urllib.request.urlopen(self.drive + '/status', timeout=0.3) as r:
+                drive = json.load(r)
+        except (OSError, ValueError):
+            return
+        if drive.get('busy') or drive.get('holding'):
+            self.moved_at = now
+            return
+        odo, imu = drive.get('odometer') or {}, drive.get('imu') or {}
+        self.pose = (odo.get('x_cm', 0.0), odo.get('y_cm', 0.0), odo.get('heading_deg', 0.0))
+        if not imu.get('online') or now - self.moved_at < MAP_SETTLE_S or now - self.mapped_at < MAP_EVERY_S:
+            return
+        cols = [float(c.min()) for c in np.array_split(free_cm, MAP_COLUMNS)]
+        with self.map_lock:
+            self.map.add_view(*self.pose, cols, MAX_CM)
+            self.mapped_at = now
+            self.render_map()
+
+    def render_map(self):
+        import cv2
+        self.map_png = cv2.imencode('.png', self.map.render(self.pose))[1].tobytes()
+
+    def reset_map(self):
+        with self.map_lock:
+            self.map.reset()
+            self.render_map()
+        return self.map.stats()
+
     def status(self):
         return {'ready': self.model is not None, 'device': self.device, 'size': self.size, 'fps': self.fps,
-                'model_ms': self.ms, 'frame_age_ms': self.frame_age_ms, 'error': self.error, **self.reading}
+                'model_ms': self.ms, 'frame_age_ms': self.frame_age_ms, 'error': self.error,
+                'map': self.map.stats(), **self.reading}
 
 
 def make_handler(service):
@@ -182,6 +231,17 @@ def make_handler(service):
                 if service.image is None:
                     return self.reply(503, {'error': 'no depth image yet'})
                 return self.reply(200, service.image, 'image/jpeg')
+            if self.path == '/map.png':
+                if service.map_png is None:
+                    return self.reply(503, {'error': 'no map yet'})
+                return self.reply(200, service.map_png, 'image/png')
+            if self.path == '/map':
+                return self.reply(200, service.map.stats())
+            self.reply(404, {'error': 'not found'})
+
+        def do_POST(self):
+            if self.path == '/map/reset':
+                return self.reply(200, service.reset_map())
             self.reply(404, {'error': 'not found'})
 
         def log_message(self, *args):

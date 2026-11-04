@@ -162,8 +162,9 @@ input[type=checkbox]{width:16px;height:16px}
       <div class="sectors">
         <div id="sec-left">Left<strong>—</strong></div><div id="sec-centre">Centre<strong>—</strong></div><div id="sec-right">Right<strong>—</strong></div>
       </div>
-      <div class="hrow"><label><input type="checkbox" id="depth-show">Show depth view</label><span id="depth-rate" class="hint" style="margin:0"></span></div>
-      <img id="depth-img" alt="Camera picture beside its depth map: free floor green, obstacles red" hidden>
+      <div class="hrow"><label>View <select id="depth-view"><option value="">none</option><option value="depth">depth</option><option value="map" selected>map</option></select></label><span id="depth-rate" class="hint" style="margin:0"></span></div>
+      <img id="depth-img" alt="Depth view (free floor green, obstacles red) or the floor map (free blue-grey, obstacles red, rover orange)">
+      <p class="hint" id="map-info"></p>
       <p class="status" id="depth-status">Depth service off</p>
     </div>
     <div class="card">
@@ -337,12 +338,14 @@ async function depthPoll(){
     $('depth-rate').textContent=s.fps?`${s.fps} fps · ${s.model_ms} ms`:'';
     $('depth-status').className='status'+(s.error||!s.ok?' warn':'');
     $('depth-status').textContent=!s.ready?'Loading the depth model…':s.error?s.error:!s.ok?(s.why||''):'Running'+(s.frame_age_ms!=null?` · frame ${s.frame_age_ms} ms old`:'');
-    if($('depth-show').checked)$('depth-img').src='/depth.jpg?t='+Date.now()}
+    const view=$('depth-view').value;$('depth-img').hidden=!view;
+    if(view)$('depth-img').src=(view==='map'?'/depth/map.png':'/depth.jpg')+'?t='+Date.now();
+    $('map-info').textContent=s.map?`Map: ${s.map.views} views · ${s.map.free_m2} m² free floor seen`:''}
   catch(e){depthOn=false;$('depth-svc').textContent='Start';$('depth-status').className='status';$('depth-status').textContent='Depth service off';
     for(const n of ['left','centre','right']){$('sec-'+n).className='';$('sec-'+n).querySelector('strong').textContent='—'}}
   setTimeout(depthPoll,depthOn?250:2000)}
 depthPoll();
-$('depth-show').onchange=e=>{$('depth-img').hidden=!e.target.checked};
+$('depth-view').onchange=e=>{$('depth-img').hidden=!e.target.value};
 $('depth-svc').onclick=async e=>{e.target.disabled=true;try{await postJSON(`/services/depth/${depthOn?'stop':'start'}`);$('depth-status').textContent=depthOn?'Stopping…':'Starting (the model takes a few seconds)…'}catch(err){$('depth-status').textContent=err.message}e.target.disabled=false};
 
 // Camera settings.

@@ -386,9 +386,10 @@ def make_handler(dashboard, password):
                     return self.reply(503, {'error': 'drive server not running'})
             if path == '/capture':
                 return self.reply(200, dashboard.recorder.status())
-            if path in ('/depth/status', '/depth.jpg'):
+            if path in ('/depth/status', '/depth.jpg', '/depth/map.png'):
                 try:
-                    with urllib.request.urlopen(DEPTH_URL + ('/status' if path == '/depth/status' else path),
+                    target = {'/depth/status': '/status', '/depth/map.png': '/map.png'}.get(path, path)
+                    with urllib.request.urlopen(DEPTH_URL + target,
                                                 timeout=2) as response:
                         return self.reply(200, response.read(), response.headers.get('Content-Type'))
                 except OSError:
