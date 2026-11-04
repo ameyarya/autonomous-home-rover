@@ -68,6 +68,8 @@ def main():
     ap.add_argument('--rooms', default='kitchen,bathroom,bedroom,living,home')
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--port', type=int, default=9900)
+    ap.add_argument('--speed-error', default='0', help='the sim rover drives this much faster than calibrated (0.1 = 10%%)')
+    ap.add_argument('--gyro-drift', default='0.02', help='gyro bias spread, deg/s')
     args = ap.parse_args()
     apt = json.loads((HERE / 'apartment/apartment.json').read_text())
     rects, size = apt['walls'], apt['size_m']
@@ -75,7 +77,8 @@ def main():
     drive, cam, depth = (f'http://127.0.0.1:{args.port + k}' for k in (0, 1, 2))
     sim = subprocess.Popen([sys.executable, str(HERE / 'apartment_sim.py'), '--no-camera', '--seed', str(args.seed),
                             '--start', ','.join(map(str, start)), '--drive-port', str(args.port),
-                            '--camera-port', str(args.port + 1), '--exact-depth-port', str(args.port + 2)],
+                            '--camera-port', str(args.port + 1), '--exact-depth-port', str(args.port + 2),
+                            '--speed-error', args.speed_error, '--gyro-drift', args.gyro_drift],
                            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     done = threading.Event()
     try:

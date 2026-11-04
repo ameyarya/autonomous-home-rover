@@ -57,6 +57,8 @@ SERVO_TAU_S = 0.15
 PLAY_RAD = math.radians(2.0)            # front-wheel play: steering offset wanders within this
 CAM_H_M, CAM_PITCH_DEG, HFOV_DEG = 0.075, 3.8, 62.0
 FPS = 15
+SPEED_FACTOR = 1.0             # --speed-error: the rover really drives this much faster than calibrated
+GYRO_BIAS_DPS = 0.02           # --gyro-drift: spread of the heading stick's leftover bias
 RAY_COLUMNS, RAY_Z_M, MAX_CM = 64, 0.03, 300.0
 DT = 0.01
 
@@ -157,7 +159,7 @@ class SimRover:
             throttle, target = self.throttle, self.target
         self.steer += (target - self.steer) * min(1.0, dt / SERVO_TAU_S)
         self.play = max(-PLAY_RAD, min(PLAY_RAD, self.play + self.rng.gauss(0, math.radians(1.5)) * math.sqrt(dt)))
-        v = (ARC_MS if abs(target) >= 1 else FWD_MS) * throttle if throttle > 0 else REV_MS * throttle
+        v = ((ARC_MS if abs(target) >= 1 else FWD_MS) * throttle if throttle > 0 else REV_MS * throttle) * SPEED_FACTOR
         full = math.atan(WHEELBASE_M / RADIUS_M)
         delta = self.steer * full + (self.play if throttle else 0.0)
         rate = v / WHEELBASE_M * math.tan(delta)
@@ -217,7 +219,7 @@ class SimImu:
     def __init__(self, rover, seed=0):
         self.rover, self.rng = rover, random.Random(seed + 1)
         self.offset = math.degrees(rover.yaw)
-        self.bias_dps = self.rng.gauss(0, 0.02)
+        self.bias_dps = self.rng.gauss(0, GYRO_BIAS_DPS)
         self.t0 = time.monotonic()
         self.bumps = 0
 
@@ -378,7 +380,11 @@ def main():
     ap.add_argument('--camera-port', type=int, default=9010)
     ap.add_argument('--exact-depth-port', type=int, default=9775)
     ap.add_argument('--no-camera', action='store_true', help='skip rendering (exact depth only; faster batch runs)')
+    ap.add_argument('--speed-error', type=float, default=0.0, help='e.g. 0.1: drives 10%% faster than calibrated')
+    ap.add_argument('--gyro-drift', type=float, default=0.02, help='spread of the gyro bias, deg/s')
     args = ap.parse_args()
+    global SPEED_FACTOR, GYRO_BIAS_DPS
+    SPEED_FACTOR, GYRO_BIAS_DPS = 1 + args.speed_error, args.gyro_drift
     sim = Sim([float(v) for v in args.start.split(',')], args.seed)
     state = drive_server.DriveState(SimTx(sim.rover), sim.imu)
     state.installed = 'rover-drive-0.9+sim c130 t50 s1200|0'
