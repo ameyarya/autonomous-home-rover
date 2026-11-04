@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shadow Report</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0f15;--panel:#121822;--panel2:#1b2330;--line:#263142;--line2:#35445b;--fg:#eef3fa;--dim:#9aabc2;--dim2:#7d8ea8;
+  --ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--accent:#60a5fa;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);padding:14px 18px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+h1{font-size:20px;margin:0;font-weight:650}.sub{font-size:12px;color:var(--dim2)}.sp{flex:1}
+a.linkbtn,button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:7px 12px;cursor:pointer;text-decoration:none;font-size:13px}
+button.primary{background:#1d4ed8;border-color:#3b82f6}button:disabled{opacity:.45;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
+h2{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim2);margin:0 0 10px}
+.big{font-size:30px;font-weight:650;font-variant-numeric:tabular-nums}
+.hint{font-size:12px;line-height:1.55;color:var(--dim);margin:8px 0 0}
+table{border-collapse:collapse;font-size:13px;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+th{color:var(--dim2);font-weight:550}
+.diff{color:var(--warn);font-weight:600}
+.clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:14px}
+.clip{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:12px}
+.clip img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#05070a}
+.clip div{padding:8px;color:var(--dim)}.clip b{color:var(--fg)}
+#status{font-size:12px;color:var(--dim);margin-top:8px}#status.ok{color:var(--ok)}#status.warn{color:var(--warn)}
+</style></head><body>
+<header><h1>Shadow report</h1><span class="sub">your driving vs what the explorer would have done</span><span class="sp"></span>
+  <button id="refresh">Refresh</button><a class="linkbtn" href="/">Dashboard</a></header>
+<div class="grid">
+  <div class="card"><h2>Recorded</h2><div class="big" id="samples">—</div><p class="hint" id="sessions">Turn on Shadow on the dashboard and drive with the arrow keys or pad.</p></div>
+  <div class="card"><h2>Agreement now</h2><div class="big" id="agree">—</div><p class="hint">Share of moments where the explorer would have made the same move as you (forward, arc left, arc right, or back up).</p></div>
+  <div class="card"><h2>Tuned from your driving</h2>
+    <table><thead><tr><th>Setting</th><th>Now</th><th>Suggested</th></tr></thead><tbody id="params"></tbody></table>
+    <p class="hint" id="suggest-note"></p>
+    <button id="apply" class="primary" disabled>Apply to the explorer</button>
+    <p id="status"></p>
+  </div>
+</div>
+<div class="card" style="margin-top:14px"><h2>You vs the explorer</h2>
+  <table id="confusion"></table>
+  <p class="hint">Rows: what you did. Columns: what the explorer would have done. The diagonal is agreement; "forward" in a row where you didn't drive forward is the riskiest kind of disagreement.</p></div>
+<div class="card" style="margin-top:14px"><h2>Disagreements (riskiest first)</h2><div class="clips" id="clips"></div></div>
+<script>
+const $ = id => document.getElementById(id);
+const NAMES = {FORWARD_CM: 'Drive forward when the centre is clear for at least (cm)', TURN_CM: 'Arc-turn only with this much ahead (cm)', SIDE_CM: '…and this much on the open side (cm)'};
+let report = null;
+async function load() {
+  $('status').textContent = 'Working…';
+  try {
+    const r = await fetch('/shadow/report', {cache: 'no-store'}); report = await r.json();
+    $('samples').textContent = report.samples;
+    $('sessions').textContent = report.samples ? `${report.sessions.length} session(s) · ${report.moving} moments driving forward or turning` : 'Nothing yet: turn on Shadow on the dashboard and drive with the arrow keys or pad.';
+    $('agree').textContent = report.agree_pct == null ? '—' : report.agree_pct + '%';
+    $('params').innerHTML = Object.keys(NAMES).map(k => `<tr><td>${NAMES[k]}</td><td>${report.params[k]}</td><td class="${report.suggested[k] !== report.params[k] ? 'diff' : ''}">${report.suggested[k]}</td></tr>`).join('');
+    const better = report.suggested_agree_pct != null && report.suggested_agree_pct > report.agree_pct;
+    $('suggest-note').textContent = report.samples < 50 ? 'Drive a bit more first: suggestions need at least 50 moments.' :
+      better ? `With these, the explorer would have agreed with you ${report.suggested_agree_pct}% of the time (now ${report.agree_pct}%). Safety floors: forward needs at least 60 cm, turns 35 cm.` : 'The current settings already match your driving best.';
+    $('apply').disabled = !(better && report.samples >= 50);
+    const A = ['forward', 'left', 'right', 'back'];
+    $('confusion').innerHTML = `<tr><th>you \\ explorer</th>${A.map(a => `<th>${a}</th>`).join('')}</tr>` +
+      A.map(y => `<tr><td>${y}</td>${A.map(e => `<td class="${y !== e && report.confusion[y][e] ? 'diff' : ''}">${report.confusion[y][e]}</td>`).join('')}</tr>`).join('');
+    $('clips').innerHTML = report.disagreements.map(d => `<div class="clip"><img loading="lazy" src="/shadow/frame.jpg?session=${d.session}&i=${d.i}" alt="camera view">
+      <div>You: <b>${d.you}</b> · explorer: <b>${d.explorer}</b><br>left ${d.sectors.left} · centre ${d.sectors.centre} · right ${d.sectors.right} cm</div></div>`).join('') || '<p class="hint">No disagreements yet.</p>';
+    $('status').textContent = '';
+  } catch (e) { $('status').textContent = 'Report unavailable: ' + e.message; $('status').className = 'warn'; }
+}
+$('refresh').onclick = load;
+$('apply').onclick = async () => {
+  $('apply').disabled = true;
+  try {
+    const r = await fetch('/shadow/apply', {method: 'POST', body: JSON.stringify({params: report.suggested})});
+    const j = await r.json(); if (!r.ok) throw new Error(j.error);
+    $('status').textContent = 'Applied: the explorer uses these from its next run (saved in mac/explore_params.json).'; $('status').className = 'ok';
+    load();
+  } catch (e) { $('status').textContent = 'Not applied: ' + e.message; $('status').className = 'warn'; $('apply').disabled = false; }
+};
+load();
+</script>
+</body></html>

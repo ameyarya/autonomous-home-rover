@@ -29,10 +29,15 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 DRIVE, DEPTH, DASH = 'http://127.0.0.1:8769', 'http://127.0.0.1:8774', 'http://127.0.0.1:8010'
 STEP_CM = 25
 FORWARD_CM, TURN_CM, SIDE_CM = 100, 60, 110
+# tuned from your driving in shadow mode (mac/shadow.py, dashboard Shadow report -> Apply)
+_tuned = Path(__file__).with_name('explore_params.json')
+if _tuned.exists():
+    globals().update({k: v for k, v in json.loads(_tuned.read_text()).items() if k in ('FORWARD_CM', 'TURN_CM', 'SIDE_CM')})
 TURN_DEG = 15
 GUARD_CM = 30
 TURN_AROUND_DEG = 75

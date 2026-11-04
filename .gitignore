@@ -46,3 +46,5 @@ sim/apartment/apartment_assets.xml
 sim/apartment/furniture.*.json
 sim/apartment/history/
 sim/apartment/*.json.tmp
+mac/shadow/
+mac/explore_params.json

@@ -218,6 +218,9 @@ class DashboardUITest(unittest.TestCase):
         cls.link = FakeLink(f'127.0.0.1:{cls.camera.server_port}')
         cls.services = FakeServices()
         cls.dash = dashboard.Dashboard(cls.link, cls.services)
+        import shadow
+        cls.dash.shadow.folder = Path(tempfile.mkdtemp())                  # never the real recordings
+        shadow.PARAMS_FILE = Path(tempfile.mkdtemp()) / 'explore_params.json'
         cls.lan = lan_address()
         cls.server = serve(dashboard.make_handler(cls.dash, PASSWORD), '0.0.0.0')
         cls.url = f'http://127.0.0.1:{cls.server.server_port}/'
@@ -585,6 +588,18 @@ class DashboardUITest(unittest.TestCase):
             self.page.close()                    # its close-time autosave lands in tmp, not elsewhere
             dashboard.SIM_DIR = old
             shutil.rmtree(tmp)
+
+    def test_shadow_switch_and_report(self):
+        self.open()
+        expect(self.page.locator('#shadow-text')).to_have_text('Shadow')
+        self.page.check('#shadow-on')
+        expect(self.page.locator('#shadow-text')).to_contain_text('Shadowing', timeout=5000)
+        self.assertTrue(self.dash.shadow.on)
+        self.page.uncheck('#shadow-on')
+        expect(self.page.locator('#shadow-text')).to_have_text('Shadow', timeout=5000)
+        self.page.goto(self.url + 'shadow')
+        expect(self.page.locator('#samples')).to_have_text('0')
+        expect(self.page.locator('#apply')).to_be_disabled()
 
     def test_heading_card_offline(self):
         self.open()

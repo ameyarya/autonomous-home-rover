@@ -37,6 +37,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import capture  # noqa: E402
+import shadow  # noqa: E402
 from xiao_link import DEFAULT_HOST, MAX_FRAME_AGE_S, StaleFrame, XiaoLink
 
 ROOT = Path(__file__).resolve().parent
@@ -341,6 +342,7 @@ class Dashboard:
         self.observation = None
         self.planner_image = None
         self.recorder = capture.Recorder(link, DRIVE_URL, DEPTH_URL)
+        self.shadow = shadow.Shadow(link, DRIVE_URL, DEPTH_URL)
 
     def observe(self, goal):
         requested = time.monotonic()
@@ -483,6 +485,21 @@ def make_handler(dashboard, password):
                     return self.reply(503, {'error': 'drive server not running'})
             if path == '/capture':
                 return self.reply(200, dashboard.recorder.status())
+            if path == '/shadow':
+                return self.reply(200, (ROOT / 'shadow.html').read_bytes(), 'text/html; charset=utf-8')
+            if path == '/shadow/status':
+                return self.reply(200, dashboard.shadow.status())
+            if path == '/shadow/report':
+                return self.reply(200, dashboard.shadow.report())
+            if path == '/shadow/frame.jpg':
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                session, i = q.get('session', [''])[0], q.get('i', ['0'])[0]
+                if not (session.replace('-', '').isdigit() and i.isdigit()):
+                    return self.reply(400, {'error': 'bad frame'})
+                try:
+                    return self.reply(200, (dashboard.shadow.folder / session / f'f{int(i):05d}.jpg').read_bytes(), 'image/jpeg')
+                except OSError:
+                    return self.reply(404, {'error': 'no such frame'})
             if path in ('/depth/status', '/depth.jpg', '/depth/map.png'):
                 try:
                     target = {'/depth/status': '/status', '/depth/map.png': '/map.png'}.get(path, path)
@@ -509,6 +526,15 @@ def make_handler(dashboard, password):
                     return self.reply(200, dashboard.services.status())
                 except Exception as error:
                     return self.reply(500, {'error': str(error)})
+            if self.path in ('/shadow/status', '/shadow/apply'):
+                size = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(size) or b'{}') if size else {}
+                if self.path == '/shadow/status':
+                    return self.reply(200, dashboard.shadow.set(body.get('on')))
+                try:
+                    return self.reply(200, {'params': shadow.apply_params(body.get('params') or {})})
+                except (ValueError, KeyError, TypeError) as error:
+                    return self.reply(400, {'error': str(error)})
             if self.path == '/capture':
                 size = int(self.headers.get('Content-Length', 0))
                 body = json.loads(self.rfile.read(size) or b'{}') if size else {}
@@ -587,6 +613,7 @@ def main():
     password = dashboard_password()
     dash = Dashboard(link, services)
     dash.recorder.start()
+    dash.shadow.start()
     server = QuietServer((args.bind, args.port), make_handler(dash, password))
     mdns = None
     if args.bind not in ('127.0.0.1', 'localhost'):

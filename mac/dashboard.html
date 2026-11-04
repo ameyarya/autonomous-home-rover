@@ -56,7 +56,7 @@ kbd{font:11px ui-monospace,monospace;padding:1px 5px;border:1px solid var(--line
 .status{font-size:12px;color:var(--dim);line-height:1.5;min-height:18px;margin:10px 0 0}
 .status.warn{color:var(--warn)}
 .tele{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px 12px;font-size:13px;flex:1}
-.strip{flex:none;display:flex;align-items:center;gap:14px;padding:10px 14px}
+.strip{flex:none;display:flex;align-items:center;gap:10px 14px;padding:10px 14px;flex-wrap:wrap}
 .strip h2{margin:0;white-space:nowrap}
 .rec{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);white-space:nowrap}
 .rec.on b{color:#f87171}.rec.on .dot{background:#ef4444;box-shadow:0 0 8px #ef444488}
@@ -141,6 +141,8 @@ input[type=checkbox]{width:16px;height:16px}
     <div class="card strip">
       <h2>Camera</h2>
       <div class="tele" id="tele"></div>
+      <label class="rec" id="shadow" title="Shadow mode: while you drive from this page, record what the camera saw, what you did and what the explorer would have done; the report tunes the explorer to drive like you"><input type="checkbox" id="shadow-on"><span class="dot"></span><b id="shadow-text">Shadow</b></label>
+      <a class="linkbtn" href="/shadow" style="padding:4px 10px">Report</a>
       <label class="rec" id="rec" title="While the rover drives, save 2 photos a second with position, heading and depth to mac/captures/ (for rebuilding the apartment later)"><input type="checkbox" id="rec-on"><span class="dot"></span><b id="rec-text">Record</b></label>
       <details id="settings"><summary>Camera settings</summary>
         <div class="form">
@@ -323,6 +325,14 @@ async function imuPoll(){
 imuPoll();
 $('imu-zero').onclick=()=>postJSON('/drive/imu/zero').catch(()=>{});
 $('imu-hold').onchange=e=>postJSON('/drive/imu',{hold:e.target.checked}).catch(()=>{});
+
+// Shadow mode.
+async function shadowPoll(){
+  try{const r=await getJSON('/shadow/status');$('shadow-on').checked=r.on;$('shadow').classList.toggle('on',r.on);
+    $('shadow-text').textContent=r.on?`Shadowing · ${r.samples}`:r.why_stopped?`Shadow (stopped: ${r.why_stopped})`:'Shadow'}catch(e){}
+  setTimeout(shadowPoll,1500)}
+shadowPoll();
+$('shadow-on').onchange=e=>postJSON('/shadow/status',{on:e.target.checked}).then(shadowPoll).catch(()=>{});
 
 // Photo capture.
 async function recPoll(){
