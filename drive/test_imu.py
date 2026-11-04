@@ -66,6 +66,13 @@ class SteerKeyTest(unittest.TestCase):
         # 5 degrees off but already turning left at 16 deg/s: predicted error is 1 deg, go straight
         self.assertEqual(imu.steer_key(1, 5, rate_dps=16), 'W')
 
+    def test_small_errors_steer_in_short_taps(self):
+        hold = imu.HeadingHold(1)
+        keys = [hold.key(4.0, 0.0) for _ in range(10)]       # half of FULL_DEG: every other step
+        self.assertEqual(keys.count('A'), 5)
+        hold = imu.HeadingHold(1)
+        self.assertEqual([hold.key(-20.0, 0.0) for _ in range(3)], ['D', 'D', 'D'])
+
     def test_wrap(self):
         self.assertEqual(imu.wrap(190), -170)
         self.assertEqual(imu.wrap(-190), 170)
@@ -82,10 +89,10 @@ class GyroMoveTest(unittest.TestCase):
         self.s.arm(True)
 
     def test_forward_holds_heading_against_drift(self):
-        out = self.s.move('forward', 40)                   # 0.8 s
+        out = self.s.move('forward', 100)                  # 2 s; unheld it would drift 8 deg
         self.assertTrue(out['gyro'])
         self.assertIn('A', self.tx.calls)                  # corrected the rightward drift
-        self.assertLess(abs(self.g.y), 4.0)
+        self.assertLess(abs(self.g.y), 5.0)
         self.assertEqual(self.tx.calls[-1], 'X')
 
     def test_without_hold_it_just_drives(self):
@@ -116,6 +123,18 @@ class GyroMoveTest(unittest.TestCase):
         out = self.s.move('left', 10)
         self.assertEqual(out['ended'], 'timeout')
         self.assertEqual(self.tx.calls[-1], 'X')
+
+    def test_turn_stops_when_stuck(self):
+        self.g.drift, self.g.turn_dps = 0, 0
+        self.s.motion['turn_radius_cm'] = 120                # planned ~4 s for 90 deg
+        out = self.s.move('left', 90)
+        self.assertEqual(out['ended'], 'stuck: heading not changing')
+        self.assertLess(out['ms'], 2000)
+        self.assertEqual(self.tx.calls[-1], 'X')
+
+    def test_straight_move_ends_straight(self):
+        self.s.move('forward', 40)
+        self.assertEqual(self.tx.calls[-2], 'W')
 
     def test_stick_lost_stops(self):
         self.g.alive = True
