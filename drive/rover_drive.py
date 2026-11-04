@@ -108,8 +108,19 @@ def find_port():
 
 class Transmitter:
     def __init__(self, port=None):
+        self.fixed_port = port
+        self.ser = None
+        self.reconnects = 0
+        self._connect()
+
+    def _connect(self):
+        if self.ser is not None:
+            try:
+                self.ser.close()
+            except Exception:
+                pass
         self.ser = serial.Serial()
-        self.ser.port = port or find_port()
+        self.ser.port = self.fixed_port or find_port()
         self.ser.baudrate = 115200
         self.ser.timeout = 0.1
         self.ser.dtr = False
@@ -137,9 +148,20 @@ class Transmitter:
         if b'WIRELESS HOLD CONTROL READY' not in out or b'Traceback' in out:
             raise RuntimeError('Transmitter setup failed: ' + out.decode(errors='replace')[-300:])
 
-    def repl(self, line, timeout=0.5):
-        self.ser.write(line.encode() + b'\r\n')
-        out = self._read_until_prompt(timeout)
+    def repl(self, line, timeout=0.5, retry=True):
+        try:
+            self.ser.write(line.encode() + b'\r\n')
+            out = self._read_until_prompt(timeout)
+        except (serial.SerialException, OSError):
+            out = None
+        # No echo of our line: the board restarted (power switch, reset) or was re-plugged and is
+        # running its own program again. Set it up again and retry once.
+        if out is None or line.encode()[:24] not in out:
+            if not retry:
+                raise RuntimeError('transmitter board not responding' + (f': {out.decode(errors="replace")[-120:]}' if out else ''))
+            self.reconnects += 1
+            self._connect()
+            return self.repl(line, timeout, retry=False)
         if b'Traceback' in out or not out.endswith(b'>>> '):
             raise RuntimeError(out.decode(errors='replace'))
         return out

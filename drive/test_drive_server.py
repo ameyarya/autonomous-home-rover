@@ -61,6 +61,22 @@ class DriveStateTest(unittest.TestCase):
         self.assertEqual(sent, ["wire('W')", "wire('W');wire('A')", "wire('W');wire('D')", "wire('S')",
                                 "wire('A')", "wire('D')", "wire('S');wire('A')", "wire('S');wire('D')"])
 
+    def test_transmitter_reconnects_when_the_board_restarted(self):
+        import rover_drive
+        tx = rover_drive.Transmitter.__new__(rover_drive.Transmitter)
+        tx.reconnects = 0
+        replies = [b'', b"wire('X')\r\n>>> "]                   # silent (rebooted), then fine
+        class Port:
+            def write(self, data): pass
+        tx.ser = Port()
+        tx._read_until_prompt = lambda timeout: replies.pop(0)
+        tx._connect = lambda: None
+        tx.repl("wire('X')")
+        self.assertEqual(tx.reconnects, 1)
+        replies[:] = [b'', b'']
+        with self.assertRaises(RuntimeError):
+            tx.repl("wire('X')")
+
     def test_pulse_is_capped(self):
         self.s.arm(True)
         result = self.s.pulse('S', 5000)
