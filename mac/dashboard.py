@@ -36,6 +36,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import capture  # noqa: E402
 from xiao_link import DEFAULT_HOST, MAX_FRAME_AGE_S, StaleFrame, XiaoLink
 
 ROOT = Path(__file__).resolve().parent
@@ -256,6 +257,7 @@ class Dashboard:
         self.lock = threading.Lock()
         self.observation = None
         self.planner_image = None
+        self.recorder = capture.Recorder(link, DRIVE_URL, DEPTH_URL)
 
     def observe(self, goal):
         requested = time.monotonic()
@@ -382,6 +384,8 @@ def make_handler(dashboard, password):
                         return self.reply(200, response.read())
                 except OSError:
                     return self.reply(503, {'error': 'drive server not running'})
+            if path == '/capture':
+                return self.reply(200, dashboard.recorder.status())
             if path in ('/depth/status', '/depth.jpg'):
                 try:
                     with urllib.request.urlopen(DEPTH_URL + ('/status' if path == '/depth/status' else path),
@@ -407,6 +411,10 @@ def make_handler(dashboard, password):
                     return self.reply(200, dashboard.services.status())
                 except Exception as error:
                     return self.reply(500, {'error': str(error)})
+            if self.path == '/capture':
+                size = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(size) or b'{}') if size else {}
+                return self.reply(200, dashboard.recorder.set(body.get('on')))
             if self.path == '/restarts/ack':
                 dashboard.restarts.acked = dashboard.restarts.total
                 return self.reply(200, {'acked': dashboard.restarts.acked})
@@ -468,7 +476,9 @@ def main():
     link = XiaoLink(args.host, max_frame_age_s=args.max_frame_age).start()
     services = Services(args.host)
     password = dashboard_password()
-    server = QuietServer((args.bind, args.port), make_handler(Dashboard(link, services), password))
+    dash = Dashboard(link, services)
+    dash.recorder.start()
+    server = QuietServer((args.bind, args.port), make_handler(dash, password))
     mdns = None
     if args.bind not in ('127.0.0.1', 'localhost'):
         ip = lan_ip(args.host)

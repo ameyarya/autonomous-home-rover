@@ -58,6 +58,8 @@ kbd{font:11px ui-monospace,monospace;padding:1px 5px;border:1px solid var(--line
 .tele{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px 12px;font-size:13px;flex:1}
 .strip{flex:none;display:flex;align-items:center;gap:14px;padding:10px 14px}
 .strip h2{margin:0;white-space:nowrap}
+.rec{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);white-space:nowrap}
+.rec.on b{color:#f87171}.rec.on .dot{background:#ef4444;box-shadow:0 0 8px #ef444488}
 .strip details{border:0;margin:0;padding:0;position:relative}
 .strip details[open] .form{position:absolute;right:0;bottom:36px;z-index:5;width:420px;background:var(--panel2);border:1px solid var(--line2);border-radius:14px;padding:14px;box-shadow:0 10px 40px #0008}
 .strip details[open] #cfg-status{position:absolute;right:0;bottom:-6px;width:420px}
@@ -138,6 +140,7 @@ input[type=checkbox]{width:16px;height:16px}
     <div class="card strip">
       <h2>Camera</h2>
       <div class="tele" id="tele"></div>
+      <label class="rec" id="rec" title="While the rover drives, save 2 photos a second with position, heading and depth to mac/captures/ (for rebuilding the apartment later)"><input type="checkbox" id="rec-on"><span class="dot"></span><b id="rec-text">Record</b></label>
       <details id="settings"><summary>Camera settings</summary>
         <div class="form">
           <label>Resolution<select data-k="framesize"><option>qvga</option><option>cif</option><option>hvga</option><option>vga</option><option>svga</option><option>xga</option><option>hd</option></select></label>
@@ -316,6 +319,14 @@ async function imuPoll(){
 imuPoll();
 $('imu-zero').onclick=()=>postJSON('/drive/imu/zero').catch(()=>{});
 $('imu-hold').onchange=e=>postJSON('/drive/imu',{hold:e.target.checked}).catch(()=>{});
+
+// Photo capture.
+async function recPoll(){
+  try{const r=await getJSON('/capture');$('rec-on').checked=r.on;$('rec').classList.toggle('on',r.on);
+    $('rec-text').textContent=r.on?`Recording · ${r.saved}`:r.why_stopped?`Record (stopped: ${r.why_stopped})`:r.saved?`Record · ${r.saved} saved`:'Record'}catch(e){}
+  setTimeout(recPoll,1500)}
+recPoll();
+$('rec-on').onchange=e=>postJSON('/capture',{on:e.target.checked}).then(recPoll).catch(()=>{});
 
 // Camera depth / obstacles.
 let depthOn=false;

@@ -32,3 +32,4 @@ mac/.vision-venv/
 mac/gallery/
 mac/marker.json
 mac/depth-service.log
+mac/captures/

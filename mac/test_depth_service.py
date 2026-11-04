@@ -51,6 +51,13 @@ class AnalyseTest(unittest.TestCase):
         reading, _, _ = ds.analyse(disp)
         self.assertFalse(reading['ok'])
 
+    def test_smoothing_ignores_a_single_glitch(self):
+        history = [{'left': 145, 'centre': 300, 'right': 95}] * 4 + [{'left': 24, 'centre': 300, 'right': 95}]
+        out = ds.smooth(history)
+        self.assertEqual(out['left'], {'cm': 145, 'state': 'clear'})
+        out = ds.smooth([{'left': 20, 'centre': 300, 'right': 95}] * 3 + [{'left': 145, 'centre': 300, 'right': 95}] * 2)
+        self.assertEqual(out['left']['state'], 'blocked')   # a real obstacle shows within 3 frames
+
     def test_overlay_shape(self):
         disp = floor_scene()
         reading, mask, free = ds.analyse(disp)

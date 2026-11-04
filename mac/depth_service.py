@@ -38,6 +38,7 @@ SECTORS = ('left', 'centre', 'right')
 BOTTOM_CM = 20.0         # floor distance at the bottom edge of the picture (to measure)
 MAX_CM = 300.0           # "clear to the horizon" is reported as this
 BLOCKED_CM, NEAR_CM = 35.0, 80.0
+SMOOTH_N = 5             # sectors report the median of this many frames (single-frame glitches seen)
 
 
 def fit_floor(disp):
@@ -73,9 +74,18 @@ def analyse(disp, bottom_cm=BOTTOM_CM):
     sectors = {}
     for name, part in zip(SECTORS, np.array_split(free_cm, 3)):
         cm = float(np.percentile(part, 10))                     # the near end of the sector
-        sectors[name] = {'cm': round(cm), 'state': 'blocked' if cm < BLOCKED_CM else 'near' if cm < NEAR_CM
-                         else 'clear'}
+        sectors[name] = {'cm': round(cm), 'state': state_for(cm)}
     return {'ok': True, 'horizon_row': horizon, 'bottom_cm': bottom_cm, 'sectors': sectors}, mask, free_cm
+
+
+def state_for(cm):
+    return 'blocked' if cm < BLOCKED_CM else 'near' if cm < NEAR_CM else 'clear'
+
+
+def smooth(history):
+    """Median per sector over recent readings (each {'left': cm, ...})."""
+    return {name: {'cm': round(float(np.median([h[name] for h in history]))),
+                   'state': state_for(float(np.median([h[name] for h in history])))} for name in SECTORS}
 
 
 def overlay(frame, disp, mask, free_cm, horizon, bottom_cm=BOTTOM_CM):
@@ -120,7 +130,7 @@ class DepthService:
     def loop(self):
         import cv2
         import torch
-        last_seq, times = None, []
+        last_seq, times, history = None, [], []
         while True:
             try:
                 jpeg, seq, age = self.frame()
@@ -133,6 +143,12 @@ class DepthService:
                 with torch.no_grad():
                     disp = self.model.infer_image(img, self.size)
                 reading, mask, free = analyse(disp, self.bottom_cm)
+                if reading['ok']:
+                    history = (history + [{k: v['cm'] for k, v in reading['sectors'].items()}])[-SMOOTH_N:]
+                    reading['raw'] = reading['sectors']
+                    reading['sectors'] = smooth(history)
+                else:
+                    history = []
                 self.ms = round((time.monotonic() - t) * 1000)
                 out = overlay(img, disp, mask, free, reading.get('horizon_row', 0), self.bottom_cm)
                 self.image = cv2.imencode('.jpg', out, [cv2.IMWRITE_JPEG_QUALITY, 70])[1].tobytes()

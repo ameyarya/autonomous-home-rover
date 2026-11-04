@@ -506,6 +506,16 @@ class DashboardUITest(unittest.TestCase):
             box = self.page.locator(card).bounding_box()
             self.assertLessEqual(box['y'] + box['height'], 860, card)
 
+    def test_record_switch(self):
+        self.open()
+        expect(self.page.locator('#rec-text')).to_have_text('Record')
+        self.page.check('#rec-on')
+        expect(self.page.locator('#rec-text')).to_contain_text('Recording', timeout=5000)
+        self.assertTrue(self.dash.recorder.on)
+        self.page.uncheck('#rec-on')
+        expect(self.page.locator('#rec-text')).to_have_text('Record', timeout=5000)
+        self.assertFalse(self.dash.recorder.on)
+
     def test_heading_card_offline(self):
         self.open()
         expect(self.page.locator('#imu-info')).to_contain_text('offline')
