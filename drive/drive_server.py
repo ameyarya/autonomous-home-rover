@@ -14,6 +14,8 @@ Run: python3 drive/drive_server.py        (HTTP on 127.0.0.1:8769)
   POST /stop                       abort any pulse or hold, disarm, stop with ACK
   POST /move   {"kind": "forward"|"back", "amount": cm}  or  {"kind": "left"|"right", "amount": deg}
                                    measured move (timed from drive/motion.json; refused unless armed);
+                                   "heading": deg (forward/back): hold this gyro heading instead of the
+                                   heading the move starts at (straight runs over several moves)
                                    {"kind": "reverse_left"|"reverse_right", "amount": deg} backs up turning the
                                    heading that way (for multi-point turns);
                                    {"kind": "test_forward"|"test_reverse"|"test_arc"} = the timed run for measuring
@@ -119,13 +121,14 @@ class DriveState:
         base = self.imu.status() if self.imu else {'online': False, 'error': 'no heading stick configured'}
         return dict(base, hold=self.heading_hold)
 
-    def _gyro_move(self, kind, amount, key, seconds, g):
+    def _gyro_move(self, kind, amount, key, seconds, g, target=None):
         """Closed loop on the stick's heading. Returns (driven s, how it ended)."""
         throttle, _ = motion.KEYS[key]
         turning = kind in ('left', 'right', 'reverse_left', 'reverse_right')
         sign = 1 if kind in ('left', 'reverse_left') else -1
         limit = seconds * TURN_TIMEOUT if turning else seconds
         start = prev_yaw = g.yaw()
+        hold_to = start if target is None else float(target)   # straight moves: this heading (absolute)
         started = prev_t = time.monotonic()
         sent, ended = key, 'done'
         moved_at, moved_yaw = started, start         # stall check for turns
@@ -152,7 +155,7 @@ class DriveState:
                     break
                 sent = key
             else:
-                sent = hold.key(start - yaw, rate, dt)
+                sent = hold.key(hold_to - yaw, rate, dt)
             if now - started >= limit:
                 ended = 'timeout' if turning else 'done'
                 break
@@ -162,7 +165,7 @@ class DriveState:
         self.gyro_end = (sent, prev_t, prev_yaw, g)
         return time.monotonic() - started, ended
 
-    def move(self, kind, amount=None):
+    def move(self, kind, amount=None, heading=None):
         """A measured move: drive `key` for the planned time, then stop with ACK."""
         if not self.armed:
             raise PermissionError('not armed')
@@ -186,7 +189,8 @@ class DriveState:
             self.gyro_end = None
             try:
                 if g:
-                    driven, ended = self._gyro_move(kind, amount, key, seconds, g)
+                    driven, ended = self._gyro_move(kind, amount, key, seconds, g,
+                                                    heading if kind in ('forward', 'back') else None)
                 else:
                     while not self.abort.is_set():
                         self.tx.wire(key)
@@ -401,7 +405,7 @@ def make_handler(state):
                     return self.reply(200, state.pulse(str(b.get('key', '')).upper(), b.get('ms', 0)))
                 if self.path == '/move':
                     b = self.body()
-                    return self.reply(200, state.move(str(b.get('kind', '')), b.get('amount')))
+                    return self.reply(200, state.move(str(b.get('kind', '')), b.get('amount'), b.get('heading')))
                 if self.path == '/motion':
                     return self.reply(200, state.save_motion(self.body().get('values') or {}))
                 if self.path == '/imu':

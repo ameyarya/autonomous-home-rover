@@ -121,6 +121,12 @@ class GyroMoveTest(unittest.TestCase):
         self.assertLess(abs(self.g.y), 5.0)
         self.assertEqual(self.tx.calls[-1], 'X')
 
+    def test_straight_move_can_hold_an_absolute_heading(self):
+        self.g.drift = 0.0
+        self.g.y = -6.0                                    # already 6 degrees right of where it should be
+        self.s.move('forward', 100, heading=0.0)
+        self.assertLess(abs(self.g.y), 2.5)                # steered back to 0, not held at -6
+
     def test_without_hold_it_just_drives(self):
         self.s.heading_hold = False
         out = self.s.move('forward', 20)
