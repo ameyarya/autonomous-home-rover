@@ -143,13 +143,26 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 
 ## Next actions
 
-1. Print and assemble the OpenFrame Two 4WD chassis (printing started 2026-10-14: first tire in TPU). Pull the MakerWorld electronics list first so missing fasteners, bearings, or drive components are ordered before assembly day.
-2. Obtain and inspect the MakerWorld electronics list and wiring instructions.
-3. Confirm the autonomous command interface while preserving the original drive electronics.
-4. Define the first patrol route. The camera half of the home-computer interface is done (`mac/xiao_link.py`, 2026-10-14: frames ~55 ms old p50 at ~27 fps, stale gate 500 ms); the drive half waits on the integration gate.
-5. XIAO firmware complete for Phase 1 bench work 2026-10-14 (see `firmware/xiao-cam/README.md`): OTA, runtime camera settings, health telemetry, mic level. Next: printed housing for XIAO + battery pack, then set `vflip`/`hmirror` once mounted.
-6. Build the drive-and-see prototype before committing to a navigation stack.
-7. Phase 1 done-criterion (restated 2026-10-14): dog companion. Parked and watching; follows when the dog moves (keeps him centred at a 30–55%-of-frame standoff, backs off if he closes fast); parks once he is still for 5 min and the vision model says he is asleep; if he leaves view, scans for up to 60 s then parks; logs a timeline of what he does. Camera side done and tested. Watcher → drive connected 2026-10-14 (`drive/drive_server.py` with dashboard arm lease + STOP, `mac/drive_client.py` move → stop → observe); unit-tested, not yet run on the chassis. Car-steering update 2026-10-16: turns are forward arcs (back up straight first if the dog is too close), and searching rotates roughly in place by alternating a forward arc and a straight reverse toward the side he was last seen, since the receiver accepts only W/A/S/D/X (no reverse with steering). Dashboard rebuilt 2026-10-16 along Mini-T lines (`mac/dashboard.py` + `dashboard.html`): one command, services started from the header, hold-to-drive manual control (new drive-server `/hold`), dog timeline, camera health, XIAO restart alerts for power drops. Simulation added 2026-10-16 (`sim/`, MuJoCo, closed-loop runs of the real behaviour + drive client; [results](sim/RESULTS.md)): never drove into the dog in 36 runs; found that the rover got wedged on door frames/furniture and kept pushing and that the 60 s search covered only ~270°; both fixed 2026-10-18 (blocked-move detection from the camera view against its own noise, back out / stop when stuck; longer scan arcs and a 75 s search), blocked pulses 281 -> 23 in the simulator. Served on the home network at http://rover.local:8010/ (mDNS; password login for other devices, none on the Mac; port 80 is used by another local app).
+Status 2026-11-03: chassis assembled; manual driving works from the dashboard (throttle and
+steering decoupled) and from the Mini-T handheld remote; live calibration page (centre 130°,
+range 45°, speed 900, saved on the rover); camera back on rover firmware (OTA), VGA q16 ≈ 15 fps /
+~130 ms over this Wi-Fi. Done from the old list: chassis printed and assembled, electronics list
+and bearings, command interface (signed app on the stock receiver), XIAO housing (cam-dock),
+drive-and-see prototype.
+
+1. **First real dog-follow run (Phase 1 done-criterion).** Floor test at low speed with the dog:
+   start the dog watcher, arm, watch it follow / back off / search / park. The dashboard redesign
+   dropped the watcher pane, so first add a compact "Follow dog" on/off and its current state to
+   the new dashboard (or watch :8768 directly).
+2. **Measure the real rover:** speed at the calibrated power, turn radius at 45° range, stop
+   latency; feed them into `sim/` `RoverParams` and rerun the scenarios.
+3. **Check stuck detection on the real camera:** watch the `blocked` timeline events; tune the
+   `ViewChange` factors (simulator-tuned 2.6× / 2.4× noise) if moves are misread.
+4. **Stop tests still owed:** remote/transmitter USB unplug and power-off mid-drive (the receiver's
+   500 ms watchdog should stop it).
+5. Fine-tune steering centre/range on the Calibrate page once driving on the floor.
+6. Then Phase 2 study items below (encoders/IMU, ranging, LiDAR, Pi, Tailscale, WaveSight, collar
+   tracker); no purchases until Phase 1 is done.
 
 ## Camera board shortlist
 
