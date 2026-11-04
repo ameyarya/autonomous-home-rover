@@ -88,7 +88,7 @@ input[type=checkbox]{width:16px;height:16px}
 .sectors div{border:1px solid var(--line2);border-radius:12px;padding:8px;text-align:center;font-size:11px;color:var(--dim2)}
 .sectors strong{display:block;font-size:18px;font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
 .sectors .clear{border-color:#16a34a}.sectors .near{border-color:var(--warn)}.sectors .blocked{border-color:#ef4444;background:#ef444422}
-#depth-img{display:block;width:100%;border-radius:10px;margin-top:10px}
+#depth-img{display:block;width:100%;max-height:min(30vh,240px);object-fit:contain;background:#05070a;border-radius:10px;margin-top:10px}
 @media(max-width:640px){.wrap{padding:16px}.tele{grid-template-columns:1fr 1fr}.pad{grid-template-columns:repeat(3,64px)}}
 </style></head><body><div class="wrap">
 <header>
@@ -164,6 +164,7 @@ input[type=checkbox]{width:16px;height:16px}
       </div>
       <div class="hrow"><label>View <select id="depth-view"><option value="">none</option><option value="depth">depth</option><option value="map" selected>map</option></select></label><span id="depth-rate" class="hint" style="margin:0"></span></div>
       <img id="depth-img" alt="Depth view (free floor green, obstacles red) or the floor map (free blue-grey, obstacles red, rover orange)">
+      <p class="hint" id="view-empty" hidden></p>
       <p class="hint" id="map-info"></p>
       <p class="status" id="depth-status">Depth service off</p>
     </div>
@@ -338,14 +339,25 @@ async function depthPoll(){
     $('depth-rate').textContent=s.fps?`${s.fps} fps · ${s.model_ms} ms`:'';
     $('depth-status').className='status'+(s.error||!s.ok?' warn':'');
     $('depth-status').textContent=!s.ready?'Loading the depth model…':s.error?s.error:!s.ok?(s.why||''):'Running'+(s.frame_age_ms!=null?` · frame ${s.frame_age_ms} ms old`:'');
-    const view=$('depth-view').value;$('depth-img').hidden=!view;
-    if(view)$('depth-img').src=(view==='map'?'/depth/map.png':'/depth.jpg')+'?t='+Date.now();
+    showView();
     $('map-info').textContent=s.map?`Map: ${s.map.views} views · ${s.map.free_m2} m² free floor seen`:''}
   catch(e){depthOn=false;$('depth-svc').textContent='Start';$('depth-status').className='status';$('depth-status').textContent='Depth service off';
     for(const n of ['left','centre','right']){$('sec-'+n).className='';$('sec-'+n).querySelector('strong').textContent='—'}}
   setTimeout(depthPoll,depthOn?250:2000)}
 depthPoll();
-$('depth-view').onchange=e=>{$('depth-img').hidden=!e.target.value};
+// Depth / map picture: load off-screen and swap in only when it arrived, so nothing flickers or
+// shows a broken image; one request at a time.
+let viewLoading=false;
+function showView(){
+  const view=$('depth-view').value;
+  if(!view){$('depth-img').hidden=true;$('view-empty').hidden=true;return}
+  if(viewLoading)return;viewLoading=true;
+  const img=new Image();
+  img.onload=()=>{viewLoading=false;$('depth-img').src=img.src;$('depth-img').hidden=false;$('view-empty').hidden=true};
+  img.onerror=()=>{viewLoading=false;$('depth-img').hidden=true;$('view-empty').hidden=false;
+    $('view-empty').textContent=view==='map'?'No map yet: it fills in while the rover stands still with the heading stick online.':'No depth picture yet.'};
+  img.src=(view==='map'?'/depth/map.png':'/depth.jpg')+'?t='+Date.now()}
+$('depth-view').onchange=()=>{viewLoading=false;showView()};
 $('depth-svc').onclick=async e=>{e.target.disabled=true;try{await postJSON(`/services/depth/${depthOn?'stop':'start'}`);$('depth-status').textContent=depthOn?'Stopping…':'Starting (the model takes a few seconds)…'}catch(err){$('depth-status').textContent=err.message}e.target.disabled=false};
 
 // Camera settings.
