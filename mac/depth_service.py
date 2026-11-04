@@ -22,7 +22,8 @@ read as "far" and the rover drove into them, 2026-11-04), so it blocks the same 
 first such thing, and the camera's fixed geometry turns that row into a distance:
 D = K / (row - HORIZON), both scaled to the image height. Measured 2026-11-04 from the run into the
 blinds (the floor's end in 18 frames against the odometer, rms 3.9 px): horizon at 0.4265 of the
-height, K = 3991 px*cm at 480 rows, so the bottom edge of the picture is ~15 cm ahead. (The first
+height, K = 3991 px*cm at 480 rows; re-measured after the rebuild with the rover facing a door at
+1.0 m and 2.0 m: 0.270 / 5340. (The first
 version took the horizon from the farthest thing in view; facing the blinds that put it at the
 blinds' foot, so the floor read "clear to the horizon" up to contact.) Re-measure after moving the
 camera. Left / centre / right report their nearest free distance.
@@ -49,8 +50,9 @@ FLOOR_ROWS = 0.15        # bottom share of the picture assumed to be floor, for 
 TOLERANCE = 0.06         # nearer than the floor line by this share of the visible floor's range = obstacle
 FAR_TOLERANCE = 0.12     # farther than the floor line by this share (below the horizon) = not floor
 FAR_MARGIN = 0.05        # ...ignoring this share of the floor rows just under the horizon (noisy)
-HORIZON_FRAC = 0.4265    # camera geometry (see above)
-K_PX_CM = 3991.0         # at 480 rows
+HORIZON_FRAC = 0.270     # camera geometry (see above), re-measured after the rebuild 2026-11-04: facing a door
+K_PX_CM = 5340.0         # at 1.0 m and 2.0 m, this detector's floor end sat at rows 183 and 156 of 480
+                         # (before the rebuild: 0.4265 / 3991; the camera now tilts up ~4° more)
 MIN_RUN = 4              # obstacle rows needed in a column (ignores specks)
 SECTORS = ('left', 'centre', 'right')
 MAX_CM = 300.0           # "clear to the horizon" is reported as this

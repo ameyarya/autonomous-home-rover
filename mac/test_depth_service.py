@@ -53,10 +53,11 @@ class AnalyseTest(unittest.TestCase):
         self.assertEqual(reading['sectors']['centre']['state'], 'blocked')
         self.assertEqual(reading['sectors']['left']['state'], 'clear')
 
-    def test_geometry_matches_the_blinds_run(self):
-        # the fit from the run into the blinds: floor end at row 288.7 of 480 was 48 cm away
-        self.assertAlmostEqual(ds.floor_cm(288.7, 480, 0.4265 * 480), 48, delta=2)
-        self.assertAlmostEqual(ds.floor_cm(479, 480, 0.4265 * 480), 14.6, delta=0.5)   # bottom edge
+    def test_geometry_matches_the_door_check(self):
+        # after the rebuild, facing a door: this detector's floor end at rows 183 / 156 of 480 = 1.0 / 2.0 m
+        hz = ds.HORIZON_FRAC * 480
+        self.assertAlmostEqual(ds.floor_cm(183, 480, hz), 100, delta=6)
+        self.assertAlmostEqual(ds.floor_cm(156, 480, hz), 200, delta=12)
 
     def test_no_floor_at_the_bottom(self):
         disp = np.ones((240, 320)) * 5.0          # a wall right in front: flat, no floor gradient
