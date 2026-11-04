@@ -72,7 +72,7 @@ class Recorder:
                 'odometer': drive.get('odometer'), 'imu': drive.get('imu'), 'last': drive.get('last')}
         try:
             depth = read_json(self.depth_url + '/status', timeout=0.3)
-            meta['depth'] = {k: depth.get(k) for k in ('sectors', 'horizon_row', 'bottom_cm')} if depth.get('ok') else None
+            meta['depth'] = {k: depth.get(k) for k in ('sectors', 'raw', 'horizon_row')} if depth.get('ok') else None
         except (OSError, ValueError):
             meta['depth'] = None
         now = datetime.datetime.now()

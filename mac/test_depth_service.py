@@ -15,9 +15,9 @@ def floor_scene(h=240, w=320, horizon=100):
 
 class AnalyseTest(unittest.TestCase):
     def test_clear_floor(self):
-        reading, mask, free = ds.analyse(floor_scene(), 20.0)
+        reading, mask, free = ds.analyse(floor_scene())
         self.assertTrue(reading['ok'])
-        self.assertAlmostEqual(reading['horizon_row'], 100, delta=3)
+        self.assertEqual(reading['horizon_row'], int(ds.HORIZON_FRAC * 240))
         self.assertEqual(reading['sectors']['centre']['cm'], ds.MAX_CM)
         self.assertEqual({s['state'] for s in reading['sectors'].values()}, {'clear'})
         self.assertFalse(mask.any())
@@ -25,30 +25,42 @@ class AnalyseTest(unittest.TestCase):
     def test_box_in_the_centre_blocks_centre_only(self):
         disp = floor_scene()
         disp[120:200, 130:190] = 102.0          # standing up, base on the floor at row 200: ~28 cm
-        reading, mask, _ = ds.analyse(disp, 20.0)
+        reading, mask, _ = ds.analyse(disp)
         self.assertEqual(reading['sectors']['centre']['state'], 'blocked')
         self.assertEqual(reading['sectors']['left']['state'], 'clear')
         self.assertEqual(reading['sectors']['right']['state'], 'clear')
         self.assertTrue(mask[150, 160])
-        self.assertAlmostEqual(reading['sectors']['centre']['cm'], 20 * 139 / 100, delta=4)
+        self.assertAlmostEqual(reading['sectors']['centre']['cm'], ds.floor_cm(200, 240, 102), delta=4)
 
     def test_far_box_is_near_not_blocked(self):
         disp = floor_scene()
         disp[105:150, 220:300] = 52.0            # base at row 150: ~56 cm
-        reading, _, _ = ds.analyse(disp, 20.0)
+        reading, _, _ = ds.analyse(disp)
         self.assertEqual(reading['sectors']['right']['state'], 'near')
         self.assertEqual(reading['sectors']['left']['state'], 'clear')
 
     def test_scale_and_shift_do_not_matter(self):
         disp = floor_scene()
         disp[120:200, 130:190] = 102.0
-        a, _, _ = ds.analyse(disp, 20.0)
-        b, _, _ = ds.analyse(disp * 0.01 + 7.0, 20.0)   # the model's units are arbitrary
+        a, _, _ = ds.analyse(disp)
+        b, _, _ = ds.analyse(disp * 0.01 + 7.0)   # the model's units are arbitrary
         self.assertEqual(a['sectors'], b['sectors'])
+
+    def test_blinds_that_look_far_still_block(self):
+        disp = floor_scene()
+        disp[110:195, 100:220] = 2.0             # reads as far as the walls, but below the horizon
+        reading, mask, _ = ds.analyse(disp)
+        self.assertEqual(reading['sectors']['centre']['state'], 'blocked')
+        self.assertEqual(reading['sectors']['left']['state'], 'clear')
+
+    def test_geometry_matches_the_blinds_run(self):
+        # the fit from the run into the blinds: floor end at row 288.7 of 480 was 48 cm away
+        self.assertAlmostEqual(ds.floor_cm(288.7, 480, 0.4265 * 480), 48, delta=2)
+        self.assertAlmostEqual(ds.floor_cm(479, 480, 0.4265 * 480), 14.6, delta=0.5)   # bottom edge
 
     def test_no_floor_at_the_bottom(self):
         disp = np.ones((240, 320)) * 5.0          # a wall right in front: flat, no floor gradient
-        reading, _, _ = ds.analyse(disp, 20.0)
+        reading, _, _ = ds.analyse(disp)
         self.assertFalse(reading['ok'])
 
     def test_smoothing_ignores_a_single_glitch(self):
@@ -60,7 +72,7 @@ class AnalyseTest(unittest.TestCase):
 
     def test_overlay_shape(self):
         disp = floor_scene()
-        reading, mask, free = ds.analyse(disp, 20.0)
+        reading, mask, free = ds.analyse(disp)
         frame = np.zeros((240, 320, 3), np.uint8)
         self.assertEqual(ds.overlay(frame, disp, mask, free, reading['horizon_row']).shape, (240, 640, 3))
 

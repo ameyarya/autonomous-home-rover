@@ -15,12 +15,17 @@ MAP_EVERY_S, and only with the heading stick online.
 
 The model gives relative inverse depth with an unknown scale and offset, so this doesn't trust
 its numbers directly. It assumes the bottom of the picture is floor and fits how floor depth changes
-with height in the image (a flat floor is a straight line in inverse depth); the horizon is where
-that line reaches the farthest things in view. Anything nearer than the floor would be at its
-height is something standing on the floor. Each column's free floor runs from the bottom up to the
-first such thing, and floor geometry turns that row into a distance: D = BOTTOM_CM * (bottom row -
-horizon) / (row - horizon), BOTTOM_CM being how far ahead the bottom edge of the picture meets the
-floor (measure it once; --bottom-cm). Left / centre / right report their nearest free distance.
+with height in the image (a flat floor is a straight line in inverse depth). Anything nearer than
+the floor would be at its height is something standing on the floor; anything much farther than the floor would be (below
+the horizon) isn't floor either: a window, glass, a mirror or bright fabric (the balcony blinds
+read as "far" and the rover drove into them, 2026-11-04), so it blocks the same way. Each column's free floor runs from the bottom up to the
+first such thing, and the camera's fixed geometry turns that row into a distance:
+D = K / (row - HORIZON), both scaled to the image height. Measured 2026-11-04 from the run into the
+blinds (the floor's end in 18 frames against the odometer, rms 3.9 px): horizon at 0.4265 of the
+height, K = 3991 px*cm at 480 rows, so the bottom edge of the picture is ~15 cm ahead. (The first
+version took the horizon from the farthest thing in view; facing the blinds that put it at the
+blinds' foot, so the floor read "clear to the horizon" up to contact.) Re-measure after moving the
+camera. Left / centre / right report their nearest free distance.
 
 Weights and model code live in mac/weights/ (gitignored): depth_anything_v2_vits.pth and the
 model package from github.com/DepthAnything/Depth-Anything-V2 (code only).
@@ -42,10 +47,12 @@ ROOT = Path(__file__).resolve().parent
 WEIGHTS = ROOT / 'weights'
 FLOOR_ROWS = 0.15        # bottom share of the picture assumed to be floor, for the fit
 TOLERANCE = 0.06         # nearer than the floor line by this share of the visible floor's range = obstacle
+FAR_TOLERANCE = 0.12     # farther than the floor line by this share (below the horizon) = not floor
+FAR_MARGIN = 0.05        # ...ignoring this share of the floor rows just under the horizon (noisy)
+HORIZON_FRAC = 0.4265    # camera geometry (see above)
+K_PX_CM = 3991.0         # at 480 rows
 MIN_RUN = 4              # obstacle rows needed in a column (ignores specks)
 SECTORS = ('left', 'centre', 'right')
-BOTTOM_CM = 8.5          # floor distance at the bottom edge of the picture. 20 was a guess; the first
-                         # mapping run measured true/estimated = 0.42 over 2 moves -> 8.5 (recheck)
 MAX_CM = 300.0           # "clear to the horizon" is reported as this
 BLOCKED_CM, NEAR_CM = 35.0, 80.0
 MAP_EVERY_S = 0.5
@@ -66,32 +73,37 @@ def fit_floor(disp):
     return float(a), float(b)
 
 
-def analyse(disp, bottom_cm=BOTTOM_CM):
+def floor_cm(row, h, horizon):
+    return K_PX_CM * h / 480.0 / max(1e-6, row - horizon)
+
+
+def analyse(disp):
     """disp: relative inverse depth (bigger = nearer), H x W. Returns the reading, an obstacle mask
     and each column's free floor distance in cm."""
     h, w = disp.shape
     a, b = fit_floor(disp)
-    far = float(np.percentile(disp, 5))
-    if a <= 0 or a * (h - 1) + b <= far:     # the bottom isn't floor getting nearer downwards
+    horizon = int(HORIZON_FRAC * h)
+    if a <= 0 or a * (h - 1) + b <= a * horizon + b:     # the bottom isn't floor getting nearer downwards
         return {'ok': False, 'why': 'no floor at the bottom of the picture'}, np.zeros_like(disp, bool), None
-    horizon = int(np.clip((far - b) / a, 0, h - 2))
     rows = np.arange(h)[:, None]
     span = a * (h - 1 - horizon)                                # disparity range of the visible floor
-    mask = (disp > a * rows + b + TOLERANCE * span) & (rows > horizon)
+    floor = a * rows + b
+    near = disp > floor + TOLERANCE * span
+    far = (disp < floor - FAR_TOLERANCE * span) & (rows > horizon + FAR_MARGIN * (h - 1 - horizon))
+    mask = (near | far) & (rows > horizon)
     free_cm = np.full(w, MAX_CM)
     for x in range(w):               # scan up from the bottom to the first run of obstacle rows
         run = 0
         for r in range(h - 1, horizon, -1):
             run = run + 1 if mask[r, x] else 0
             if run >= MIN_RUN:
-                base = r + MIN_RUN - 1
-                free_cm[x] = min(MAX_CM, bottom_cm * (h - 1 - horizon) / max(1, base - horizon))
+                free_cm[x] = min(MAX_CM, floor_cm(r + MIN_RUN - 1, h, horizon))
                 break
     sectors = {}
     for name, part in zip(SECTORS, np.array_split(free_cm, 3)):
         cm = float(np.percentile(part, 10))                     # the near end of the sector
         sectors[name] = {'cm': round(cm), 'state': state_for(cm)}
-    return {'ok': True, 'horizon_row': horizon, 'bottom_cm': bottom_cm, 'sectors': sectors}, mask, free_cm
+    return {'ok': True, 'horizon_row': horizon, 'sectors': sectors}, mask, free_cm
 
 
 def state_for(cm):
@@ -104,7 +116,7 @@ def smooth(history):
                    'state': state_for(float(np.median([h[name] for h in history])))} for name in SECTORS}
 
 
-def overlay(frame, disp, mask, free_cm, horizon, bottom_cm=BOTTOM_CM):
+def overlay(frame, disp, mask, free_cm, horizon):
     import cv2
     v = disp - disp.min()
     v = (255 * v / max(float(v.max()), 1e-6)).astype(np.uint8)
@@ -112,7 +124,7 @@ def overlay(frame, disp, mask, free_cm, horizon, bottom_cm=BOTTOM_CM):
     if free_cm is not None:
         h = disp.shape[0]
         for x in range(0, disp.shape[1], 4):                    # free floor in green, obstacles red
-            top = int(horizon + bottom_cm * (h - 1 - horizon) / free_cm[x])
+            top = int(horizon + K_PX_CM * h / 480.0 / free_cm[x])
             cv2.line(colour, (x, h - 1), (x, top), (60, 200, 60), 1)
         colour[mask] = (40, 40, 230)
         cv2.line(colour, (0, horizon), (disp.shape[1], horizon), (255, 255, 255), 1)
@@ -120,8 +132,8 @@ def overlay(frame, disp, mask, free_cm, horizon, bottom_cm=BOTTOM_CM):
 
 
 class DepthService:
-    def __init__(self, source, size, device, bottom_cm=BOTTOM_CM, drive='http://127.0.0.1:8769'):
-        self.source, self.size, self.device, self.bottom_cm, self.drive = source, size, device, bottom_cm, drive
+    def __init__(self, source, size, device, drive='http://127.0.0.1:8769'):
+        self.source, self.size, self.device, self.drive = source, size, device, drive
         self.map = floor_map.FloorMap()
         self.map_lock = threading.Lock()
         self.map_png = None
@@ -185,7 +197,7 @@ class DepthService:
                 n += 1
                 if n % 2 == 0:
                     self.watch(img)
-                reading, mask, free = analyse(disp, self.bottom_cm)
+                reading, mask, free = analyse(disp)
                 if reading['ok']:
                     history = (history + [{k: v['cm'] for k, v in reading['sectors'].items()}])[-SMOOTH_N:]
                     reading['raw'] = reading['sectors']
@@ -201,7 +213,7 @@ class DepthService:
                     cv2.rectangle(shown, (x0, y0), (x1, y1), (0, 165, 255), 2)
                     cv2.putText(shown, f'{name} {conf:.2f}', (x0 + 4, y0 + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
                                 (0, 165, 255), 2)
-                out = overlay(shown, disp, mask, free, reading.get('horizon_row', 0), self.bottom_cm)
+                out = overlay(shown, disp, mask, free, reading.get('horizon_row', 0))
                 self.image = cv2.imencode('.jpg', out, [cv2.IMWRITE_JPEG_QUALITY, 70])[1].tobytes()
                 self.reading, self.frame_age_ms, self.error = reading, age, None
                 times = [x for x in times + [time.monotonic()] if time.monotonic() - x < 2]
@@ -292,10 +304,8 @@ def main():
     parser.add_argument('--source', default='http://127.0.0.1:8010/live.jpg')
     parser.add_argument('--size', type=int, default=336, help='model input size (multiple of 14)')
     parser.add_argument('--device', default='mps')
-    parser.add_argument('--bottom-cm', type=float, default=BOTTOM_CM,
-                        help='how far ahead the bottom edge of the picture meets the floor')
     args = parser.parse_args()
-    service = DepthService(args.source, args.size, args.device, args.bottom_cm)
+    service = DepthService(args.source, args.size, args.device)
     server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(service))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     print(f'depth service on http://127.0.0.1:{args.port} (loading model)', flush=True)

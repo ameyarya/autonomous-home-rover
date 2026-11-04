@@ -184,7 +184,7 @@ def main():
     print('map:', call(DEPTH + '/map'))
     if scale:
         print(f'scale check: true/estimated distance = {statistics.median(scale):.2f} from {len(scale)} moves '
-              '(multiply --bottom-cm by this)')
+              '(multiply depth_service.K_PX_CM by this)')
 
 
 if __name__ == '__main__':
