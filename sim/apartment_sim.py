@@ -85,7 +85,8 @@ class Walls:
     def __init__(self, rects):
         self.rects = [(r['x0'], r['y0'], r['x1'], r['y1']) for r in rects]
         self.kinds = [r.get('kind', 'wall') for r in rects]
-        self.last_kind = None
+        self.names = [r.get('name', '?') for r in rects]
+        self.last_kind = self.last_name = None
 
     def corners(self, x, y, yaw):
         c, s = math.cos(yaw), math.sin(yaw)
@@ -96,10 +97,12 @@ class Walls:
     def hits(self, x, y, yaw):
         pts = self.corners(x, y, yaw)
         edge = [((pts[i][0] + pts[(i + 1) % 4][0]) / 2, (pts[i][1] + pts[(i + 1) % 4][1]) / 2) for i in range(4)]
-        for (x0, y0, x1, y1), kind in zip(self.rects, self.kinds):
-            for px, py in pts + edge + [(x, y)]:
+        for (x0, y0, x1, y1), kind, name in zip(self.rects, self.kinds, self.names):
+            for i, (px, py) in enumerate(pts + edge + [(x, y)]):
                 if x0 <= px <= x1 and y0 <= py <= y1:
-                    self.last_kind = kind
+                    self.last_kind, self.last_name = kind, name
+                    self.last_part = ('front left', 'front right', 'rear right', 'rear left', 'front', 'right side',
+                                      'rear', 'left side', 'centre')[i]
                     return True
         return False
 
@@ -123,6 +126,7 @@ class SimRover:
         self.lock = threading.Lock()
         self.collisions, self.pushing_s, self.path_m = 0, 0.0, 0.0
         self.barrier_hits = 0
+        self.events = []
         self.min_clear = walls.clearance(x, y)
         self.touching = False
         self.yaw_rate = 0.0
@@ -166,6 +170,10 @@ class SimRover:
                     self.barrier_hits += 1
                 else:
                     self.collisions += 1
+                    self.events.append({'with': self.walls.last_name, 'part': self.walls.last_part,
+                                        'moving': 'reverse' if throttle < 0 else 'forward',
+                                        'steer': round(target, 2), 'x': round(self.x, 2), 'y': round(self.y, 2),
+                                        'heading': round(math.degrees(self.yaw))})
             self.touching = True
             self.pushing_s += dt
             self.yaw_rate = 0.0
@@ -301,7 +309,7 @@ class Sim:
         r = self.rover
         return {'x_m': round(r.x, 3), 'y_m': round(r.y, 3), 'heading_deg': round(math.degrees(r.yaw), 1),
                 'collisions': r.collisions, 'barrier_hits': r.barrier_hits, 'pushing_s': round(r.pushing_s, 2),
-                'path_m': round(r.path_m, 2),
+                'path_m': round(r.path_m, 2), 'collision_events': r.events[-10:],
                 'min_clearance_m': round(r.min_clear, 3), 'touching': r.touching}
 
 

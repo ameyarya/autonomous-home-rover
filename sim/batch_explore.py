@@ -23,11 +23,31 @@ sys.path.insert(0, str(HERE))
 import apartment_sim  # noqa: E402
 
 
+HOME = (2.0, 4.5)               # a point in the living room: starts must be reachable from it
+
+
+def reachable(walls, cell=0.1):
+    """Cells the rover's centre can reach from HOME without crossing walls, furniture or virtual doors
+    (a flood fill keeping 15 cm clear: about half the rover's width)."""
+    nx, ny = int(8 / cell), int(8 / cell)
+    ok = lambda i, j: walls.clearance((i + .5) * cell, (j + .5) * cell) > 0.15
+    start = (int(HOME[0] / cell), int(HOME[1] / cell))
+    seen, todo = {start}, [start]
+    while todo:
+        i, j = todo.pop()
+        for a, b in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+            if 0 <= a < nx and 0 <= b < ny and (a, b) not in seen and ok(a, b):
+                seen.add((a, b))
+                todo.append((a, b))
+    return [((i + .5) * cell, (j + .5) * cell) for i, j in seen]
+
+
 def free_starts(n, seed):
     walls = apartment_sim.Walls(json.loads((HERE / 'apartment/apartment.json').read_text())['walls'])
+    cells = reachable(walls)
     rng, out = random.Random(seed), []
     while len(out) < n:
-        x, y, h = rng.uniform(0.3, 7.6), rng.uniform(0.3, 7.6), rng.uniform(-180, 180)
+        (x, y), h = rng.choice(cells), rng.uniform(-180, 180)
         if walls.clearance(x, y) > 0.45 and not walls.hits(x, y, math.radians(h)):
             out.append((round(x, 2), round(y, 2), round(h)))
     return out
@@ -85,6 +105,12 @@ def main():
               f'{r.get("barrier_hits", 0):>5} {r["pushing_s"]:>6} {r["min_clearance_m"]:>7}  {r["stopped"]}')
     hits = sum(r['collisions'] for r in results)
     doors = sum(r.get('barrier_hits', 0) for r in results)
+    events = [dict(e, run=r['run']) for r in results for e in r.get('collision_events', [])]
+    if events:
+        print('\ncollisions:')
+        for e in events:
+            print(f"  run {e['run']}: {e['part']} hit {e['with']} while moving {e['moving']} (steer {e['steer']}) "
+                  f"at ({e['x']}, {e['y']}) heading {e['heading']}")
     print(f'\n{len(results)} runs: {hits} collisions, {doors} virtual-door touches, {sum(r["path_m"] for r in results):.1f} m driven, '
           f'closest approach {min(r["min_clearance_m"] for r in results):.2f} m')
 
