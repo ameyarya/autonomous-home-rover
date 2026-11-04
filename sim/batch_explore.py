@@ -58,13 +58,15 @@ def get(url):
         return json.load(r)
 
 
-def run_one(i, start, steps, seed):
+def run_one(i, start, steps, seed, extra=()):
     base = 9800 + i * 10
     drive, cam, depth = base, base + 1, base + 2
+    (HERE / 'out').mkdir(exist_ok=True)
+    log = open(HERE / f'out/sim_{i}.log', 'w')
     sim = subprocess.Popen([sys.executable, str(HERE / 'apartment_sim.py'), '--no-camera', '--seed', str(seed + i),
                             '--start', ','.join(map(str, start)), '--drive-port', str(drive),
                             '--camera-port', str(cam), '--exact-depth-port', str(depth)],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+                           stdout=log, stderr=subprocess.STDOUT)
     try:
         for _ in range(50):
             try:
@@ -74,17 +76,25 @@ def run_one(i, start, steps, seed):
                 time.sleep(0.2)
         t = time.monotonic()
         out = subprocess.run(['python3', str(REPO / 'mac/explore.py'), '--steps', str(steps), '--no-capture',
-                              '--drive', f'http://127.0.0.1:{drive}', '--depth', f'http://127.0.0.1:{depth}'],
+                              '--drive', f'http://127.0.0.1:{drive}', '--depth', f'http://127.0.0.1:{depth}', *extra],
                              capture_output=True, text=True, timeout=steps * 30)
         lines = out.stdout.strip().splitlines()
         stopped = next((l[9:] for l in lines if l.startswith('stopped:')), out.stderr.strip()[-120:] or '?')
         moves = [json.loads(l) for l in lines if l.startswith('{')]
-        truth = get(f'http://127.0.0.1:{cam}/truth')
+        try:
+            truth = get(f'http://127.0.0.1:{cam}/truth')
+        except OSError:
+            tail = (HERE / f'out/sim_{i}.log').read_text().strip().splitlines()[-1:] or ['?']
+            truth = {'collisions': 0, 'barrier_hits': 0, 'pushing_s': 0, 'path_m': 0, 'min_clearance_m': 9,
+                     'collision_events': []}
+            stopped = f'SIMULATOR CRASHED: {tail[0][:100]}'
+        print(f'run {i} done: {stopped}', flush=True)
         return {'run': i, 'start': start, 'steps': len(moves), 'stopped': stopped, 'minutes': round((time.monotonic() - t) / 60, 1),
                 'turns': sum(1 for m in moves if str(m.get('move', '')).startswith('turn_')), **truth}
     finally:
         sim.terminate()
         sim.wait(5)
+        log.close()
 
 
 def main():
@@ -93,10 +103,12 @@ def main():
     ap.add_argument('--parallel', type=int, default=4)
     ap.add_argument('--steps', type=int, default=40)
     ap.add_argument('--seed', type=int, default=1)
+    ap.add_argument('--reverse-arcs', action='store_true', help="explorer's old multi-point turns (reverse arcs)")
     args = ap.parse_args()
     starts = free_starts(args.runs, args.seed)
     with ThreadPoolExecutor(args.parallel) as pool:
-        results = list(pool.map(lambda a: run_one(a[0], a[1], args.steps, args.seed), enumerate(starts)))
+        extra = ('--reverse-arcs',) if args.reverse_arcs else ()
+        results = list(pool.map(lambda a: run_one(a[0], a[1], args.steps, args.seed, extra), enumerate(starts)))
     (HERE / 'out').mkdir(exist_ok=True)
     (HERE / 'out/batch.json').write_text(json.dumps(results, indent=1))
     print(f'{"run":>3} {"start":>18} {"steps":>5} {"turns":>5} {"path m":>6} {"hits":>4} {"doors":>5} {"push s":>6} {"closest":>7}  stopped')

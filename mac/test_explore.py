@@ -72,8 +72,8 @@ class GuardTest(unittest.TestCase):
             done, why = explore.multi_point_turn(explore.Guard(), 'right', 75)
         finally:
             explore.Guard.move, explore.SETTLE_S = real_move, settle
-        self.assertEqual(moves, ['reverse_right', 'right', 'reverse_right', 'right'])
-        self.assertEqual(why, 'turned 80°')
+        self.assertEqual(moves, ['back', 'right', 'back', 'right', 'back', 'right'])   # straight back, arc forward
+        self.assertEqual(why, 'turned 60° in 6 moves')
 
     def test_multi_point_turn_only_reverses_when_blocked_ahead(self):
         moves = []
@@ -85,7 +85,7 @@ class GuardTest(unittest.TestCase):
             explore.multi_point_turn(explore.Guard(), 'left', 75)
         finally:
             explore.Guard.move, explore.SETTLE_S = real_move, settle
-        self.assertEqual(set(moves), {'reverse_left'})
+        self.assertEqual(set(moves), {'back'})
 
     def test_reverse_turns_are_not_stopped_for_what_is_ahead(self):
         self.depth['sectors'] = sectors(300, 20, 300)

@@ -22,8 +22,16 @@ transmitter and heading stick) on :9769 and the rendered rover camera on :9010; 
   (local) and rebuilds the simulator's apartment.
 - Furniture and floor textures come from photos (`apartment/photos/`, local); exact ray depth on
   :9775 for testing driving decisions; `batch_explore.py` runs many episodes in parallel and scores
-  them (first batch: 8 runs, 39 m, 1 collision during a reverse turn; most runs ended on arc turns
-  that timed out short of the angle).
+  them. Same 8 starts (seed 3) on the corrected apartment with virtual doors:
+
+  | Explorer | Runs finishing 40 steps | Driven | Collisions | Door touches |
+  |---|---|---|---|---|
+  | first version (timed-out turns end the run) | 1 of 8 | 39 m | 1 | – |
+  | turns that got most of the way count; arcs at the measured 37 cm/s | 4 of 8 | 90 m | 5 | 2 |
+  | multi-point turns back up straight, turn forward | **8 of 8** | **101 m** | **0** | 8 (one run) |
+
+  Every collision in the middle row was the rear corner swinging into something unseen during a
+  reverse arc (vanity, boxes), which is why turns now back up straight over the path they came in on.
 
 ```sh
 mac/.vision-venv/bin/python sim/apartment/build_apartment.py

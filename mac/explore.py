@@ -38,6 +38,9 @@ GUARD_CM = 30
 TURN_AROUND_DEG = 75
 REVERSE_DEG = 20
 TURN_MOVES = 6
+REVERSE_ARCS = False     # multi-point turns back up straight (over the path it came in on) and turn with
+                         # forward arcs the camera watches: in the sim every collision (5 of 5) was the
+                         # rear corner swinging into something unseen during a reverse arc
 WAIT_S = 30
 STUCK_SHARE = 0.4        # a turn that reached less than this share of its angle: steering stuck
 SETTLE_S = 1.4           # the depth service maps after 0.6 s still; smoothing needs ~5 fresh frames
@@ -91,14 +94,15 @@ def multi_point_turn(guard, side, target):
                 return moves, 'facing open floor'
             if sec['centre'] < TURN_CM:
                 continue                                # no room ahead: reverse again
-        kind = side if forward else 'reverse_' + side
-        out = guard.move(kind, TURN_DEG if forward else REVERSE_DEG)
+        kind = side if forward else ('reverse_' + side if REVERSE_ARCS else 'back')
+        amount = TURN_DEG if forward else (REVERSE_DEG if REVERSE_ARCS else STEP_CM)
+        out = guard.move(kind, amount)
         moves.append((kind, out.get('turned_deg'), out.get('ended') or out.get('error')))
         if guard.why:
             return moves, f'guard: {guard.why}'
-        if not finished(out, kind, TURN_DEG if forward else REVERSE_DEG):
+        if not finished(out, kind, amount):
             return moves, f'{kind} did not finish ({out.get("error") or out.get("ended")})'
-        turned += abs(out.get('turned_deg') or 0)
+        turned += abs(out.get('turned_deg') or 0) if kind != 'back' else 0
         if turned >= target:
             return moves, f'turned {turned:.0f}°'
     return moves, f'turned {turned:.0f}° in {TURN_MOVES} moves' 
@@ -156,8 +160,10 @@ def main():
     parser.add_argument('--drive', default=DRIVE, help='drive server (the simulator uses http://127.0.0.1:9769)')
     parser.add_argument('--depth', default=DEPTH, help='depth service')
     parser.add_argument('--no-capture', action='store_true', help="don't record photos (simulator runs)")
+    parser.add_argument('--reverse-arcs', action='store_true', help='multi-point turns reverse with the wheels turned')
     args = parser.parse_args()
-    DRIVE, DEPTH = args.drive, args.depth
+    global REVERSE_ARCS
+    DRIVE, DEPTH, REVERSE_ARCS = args.drive, args.depth, args.reverse_arcs or REVERSE_ARCS
 
     imu = call(DRIVE + '/imu')
     depth = call(DEPTH + '/status')

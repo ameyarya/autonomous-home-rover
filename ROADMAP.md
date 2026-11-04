@@ -16,6 +16,7 @@ Working list, one item at a time, simplest first (details and reasoning: [PLAN.m
 - [ ] 11. **Builds the map itself** — exploration; camera-only visual SLAM as an experiment.
 - [ ] 12. **Docking and unattended runs** — return to a charger, scheduled tasks.
 - [ ] 12b. **Apartment capture for simulation** (idea, 2026-11-03): whenever the rover drives, save frames with their pose (heading, odometer x/y), depth and time into a local dataset. Later, rebuild the apartment from them (photogrammetry or Gaussian splatting → mesh) as a simulation scene (Gazebo / Isaac Sim / MuJoCo) to train other robots. Needs good poses: items 6–7, or the phone/LiDAR path. *Recorder built 2026-11-03 (`mac/capture.py`, Record switch); not used on a drive yet.*
+- [ ] 12c. **Apartment simulator** (2026-11-04): MuJoCo copy of the apartment from the floor plan + photos, edited on the dashboard Sim page (furniture, virtual doors), the real drive server/explorer running against it, batch runs scored from the truth. Found and fixed: a zero-frame-age bug, runs ending on near-complete turns, and rear-corner collisions in reverse arcs (now 0 collisions in 8 runs / 101 m). Next: perception on real photos, the ultrasonic sensor, then ROS 2.
 - [ ] 13. **Full stack** — 2D LiDAR, Raspberry Pi onboard, ROS 2 + slam_toolbox + Nav2, Tailscale.
 
 Later add-on: the owner's WaveSight home-sensing project as a room-level position hint (see PLAN.md).
