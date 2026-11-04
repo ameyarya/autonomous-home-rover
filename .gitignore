@@ -33,3 +33,11 @@ mac/gallery/
 mac/marker.json
 mac/depth-service.log
 mac/captures/
+sim/apartment/*.png
+sim/apartment/*.jpg
+sim/apartment/*.jpeg
+sim/apartment/*.heic
+sim/apartment/apartment.xml
+sim/apartment/apartment.json
+sim/apartment/photos/
+sim/.scene.xml

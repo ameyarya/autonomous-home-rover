@@ -143,10 +143,15 @@ def wait_for_clear_view():
 
 
 def main():
+    global DRIVE, DEPTH
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--steps', type=int, default=30)
     parser.add_argument('--keep-map', action='store_true', help='add to the current map instead of a new one')
+    parser.add_argument('--drive', default=DRIVE, help='drive server (the simulator uses http://127.0.0.1:9769)')
+    parser.add_argument('--depth', default=DEPTH, help='depth service')
+    parser.add_argument('--no-capture', action='store_true', help="don't record photos (simulator runs)")
     args = parser.parse_args()
+    DRIVE, DEPTH = args.drive, args.depth
 
     imu = call(DRIVE + '/imu')
     depth = call(DEPTH + '/status')
@@ -157,7 +162,8 @@ def main():
     if not args.keep_map:
         call(DRIVE + '/odometer/reset', {})
         call(DEPTH + '/map/reset', {})
-    call(DASH + '/capture', {'on': True})
+    if not args.no_capture:
+        call(DASH + '/capture', {'on': True})
     bumps0 = imu['bumps']
     done = threading.Event()
 
@@ -238,7 +244,8 @@ def main():
         done.set()
         time.sleep(0.6)                                 # let a renewal in flight land before disarming
         call(DRIVE + '/arm', {'armed': False})
-        call(DASH + '/capture', {'on': False})
+        if not args.no_capture:
+            call(DASH + '/capture', {'on': False})
     print('stopped:', why)
     print('map:', call(DEPTH + '/map'))
     if scale:

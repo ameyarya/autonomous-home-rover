@@ -1,5 +1,37 @@
 # Simulation
 
+## The apartment (2026-11-04)
+
+The rover in a copy of the real apartment, behind the same interfaces as the real one, so the real
+code runs unchanged: `apartment_sim.py` serves the real `drive/drive_server.py` (with a simulated
+transmitter and heading stick) on :9769 and the rendered rover camera on :9010; the real
+`mac/depth_service.py` and `mac/explore.py` point at it.
+
+- `apartment/build_apartment.py` builds `apartment/apartment.xml` + `.json` from the floor plan
+  (`apartment/floorplan.png`; thick lines = walls, 13.1 px/ft from the 12' x 12' bedroom; the
+  balcony slider is its own "blinds" geom). The floor plan, robot-vacuum map, photos and generated
+  apartment files are personal and stay local (gitignored); only the code is in git.
+- Rover: measured speeds and turning radius, the receiver's key rules (rover app 0.9), servo lag,
+  front-wheel play, gyro noise and bias; collisions stop it and count as bumps. Camera 7.5 cm up,
+  3.8° up, 62° wide: the floor-wall line at 0.5 / 1.1 / 2.3 m lands within 2 px of the real
+  rover's fitted geometry.
+- `GET :9010/truth`: true pose, collisions, time pushing a wall, path length, closest approach.
+
+```sh
+mac/.vision-venv/bin/python sim/apartment/build_apartment.py
+sim/.venv/bin/python sim/apartment_sim.py --start 2.0,4.5,90 --seed 1 &
+<detector python> mac/depth_service.py --port 9774 --source http://127.0.0.1:9010/live.jpg --drive http://127.0.0.1:9769 &
+python3 mac/explore.py --steps 40 --drive http://127.0.0.1:9769 --depth http://127.0.0.1:9774 --no-capture
+curl -s 127.0.0.1:9010/truth
+```
+
+First run: 17 steps, 4.8 m, no collisions, closest 20 cm, two multi-point turns, 9.2 m² mapped.
+It also showed the depth model reading plain untextured sim surfaces badly (scale check 0.27 vs
+1.00 at home), so realistic floor and wall textures and furniture come next (from photos and the
+robot-vacuum map).
+
+## The first living-room sim (dog companion, 2026-10)
+
 Closed-loop tests of the real dog-companion code (`mac/dog_behavior.py`, `mac/drive_client.py`) in a
 MuJoCo living room, before the chassis exists. The rover is a kinematic car (front-wheel steering,
 W/A/S/D pulses through the same drive client), the dog follows scripts (walk, run, stand and wag, lie
