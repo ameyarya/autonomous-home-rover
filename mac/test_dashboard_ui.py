@@ -497,6 +497,15 @@ class DashboardUITest(unittest.TestCase):
             dashboard.DEPTH_URL = old
             server.shutdown()
 
+    def test_fits_a_laptop_window_without_scrolling(self):
+        self.page.set_viewport_size({'width': 1440, 'height': 860})
+        self.open()
+        expect(self.page.locator('#arm')).to_be_visible()
+        self.assertLessEqual(self.page.evaluate('document.scrollingElement.scrollHeight'), 860)
+        for card in ('#arm', '#stop', '#imu-hold', '#depth-svc', '[data-move=back][data-amount="50"]', '#live-age'):
+            box = self.page.locator(card).bounding_box()
+            self.assertLessEqual(box['y'] + box['height'], 860, card)
+
     def test_heading_card_offline(self):
         self.open()
         expect(self.page.locator('#imu-info')).to_contain_text('offline')
