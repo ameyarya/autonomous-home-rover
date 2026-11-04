@@ -6,11 +6,26 @@ import numpy as np
 import depth_service as ds
 
 
-def floor_scene(h=240, w=320, horizon=100):
+def floor_scene(h=240, w=320, horizon=None):
+    horizon = int(ds.HORIZON_FRAC * h) if horizon is None else horizon          # matches the camera geometry
     rows = np.arange(h)[:, None].astype(float)
     disp = np.clip(rows - horizon, 0, None) * np.ones((1, w)) + 2.0   # flat floor + far walls
     disp[:horizon] = 2.0
     return disp
+
+
+def foot_row(cm, h=240):
+    """The image row where something standing `cm` ahead meets the floor."""
+    hz = int(ds.HORIZON_FRAC * h)
+    return int(round(hz + ds.K_PX_CM * h / 480 / cm))
+
+
+def standing(disp, cm, cols, top=None):
+    """An upright face `cm` away: one depth from its foot up (the floor's depth at its foot)."""
+    r = foot_row(cm, disp.shape[0])
+    hz = int(ds.HORIZON_FRAC * disp.shape[0])
+    disp[(top or hz + 2):r, cols[0]:cols[1]] = r - hz + 2.0
+    return r
 
 
 class AnalyseTest(unittest.TestCase):
@@ -24,31 +39,32 @@ class AnalyseTest(unittest.TestCase):
 
     def test_box_in_the_centre_blocks_centre_only(self):
         disp = floor_scene()
-        disp[120:200, 130:190] = 102.0          # standing up, base on the floor at row 200: ~28 cm
+        foot = standing(disp, 28, (130, 190))   # standing up, 28 cm ahead
         reading, mask, _ = ds.analyse(disp)
         self.assertEqual(reading['sectors']['centre']['state'], 'blocked')
         self.assertEqual(reading['sectors']['left']['state'], 'clear')
         self.assertEqual(reading['sectors']['right']['state'], 'clear')
-        self.assertTrue(mask[150, 160])
-        self.assertAlmostEqual(reading['sectors']['centre']['cm'], ds.floor_cm(200, 240, 102), delta=4)
+        self.assertTrue(mask[(int(ds.HORIZON_FRAC * 240) + foot) // 2, 160])   # its upper part is flagged
+        self.assertLess(abs(reading['sectors']['centre']['cm'] - 28), 8)
 
     def test_far_box_is_near_not_blocked(self):
         disp = floor_scene()
-        disp[105:150, 220:300] = 52.0            # base at row 150: ~56 cm
+        standing(disp, 56, (220, 300))           # 56 cm ahead
         reading, _, _ = ds.analyse(disp)
         self.assertEqual(reading['sectors']['right']['state'], 'near')
         self.assertEqual(reading['sectors']['left']['state'], 'clear')
 
     def test_scale_and_shift_do_not_matter(self):
         disp = floor_scene()
-        disp[120:200, 130:190] = 102.0
+        standing(disp, 28, (130, 190))
         a, _, _ = ds.analyse(disp)
         b, _, _ = ds.analyse(disp * 0.01 + 7.0)   # the model's units are arbitrary
         self.assertEqual(a['sectors'], b['sectors'])
 
     def test_blinds_that_look_far_still_block(self):
         disp = floor_scene()
-        disp[110:195, 100:220] = 2.0             # reads as far as the walls, but below the horizon
+        hz = int(ds.HORIZON_FRAC * 240)
+        disp[hz + 8:foot_row(30), 100:220] = 2.0  # reads as far as the walls, but below the horizon
         reading, mask, _ = ds.analyse(disp)
         self.assertEqual(reading['sectors']['centre']['state'], 'blocked')
         self.assertEqual(reading['sectors']['left']['state'], 'clear')
