@@ -545,10 +545,17 @@ class DashboardUITest(unittest.TestCase):
             expect(self.page.locator('#status')).to_contain_text('Saved')
             saved = json.loads((tmp / 'furniture.json').read_text())
             self.assertAlmostEqual((saved['boxes'][0]['x0'] + saved['boxes'][0]['x1']) / 2, 2.5)
+            self.page.on('dialog', lambda d: d.accept('dining_table'))
+            self.page.locator('#list div').first.dblclick()
+            expect(self.page.locator('#list div').first).to_contain_text('dining_table')
             self.page.click('#add-box')
+            self.page.click('#add-box')
+            self.page.evaluate("document.querySelectorAll('#list div')[2].dispatchEvent(new MouseEvent('click'))")
             self.page.click('#save')
             expect(self.page.locator('#status')).to_contain_text('Saved')
-            self.assertEqual(len(json.loads((tmp / 'furniture.json').read_text())['boxes']), 2)
+            boxes = json.loads((tmp / 'furniture.json').read_text())['boxes']
+            self.assertEqual([b['name'] for b in boxes][0], 'dining_table')
+            self.assertEqual(len({b['name'] for b in boxes}), 3)          # all distinct after saving
         finally:
             dashboard.SIM_DIR, dashboard.SIM_BUILD = old
             shutil.rmtree(tmp)

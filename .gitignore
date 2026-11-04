@@ -43,3 +43,4 @@ sim/apartment/photos/
 sim/.scene.xml
 sim/apartment/furniture.json
 sim/apartment/apartment_assets.xml
+sim/apartment/furniture.*.json

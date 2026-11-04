@@ -152,9 +152,13 @@ def save_furniture(furn):
             rgb = [num(c, 0, 1) for c in item.get('rgb', [0.6, 0.6, 0.6])][:3]
             out.append({'name': name or f'{kind}{i}', **row, **({'rgb': rgb} if kind != 'carpet' else {})})
         clean[kind] = out
-    names = [o['name'] for k in ('boxes', 'cylinders', 'rugs') for o in clean[k]]
-    if len(names) != len(set(names)):
-        raise ValueError('two pieces have the same name')
+    seen = set()                     # duplicate names get _2, _3 ... (the simulator needs unique names)
+    for k in ('boxes', 'cylinders', 'rugs'):
+        for o in clean[k]:
+            base, n = o['name'], 2
+            while o['name'] in seen:
+                o['name'], n = f'{base}_{n}', n + 1
+            seen.add(o['name'])
     (SIM_DIR / 'furniture.json').write_text(json.dumps(clean, indent=1))
     subprocess.run(SIM_BUILD, check=True, capture_output=True, timeout=60)
     return sim_data()

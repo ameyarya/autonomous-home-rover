@@ -43,7 +43,7 @@ input,select{font:inherit;color:inherit;background:#0d131c;border:1px solid var(
   <div id="stage"><svg id="plan"></svg><canvas id="three"></canvas></div>
   <aside>
     <div><h2>Selected</h2></div>
-    <div id="none" class="hint">Click a piece of furniture to edit it. Walls come from the floor plan.</div>
+    <div id="none" class="hint">Click a piece of furniture to edit it; double-click it (or its name in the list) to rename it. Walls come from the floor plan.</div>
     <div id="edit" hidden>
       <div class="grid2">
         <label>Name<input id="f-name"></label>
@@ -121,6 +121,7 @@ function draw() {
       ? el('circle', {cx, cy, r: g.w / 2 * S, fill, class: 'item' + (isSel ? ' sel' : '')})
       : el('rect', {x: cx - g.w / 2 * S, y: cy - g.d / 2 * S, width: g.w * S, height: g.d * S, fill, class: 'item' + (isSel ? ' sel' : ''), rx: it.kind === 'rug' ? 6 : 2});
     node.addEventListener('pointerdown', e => startDrag(e, it, 'move'));
+    node.addEventListener('dblclick', e => { e.stopPropagation(); rename(it); });
     const t = el('text', {x: cx, y: cy + 4, 'text-anchor': 'middle', 'font-size': 11, fill: '#0b0f15', 'pointer-events': 'none'});
     t.textContent = it.o.name;
     if (isSel) {
@@ -170,12 +171,24 @@ for (const id of ['f-name', 'f-h', 'f-x', 'f-y', 'f-w', 'f-d']) $(id).addEventLi
   const w = Math.max(0.05, +$('f-w').value), d = sel.kind === 'cyl' ? w : Math.max(0.05, +$('f-d').value);
   setGeom(sel, {x: +$('f-x').value, y: +$('f-y').value, w, d}); draw();
 });
+function rename(it) {
+  const name = prompt('Name for this piece', it.o.name);
+  if (name === null) return;
+  const clean = name.trim().replace(/[^\w-]/g, '_').slice(0, 40);
+  if (!clean) return;
+  if (items().some(x => x.o !== it.o && x.o.name === clean)) { status(`"${clean}" is already used by another piece`, 'warn'); return; }
+  snapshot(); it.o.name = clean; sel = it; draw(); status(`Renamed to ${clean}. Save to keep it.`);
+}
 function list() {
   $('list').innerHTML = '';
   for (const it of items()) {
-    const d = document.createElement('div'); d.textContent = `${it.o.name} · ${it.kind}`;
+    const d = document.createElement('div');
+    const dup = items().filter(x => x.o.name === it.o.name).length > 1;
+    d.textContent = `${it.o.name} · ${it.kind}${dup ? ' · same name as another' : ''}`;
+    if (dup) d.style.color = 'var(--warn)';
     if (sel && sel.o === it.o) d.className = 'sel';
-    d.onclick = () => { sel = it; draw(); }; $('list').appendChild(d);
+    d.onclick = () => { sel = it; draw(); }; d.ondblclick = () => rename(it);
+    d.title = 'Double-click to rename'; $('list').appendChild(d);
   }
 }
 $('rot').onclick = () => { if (!sel || sel.kind === 'cyl') return; snapshot(); const g = geom(sel); setGeom(sel, {...g, w: g.d, d: g.w}); draw(); };
