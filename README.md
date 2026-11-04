@@ -18,7 +18,7 @@ wirelessly to the stock receiver and drive electronics.
 - XIAO ESP32S3 Sense firmware configured and bench-verified 2026-10-14: OV3660 camera (VGA MJPEG ~15 fps), 5 Hz telemetry with health and mic level, settings over HTTP, updates over Wi-Fi ([firmware/xiao-cam](firmware/xiao-cam/README.md)). Powered by an iPhone Air battery pack.
 - Direction (2026-11-03): dog following dropped; next is the [autonomy roadmap](PLAN.md#autonomy-roadmap-2026-11-03-replaces-the-dog-companion-goal): measured moves → gyro/ToF/odometry → landmarks so it knows where it is → apartment map → go-to and tasks.
 - Handheld control (2026-11-03): the Mini-T remote drives the rover directly (left stick throttle, right stick steering); see [remote](remote/README.md). Link test pending (receiver was off).
-- Heading (2026-11-03): an M5StickS3 on the rover streams its gyro heading over Wi-Fi. The drive server uses it for heading hold and turn-by-angle, and the dashboard shows a live compass ([firmware/m5stick-imu](firmware/m5stick-imu/README.md)). Road test pending.
+- Heading (2026-11-03): an M5StickS3 on the rover streams its gyro heading over Wi-Fi. The drive server uses it for heading hold and turn-by-angle, and the dashboard shows a live compass ([firmware/m5stick-imu](firmware/m5stick-imu/README.md)). Road-tested: 1 m straight ends 1.1° off, 90° turn lands at 89.8°.
 - Autonomy software will be ported from the working Mini-T stack (command path, autonomy loop, detector + dashboard, calibration discipline) — see [PLAN.md](PLAN.md) for the reuse mapping.
 
 ## Docs

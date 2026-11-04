@@ -40,7 +40,8 @@ It uses M5Unified and mDNS from the ESP component registry. Arduino isn't needed
 - The drive server reports it online and calibrated, at 0.0°, battery 100%.
 - Screen redraw is double-buffered, which fixed a flicker in the first build.
 
-Not yet verified: rotating it to check the angle reads true, and driving with heading hold.
+- Mounted on the rover: angles read true by hand (+90° for a quarter turn left).
+- Road test: with heading hold, a 1 m straight ends 1.1° off; a 90° left turn measures 89.8°.
 
 A full 8 MB backup of the factory firmware is kept locally in `backups/` (not in git). To restore
 it: `esptool.py --chip esp32s3 -p <port> write_flash 0 backups/sticks3-factory-8MB.bin`.
