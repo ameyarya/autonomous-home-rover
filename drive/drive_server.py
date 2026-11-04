@@ -57,6 +57,8 @@ MANUAL_QUIET_S = 2.0          # autonomous pulses refused this long after manual
 REPEAT_S = 0.15               # resend the key this often (receiver watchdog is 500 ms)
 TICK_S = 0.1                  # heading-hold control step
 TURN_TIMEOUT = 1.6            # gyro turns give up after this many times the planned time
+BLOCKED_DEG = 15.0            # a straight move this far off its heading has hit something: stop at once
+                              # (2026-11-04: it hit a chair base, swung to -55° and kept pushing)
 
 
 class DriveState:
@@ -114,6 +116,13 @@ class DriveState:
     def count(self, key, seconds, turn_deg=None):
         self.odometer.add(key, seconds, self.motion, self.power(), turn_deg)
 
+    def bumps(self):
+        """The heading stick's bump count (jolts over 0.6 g), or 0 without one."""
+        try:
+            return int((self.imu.status() or {}).get('bumps') or 0) if self.imu else 0
+        except Exception:
+            return 0
+
     def gyro(self):
         """The heading stick, when it's online and heading hold is on."""
         return self.imu if self.imu and self.heading_hold and self.imu.fresh() else None
@@ -133,6 +142,7 @@ class DriveState:
         started = prev_t = time.monotonic()
         sent, ended = key, 'done'
         moved_at, moved_yaw = started, start         # stall check for turns
+        bumps0 = self.bumps()
         self.gyro_log = []                            # (s, key sent, yaw) per step
         hold = heading.HeadingHold(throttle, motion.GENTLE)
         while True:
@@ -146,6 +156,12 @@ class DriveState:
             dt = now - prev_t
             self.count(sent, dt, yaw - prev_yaw)
             prev_t, prev_yaw = now, yaw
+            if self.bumps() > bumps0:
+                ended = 'blocked: bump'
+                break
+            if not turning and abs(hold_to - yaw) > BLOCKED_DEG:
+                ended = f'blocked: knocked {yaw - hold_to:+.0f}° off course'
+                break
             if turning:
                 if sign * (yaw - start) + max(0.0, sign * rate) * heading.TURN_LEAD_S >= amount:
                     break

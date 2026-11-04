@@ -121,6 +121,23 @@ class GyroMoveTest(unittest.TestCase):
         self.assertLess(abs(self.g.y), 5.0)
         self.assertEqual(self.tx.calls[-1], 'X')
 
+    def test_straight_move_stops_when_knocked_off_course(self):
+        self.g.drift = -60.0                               # something shoves it round, faster than it can steer
+        out = self.s.move('forward', 100)
+        self.assertTrue(out['ended'].startswith('blocked'))
+        self.assertLess(out['ms'], 1500)
+        self.assertEqual(self.tx.calls[-1], 'X')
+
+    def test_straight_move_stops_on_a_bump(self):
+        import threading
+        self.g.drift = 0.0
+        self.g.bumps = 0
+        self.g.status = lambda: {'online': True, 'bumps': self.g.bumps}
+        threading.Timer(0.4, lambda: setattr(self.g, 'bumps', 1)).start()
+        out = self.s.move('forward', 100)
+        self.assertEqual(out['ended'], 'blocked: bump')
+        self.assertLess(out['ms'], 1200)
+
     def test_straight_move_can_hold_an_absolute_heading(self):
         self.g.drift = 0.0
         self.g.y = -6.0                                    # already 6 degrees right of where it should be
