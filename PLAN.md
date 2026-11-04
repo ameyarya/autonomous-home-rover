@@ -188,7 +188,7 @@ range 50°, speed 1200, saved on the rover); camera back on rover firmware (OTA)
 ~130 ms over this Wi-Fi. Phase 1 build items are done; the dog-companion goal is dropped in favour
 of the [autonomy roadmap](#autonomy-roadmap-2026-11-03-replaces-the-dog-companion-goal).
 
-1. Roadmap item 1 (measured moves): built 2026-11-03; owner measures forward/reverse speed and turning circle on the Calibrate page, then we check the accuracy. Next: item 2 (snapshot task v0).
+1. Roadmap item 1 (measured moves): done and calibrated 2026-11-03 (see ROADMAP.md). Next: item 2 (snapshot task v0).
 2. Decide on the ~US$20 sensor order for items 3–5 (IMU, ToF, IR encoder) and check free XIAO pins.
 3. Stop tests still owed: remote/transmitter USB unplug and power-off mid-drive.
 

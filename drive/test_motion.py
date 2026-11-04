@@ -40,6 +40,20 @@ class Radius(unittest.TestCase):
             motion.radius_from_arc(40, 0)
 
 
+class ArcTiming(unittest.TestCase):
+    def test_turns_are_timed_from_the_arc_run(self):
+        m = dict(M, arc_forward_cm=70, arc_sideways_cm=20, turn_radius_cm=132.5)
+        turned, travelled = motion.arc_measured(m)
+        self.assertAlmostEqual(turned, 31.9, places=1)
+        # 90 deg takes 90/31.9 of the 2 s run, whatever forward_cm_s says
+        self.assertAlmostEqual(motion.plan('left', 90, m, 1200)[1], 2.0 * 90 / turned, places=2)
+        o = motion.Odometer()
+        o.add('A', 2.0, m, 1200)
+        self.assertAlmostEqual(o.as_dict()['heading_deg'], 31.9, places=0)
+        self.assertAlmostEqual(o.as_dict()['x_cm'], 70, delta=1)
+        self.assertAlmostEqual(o.as_dict()['y_cm'], 20, delta=1)
+
+
 class Odometer(unittest.TestCase):
     def test_straight_then_quarter_turn(self):
         o = motion.Odometer()

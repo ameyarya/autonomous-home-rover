@@ -59,11 +59,25 @@ def radius_from_arc(forward_cm, sideways_cm):
     return (forward_cm ** 2 + sideways_cm ** 2) / (2 * sideways_cm)
 
 
+def arc_measured(m):
+    """(degrees turned, cm travelled) in the TEST_S['arc'] run, from its forward/sideways offsets."""
+    f, side = m.get('arc_forward_cm'), m.get('arc_sideways_cm')
+    if not (f is not None and side):
+        return None
+    r = radius_from_arc(f, side)
+    turned = 2 * math.asin(min(1.0, math.hypot(f, side) / (2 * r)))
+    return math.degrees(turned), r * turned
+
+
 def scaled(m, power):
-    """Speeds scaled to the current power setting (roughly linear; re-measure after big changes)."""
+    """Speeds scaled to the current power setting (roughly linear; re-measure after big changes).
+    'arc' is the speed along a full-lock turn: from the arc run itself when measured (it times
+    turns directly), else the forward speed."""
     f = power / m['power'] if m.get('power') and power else 1.0
-    return {'forward': (m.get('forward_cm_s') or 0) * f, 'reverse': (m.get('reverse_cm_s') or 0) * f,
-            'radius': m.get('turn_radius_cm') or 0}
+    forward = (m.get('forward_cm_s') or 0) * f
+    arc = arc_measured(m)
+    return {'forward': forward, 'reverse': (m.get('reverse_cm_s') or 0) * f,
+            'radius': m.get('turn_radius_cm') or 0, 'arc': arc[1] / TEST_S['arc'] * f if arc else forward}
 
 
 def plan(kind, amount, m, power):
@@ -75,9 +89,9 @@ def plan(kind, amount, m, power):
             raise ValueError(f'measure the {"forward" if kind == "forward" else "reverse"} speed first')
         key, seconds = ('W' if kind == 'forward' else 'S'), abs(amount) / speed
     elif kind in ('left', 'right'):
-        if not (s['forward'] and s['radius']):
-            raise ValueError('measure the forward speed and the turning circle first')
-        key, seconds = ('A' if kind == 'left' else 'D'), s['radius'] * math.radians(abs(amount)) / s['forward']
+        if not (s['arc'] and s['radius']):
+            raise ValueError('measure the turning circle (and forward speed) first')
+        key, seconds = ('A' if kind == 'left' else 'D'), s['radius'] * math.radians(abs(amount)) / s['arc']
     else:
         raise ValueError('kind must be forward, back, left or right')
     if seconds > MAX_MOVE_S:
@@ -101,7 +115,7 @@ class Odometer:
             return
         throttle, steer = KEYS[key]
         s = scaled(m, power)
-        speed = s['forward'] if throttle > 0 else s['reverse'] if throttle < 0 else 0
+        speed = (s['arc'] if steer else s['forward']) if throttle > 0 else s['reverse'] if throttle < 0 else 0
         travel = throttle * speed * seconds                     # signed cm
         self.distance_cm += abs(travel)
         turn = travel / s['radius'] * steer if steer and s['radius'] else 0.0   # radians, + = left
