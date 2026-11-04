@@ -181,8 +181,10 @@ const fmt=(v,u='')=>v===null||v===undefined?'—':v+u;
 
 // Live view: request the next frame as soon as one arrives.
 const live=$('live');
-live.onload=()=>{live.classList.remove('off');$('live-empty').hidden=true;setTimeout(nextLive,30)};
-live.onerror=()=>{live.classList.add('off');$('live-empty').hidden=false;setTimeout(nextLive,700)};
+// A missed frame keeps the last picture; only ~2 s of failures blank it.
+let liveFails=0;
+live.onload=()=>{liveFails=0;live.classList.remove('off');$('live-empty').hidden=true;setTimeout(nextLive,30)};
+live.onerror=()=>{if(++liveFails>=10){live.classList.add('off');$('live-empty').hidden=false}setTimeout(nextLive,liveFails<10?150:700)};
 function nextLive(){live.src='/live.jpg?'+Date.now()}nextLive();
 
 // Camera health + restart alert.

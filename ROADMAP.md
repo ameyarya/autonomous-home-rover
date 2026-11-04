@@ -15,6 +15,7 @@ Working list, one item at a time, simplest first (details and reasoning: [PLAN.m
 - [ ] 10. **Tasks on the map** — "find the dog and take a picture": visit rooms, look, photograph, come back.
 - [ ] 11. **Builds the map itself** — exploration; camera-only visual SLAM as an experiment.
 - [ ] 12. **Docking and unattended runs** — return to a charger, scheduled tasks.
+- [ ] 12b. **Apartment capture for simulation** (idea, 2026-11-03): whenever the rover drives, save frames with their pose (heading, odometer x/y), depth and time into a local dataset. Later, rebuild the apartment from them (photogrammetry or Gaussian splatting → mesh) as a simulation scene (Gazebo / Isaac Sim / MuJoCo) to train other robots. Needs good poses: items 6–7, or the phone/LiDAR path.
 - [ ] 13. **Full stack** — 2D LiDAR, Raspberry Pi onboard, ROS 2 + slam_toolbox + Nav2, Tailscale.
 
 Later add-on: the owner's WaveSight home-sensing project as a room-level position hint (see PLAN.md).

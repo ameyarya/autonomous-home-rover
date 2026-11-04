@@ -293,6 +293,7 @@ class Dashboard:
 
 class QuietServer(ThreadingHTTPServer):
     """Browsers drop image/poll connections mid-request all the time; don't print tracebacks for that."""
+    request_queue_size = 64      # the page and the depth service both pull frames ~20 times a second
 
     def handle_error(self, request, client_address):
         if not isinstance(sys.exc_info()[1], (ConnectionResetError, BrokenPipeError)):
