@@ -71,6 +71,15 @@ camera alone is the hardest way to know position, so cheap sensors (~US$20 total
 | 12 | **Docking and unattended runs:** marker-guided return to a charging dock, scheduled tasks, health checks | 9 + dock hardware | high |
 | 13 | **Full stack:** 2D LiDAR (LDS02RR, ~US$20), Raspberry Pi onboard, ROS 2 + slam_toolbox + Nav2; Tailscale for remote use | big hardware step | very high |
 
+Later add-on (owner's separate WaveSight home-mapping project, 2026-11-03): Wi-Fi sensing boards
+per room can't give the precise pose (the small, low rover barely disturbs the signal and can't be
+told apart from people or the dog), but reversed, with the boards *listening to the rover's own
+radio* (camera Wi-Fi, ESP-NOW drive frames), they give a coarse fix: RSSI from 3+ boards ≈ 2–3 m
+(room level), a trained CSI fingerprint ≈ 1 m. Use it as a room-level prior and to recover when
+lost (narrows which AprilTags to look for), and motion zones as task targets (item 10); markers +
+odometry + gyro stay the precise source. When building it: a board per room, log packets heard
+from the rover's MACs.
+
 Dropped 2026-11-03: dog following (Phase 1's dog-companion done-criterion), the collar tracker
 and WaveSight motion zones (both were for finding the dog). The dog watcher code stays in `mac/`
 unused; its detector is reused for the snapshot task.
