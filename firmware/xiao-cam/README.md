@@ -102,3 +102,11 @@ shasum -a 256 -c backups/<image>.bin.sha256
 esptool --chip esp32s3 -p /dev/cu.usbmodem<port> -b 921600 write-flash 0 backups/<image>.bin
 ```
 
+2026-11-03 video lag on the assembled rover: the door-cam work had left `framesize=hd&quality=10`
+(~1.3 fps reaching the Mac, ~1 s old). The restored backup was also old firmware (one viewer);
+current firmware (`83c0b4b`) pushed over Wi-Fi with OTA. The camera captures ~28 fps, but the
+Wi-Fi link only carries ~150 KB/s here (ping 5–190 ms), so frames queue: VGA q12 ≈ 6–9 fps;
+**VGA q16 ≈ 15 fps, 120–150 ms typical** with occasional ~0.9 s hiccups — now the setting.
+Build note: this ESP-IDF (v5.4.4, now in ~/Documents/Projects/esp-idf) wants xtensa toolchain
+esp-14.2.0_20260121; its export.sh fails on a missing riscv gdb (not needed for the S3).
+
