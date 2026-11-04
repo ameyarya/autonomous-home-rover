@@ -9,7 +9,10 @@ the turn rate to stop before overshooting, small errors inside DEADBAND_DEG are 
 corrections use the rover app's fine steering: gentle steer (a third of full lock) up to FULL_DEG,
 full lock only beyond, and "wheels centred now" when on course (a lone W would keep the last steer
 for 400 ms, so every tap used to last 400 ms).
-Road runs 2026-11-03: full lock every step zigzagged ±4°; short full-lock taps still felt zig-zaggy.
+Road runs 2026-11-03: full lock every step zigzagged ±4°; short full-lock taps still felt zig-zaggy;
+gentle-only steered left every step for 1.7 s and still drifted right 4° (the front-wheel play
+eats a 15° servo move). So HeadingHold works out a steering amount (proportional to the predicted
+error, plus a slowly built trim for a steady pull) and mixes gentle and full-lock steps to get it.
 """
 import json
 import socket
@@ -22,20 +25,46 @@ SUB_EVERY_S = 1.0
 DEADBAND_DEG = 2.0
 LEAD_S = 0.4             # servo + radio + Wi-Fi delay, plus the rover's own response
 FULL_DEG = 10.0          # predicted error beyond which it uses full lock
+TURN_LEAD_S = 0.15       # turns: 0.4 s stopped a 90° turn 6° early, it only coasted ~2°
+KP = 1 / 10.0            # steering amount per degree of predicted error (10° off = full lock)
+KI = 0.08                # trim built per degree-second of error
+TRIM_MAX = 0.6
+RATE_SMOOTH = 0.5        # the wobble spikes the turn rate; smooth it a little
 STALL_S = 1.0            # a gyro turn with no heading change for this long = stuck
 STALL_DPS = 2.0
 
 
-def steer_key(throttle, error_deg, rate_dps=0.0, deadband=DEADBAND_DEG, lead_s=LEAD_S):
-    """Key that steers toward the target. error = target - yaw (+ = need to turn left).
-    Forward: a/A turn left, d/D right. Reversing turns the other way: c/C swing the heading left.
-    Lower case = gentle (or w/s: wheels centred now), upper case = full lock."""
-    predicted = error_deg - rate_dps * lead_s
-    if abs(predicted) <= deadband:
-        return 'w' if throttle > 0 else 's'
-    left = predicted > 0
-    key = ('a' if left else 'd') if throttle > 0 else ('c' if left else 'z')
-    return key.upper() if abs(predicted) > FULL_DEG else key
+class HeadingHold:
+    """Steering amount u in [-1, 1] (+ = left) from the error, made from gentle (a/d) and full-lock
+    (A/D) steps: |u| <= GENTLE mixes centred and gentle steps, above that gentle and full lock."""
+    def __init__(self, throttle, gentle=0.3):
+        self.throttle, self.gentle = throttle, gentle
+        self.trim, self.rate, self.acc = 0.0, 0.0, 0.0
+
+    def amount(self, error_deg, rate_dps, dt):
+        self.rate += RATE_SMOOTH * (rate_dps - self.rate)
+        predicted = error_deg - self.rate * LEAD_S
+        self.trim = max(-TRIM_MAX, min(TRIM_MAX, self.trim + KI * error_deg * dt))
+        u = KP * predicted + self.trim
+        if abs(predicted) <= DEADBAND_DEG and abs(self.trim) < 0.05:
+            u = 0.0
+        return max(-1.0, min(1.0, u))
+
+    def key(self, error_deg, rate_dps, dt):
+        u = self.amount(error_deg, rate_dps, dt)
+        left = u > 0
+        fwd = self.throttle > 0
+        straight, gentle = ('w' if fwd else 's'), (('a' if left else 'd') if fwd else ('c' if left else 'z'))
+        mag = abs(u)
+        if mag <= self.gentle:                       # centred or gentle, in proportion
+            low, high, share = straight, gentle, mag / self.gentle
+        else:                                        # gentle or full lock, in proportion
+            low, high, share = gentle, gentle.upper(), (mag - self.gentle) / (1 - self.gentle)
+        self.acc += share
+        if self.acc >= 1.0:
+            self.acc -= 1.0
+            return high
+        return low
 
 
 def wrap(deg):

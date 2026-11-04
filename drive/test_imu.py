@@ -51,21 +51,43 @@ class GyroTx(FakeTx):
         super().stop()
 
 
-class SteerKeyTest(unittest.TestCase):
-    def test_forward(self):
-        self.assertEqual(imu.steer_key(1, 0.5), 'w')        # on course: wheels centred now
-        self.assertEqual(imu.steer_key(1, 5), 'a')          # drifted right: gentle left
-        self.assertEqual(imu.steer_key(1, -5), 'd')
-        self.assertEqual(imu.steer_key(1, 20), 'A')         # far off: full lock
+class HeadingHoldTest(unittest.TestCase):
+    def keys(self, throttle, error, n=10, rate=0.0):
+        h = imu.HeadingHold(throttle)
+        return [h.key(error, rate, 0.0) for _ in range(n)]
+
+    def test_on_course_goes_straight(self):
+        self.assertEqual(set(self.keys(1, 0.5)), {'w'})
+        self.assertEqual(set(self.keys(-1, -1.0)), {'s'})
+
+    def test_small_error_mixes_straight_and_gentle(self):
+        keys = self.keys(1, 3.0)                       # u = 0.3: all gentle
+        self.assertEqual(set(keys), {'a'})
+        keys = self.keys(1, -2.5, n=12)                # u = 0.25: mostly gentle right, some straight
+        self.assertEqual(set(keys), {'w', 'd'})
+
+    def test_bigger_error_mixes_gentle_and_full_lock(self):
+        keys = self.keys(1, 6.5)                       # u = 0.65: half gentle, half full lock
+        self.assertEqual(set(keys), {'a', 'A'})
+        self.assertEqual(set(self.keys(1, 30.0)), {'A'})
 
     def test_reverse_steers_the_other_way(self):
-        self.assertEqual(imu.steer_key(-1, 0), 's')
-        self.assertEqual(imu.steer_key(-1, 5), 'c')
-        self.assertEqual(imu.steer_key(-1, -20), 'Z')
+        self.assertEqual(set(self.keys(-1, 3.0)), {'c'})
+        self.assertEqual(set(self.keys(-1, -30.0)), {'Z'})
 
     def test_lead_stops_steering_before_target(self):
-        # 5 degrees off but already turning left at 16 deg/s: predicted error is -1.4 deg, go straight
-        self.assertEqual(imu.steer_key(1, 5, rate_dps=16), 'w')
+        # 3 degrees off but already turning back at 16 deg/s: go straight (or the other way)
+        h = imu.HeadingHold(1)
+        h.rate = 16.0
+        self.assertNotIn(h.key(3.0, 16.0, 0.0), ('a', 'A'))
+
+    def test_steady_pull_builds_trim(self):
+        h = imu.HeadingHold(1)
+        first = h.amount(2.0, 0.0, 0.1)
+        for _ in range(30):
+            later = h.amount(2.0, 0.0, 0.1)
+        self.assertGreater(later, first + 0.2)
+        self.assertLessEqual(h.trim, imu.TRIM_MAX)
 
     def test_wrap(self):
         self.assertEqual(imu.wrap(190), -170)
@@ -82,11 +104,16 @@ class GyroMoveTest(unittest.TestCase):
         self.s.power = lambda: 1200
         self.s.arm(True)
 
+    def test_holds_heading_when_the_pull_beats_gentle_steering(self):
+        self.g.drift = -8.0                                # gentle alone gives only +4.8 deg/s back
+        self.s.move('forward', 100)
+        self.assertIn('A', self.tx.calls)
+        self.assertLess(abs(self.g.y), 5.0)
+
     def test_forward_holds_heading_against_drift(self):
         out = self.s.move('forward', 100)                  # 2 s; unheld it would drift 8 deg
         self.assertTrue(out['gyro'])
         self.assertIn('a', self.tx.calls)                  # corrected the rightward drift, gently
-        self.assertNotIn('A', self.tx.calls)
         self.assertLess(abs(self.g.y), 5.0)
         self.assertEqual(self.tx.calls[-1], 'X')
 
@@ -126,10 +153,6 @@ class GyroMoveTest(unittest.TestCase):
         self.assertEqual(out['ended'], 'stuck: heading not changing')
         self.assertLess(out['ms'], 2000)
         self.assertEqual(self.tx.calls[-1], 'X')
-
-    def test_straight_move_ends_straight(self):
-        self.s.move('forward', 40)
-        self.assertEqual(self.tx.calls[-2], 'w')
 
     def test_stick_lost_stops(self):
         self.g.alive = True

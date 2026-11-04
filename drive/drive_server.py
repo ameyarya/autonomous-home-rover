@@ -116,6 +116,8 @@ class DriveState:
         started = prev_t = time.monotonic()
         sent, ended = key, 'done'
         moved_at, moved_yaw = started, start         # stall check for turns
+        self.gyro_log = []                            # (s, key sent, yaw) per step
+        hold = heading.HeadingHold(throttle, motion.GENTLE)
         while True:
             if self.abort.is_set():
                 ended = 'aborted'
@@ -124,10 +126,11 @@ class DriveState:
                 ended = 'heading stick lost'
                 break
             now, yaw, rate = time.monotonic(), g.yaw(), g.rate()
-            self.count(sent, now - prev_t, yaw - prev_yaw)
+            dt = now - prev_t
+            self.count(sent, dt, yaw - prev_yaw)
             prev_t, prev_yaw = now, yaw
             if turning:
-                if sign * (yaw - start) + max(0.0, sign * rate) * heading.LEAD_S >= amount:
+                if sign * (yaw - start) + max(0.0, sign * rate) * heading.TURN_LEAD_S >= amount:
                     break
                 if abs(yaw - moved_yaw) > heading.STALL_DPS * heading.STALL_S / 2:
                     moved_at, moved_yaw = now, yaw
@@ -135,14 +138,13 @@ class DriveState:
                     ended = 'stuck: heading not changing'
                     break
                 sent = key
-            elif seconds - (now - started) < heading.LEAD_S:     # finish straight, don't coast off-line
-                sent = 'w' if throttle > 0 else 's'
             else:
-                sent = heading.steer_key(throttle, start - yaw, rate)
+                sent = hold.key(start - yaw, rate, dt)
             if now - started >= limit:
                 ended = 'timeout' if turning else 'done'
                 break
             self.tx.wire(sent)
+            self.gyro_log.append((round(now - started, 2), sent, round(yaw - start, 1)))
             self.abort.wait(TICK_S)
         self.gyro_end = (sent, prev_t, prev_yaw, g)
         return time.monotonic() - started, ended
@@ -196,6 +198,8 @@ class DriveState:
         if g and g.fresh():
             moved = g.yaw() - start_yaw
             self.last['turned_deg'] = round(moved, 1)
+        if g:
+            self.last['steps'] = self.gyro_log
         return dict(self.last, odometer=self.odometer.as_dict())
 
     def motion_status(self):
