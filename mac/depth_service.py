@@ -59,8 +59,9 @@ MAP_EVERY_S = 0.5
 MAP_SETTLE_S = 0.6       # after a move, wait this long before mapping (picture and pose settle)
 MAP_COLUMNS = 64
 WATCH = {16: 'dog', 15: 'cat', 0: 'person'}   # COCO class ids
-WATCH_CONF = 0.35
+WATCH_CONF = {'dog': 0.35, 'cat': 0.35, 'person': 0.5}
 SEEN_HOLD_S = 1.5
+SEEN_MIN = 2             # detections within SEEN_HOLD_S before it counts (one-frame false "person" seen)
 SMOOTH_N = 5             # sectors report the median of this many frames (single-frame glitches seen)
 
 
@@ -141,7 +142,8 @@ class DepthService:
         self.moved_at = 0.0
         self.pose = None
         self.yolo = None
-        self.seen = {}           # name -> (monotonic time, confidence, box)
+        self.seen = {}           # name -> (monotonic time, confidence, box) of the latest detection
+        self.hits = {}           # name -> recent detection times
         self.model = None
         self.reading = {'ok': False, 'why': 'starting'}
         self.image = None
@@ -163,16 +165,21 @@ class DepthService:
 
     def watch(self, img):
         """Dogs, cats and people in view (they stop the explorer)."""
-        result = self.yolo.predict(img, device=self.device, imgsz=416, conf=WATCH_CONF, verbose=False,
-                                   classes=list(WATCH))[0]
+        result = self.yolo.predict(img, device=self.device, imgsz=416, conf=min(WATCH_CONF.values()),
+                                   verbose=False, classes=list(WATCH))[0]
         now = time.monotonic()
         for box in result.boxes:
             name = WATCH[int(box.cls)]
+            if float(box.conf) < WATCH_CONF[name]:
+                continue
             self.seen[name] = (now, float(box.conf), [int(v) for v in box.xyxy[0].tolist()])
+            self.hits.setdefault(name, []).append(now)
 
     def stop_for(self):
         now = time.monotonic()
-        return sorted(n for n, (t, _, _) in self.seen.items() if now - t < SEEN_HOLD_S)
+        for name in list(self.hits):
+            self.hits[name] = [t for t in self.hits[name] if now - t < SEEN_HOLD_S]
+        return sorted(n for n, ts in self.hits.items() if len(ts) >= SEEN_MIN)
 
     def frame(self):
         with urllib.request.urlopen(self.source, timeout=2) as r:

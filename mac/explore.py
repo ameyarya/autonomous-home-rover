@@ -74,9 +74,9 @@ class Guard:
             elif self.forward and d.get('ok') and d['sectors']['centre']['cm'] < GUARD_CM:
                 why = f'centre {d["sectors"]["centre"]["cm"]} cm'
             if why and self.active.is_set():
-                call(DRIVE + '/stop', {})
-                self.why = why
+                self.why = why                          # before the stop: the move returns as soon as it lands
                 self.active.clear()
+                call(DRIVE + '/stop', {'from': f'explorer guard: {why}'})
             time.sleep(0.1)
 
     def move(self, kind, amount):
@@ -158,7 +158,7 @@ def main():
                               'error': out.get('error'), 'odometer': out.get('odometer'),
                               'map': d.get('map')}), flush=True)
             if 'acknowledge stop' in str(out.get('error')):  # a missed radio reply: stop again, go on if it acks
-                again = call(DRIVE + '/stop', {})
+                again = call(DRIVE + '/stop', {'from': 'explorer'})
                 if not again.get('error') and again.get('armed') is False:
                     print(f'step {i}: stop ACK missed once, the retry was acknowledged', flush=True)
                     call(DRIVE + '/arm', {'armed': True, 'fresh': True})

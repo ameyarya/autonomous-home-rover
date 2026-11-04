@@ -99,6 +99,8 @@ class DriveState:
             except Exception as error:
                 self.error = f'stop failed: {error}'
         self.last = {'key': 'X', 'why': why, 't': time.time()}
+        if why not in ('test reset',):
+            print(f'{time.strftime("%H:%M:%S")} stop: {why}', flush=True)   # in drive-server.log
 
     def power(self):
         live = calibration.live_values(self.installed)
@@ -390,7 +392,7 @@ def make_handler(state):
                     state.arm(bool(b.get('armed')), renew=bool(b.get('renew')))
                     return self.reply(200, state.status())
                 if self.path == '/stop':
-                    state.stop('stop requested')
+                    state.stop(f'stop requested ({self.body().get("from") or "unnamed"})')
                     return self.reply(200, state.status())
                 if self.path == '/pulse':
                     b = self.body()

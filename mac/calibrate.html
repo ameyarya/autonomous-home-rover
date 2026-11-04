@@ -182,7 +182,7 @@ function showDrive(s){if(s.armed===undefined){$('drive-status').textContent='Dri
 async function lease(){if(!installing){try{showDrive(armed&&mine?await postJSON('/drive/arm',{armed:true,renew:true}):await getJSON('/drive/status'))}catch(e){armed=false;$('arm').textContent='Arm';$('arm').className='';$('drive-status').textContent='Drive server offline'}}setTimeout(lease,1000)}
 lease();
 $('arm').onclick=async()=>{try{mine=!armed;showDrive(await postJSON('/drive/arm',{armed:!armed,fresh:true}))}catch(e){$('drive-status').textContent=e.message}};
-async function estop(){release();armed=false;try{showDrive(await postJSON('/drive/stop'))}catch(e){}}
+async function estop(){release();armed=false;try{showDrive(await postJSON('/drive/stop',{from:'calibrate STOP'}))}catch(e){}}
 $('stop').onclick=estop;
 function press(key){if(!armed){$('drive-status').textContent='Arm first.';return}if(held===key)return;held=key;
   const send=()=>postJSON('/drive/hold',{key}).catch(e=>{$('drive-status').textContent=e.message;release()});send();clearInterval(holdTimer);holdTimer=setInterval(send,150)}
@@ -195,6 +195,6 @@ addEventListener('keydown',e=>{if(e.target.closest('input'))return;const k=e.key
   if(k==='escape'||k===' '){e.preventDefault();estop();return}if(keymap[k]){e.preventDefault();press(keymap[k])}});
 addEventListener('keyup',e=>{if(keymap[e.key.toLowerCase()]===held)release()});
 addEventListener('blur',release);
-addEventListener('pagehide',()=>{if(armed)navigator.sendBeacon('/drive/stop','{}')});
+addEventListener('pagehide',()=>{if(armed&&mine)navigator.sendBeacon('/drive/stop','{"from":"calibrate closed"}')});
 </script>
 </body></html>

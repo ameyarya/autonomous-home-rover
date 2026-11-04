@@ -267,7 +267,7 @@ async function lease(){
   setTimeout(lease,1000)}
 lease();
 $('arm').onclick=async()=>{try{mine=!armed;showDrive(await postJSON('/drive/arm',{armed:!armed,fresh:true}))}catch(e){$('drive-status').textContent=e.message}};
-async function estop(){down.clear();update();armed=false;showArmed();try{showDrive(await postJSON('/drive/stop'))}catch(e){}}
+async function estop(){down.clear();update();armed=false;showArmed();try{showDrive(await postJSON('/drive/stop',{from:'dashboard STOP'}))}catch(e){}}
 $('stop').onclick=estop;
 function update(){
   document.querySelectorAll('.pad button').forEach(b=>b.classList.toggle('on',down.has(b.dataset.dir)));
@@ -290,7 +290,7 @@ addEventListener('blur',()=>{down.clear();update()});
 document.querySelectorAll('.pad button').forEach(b=>{
   b.onpointerdown=e=>{try{b.setPointerCapture(e.pointerId)}catch(err){}down.add(b.dataset.dir);update()};
   b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>{down.delete(b.dataset.dir);update()}});
-addEventListener('pagehide',()=>{if(armed)navigator.sendBeacon('/drive/stop','{}')});
+addEventListener('pagehide',()=>{if(armed&&mine)navigator.sendBeacon('/drive/stop','{"from":"dashboard closed"}')});
 
 
 // Measured moves + odometer (estimates from drive time).

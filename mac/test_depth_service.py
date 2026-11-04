@@ -70,6 +70,16 @@ class AnalyseTest(unittest.TestCase):
         out = ds.smooth([{'left': 20, 'centre': 300, 'right': 95}] * 3 + [{'left': 145, 'centre': 300, 'right': 95}] * 2)
         self.assertEqual(out['left']['state'], 'blocked')   # a real obstacle shows within 3 frames
 
+    def test_one_frame_detection_does_not_stop(self):
+        svc = ds.DepthService('', 336, 'cpu')
+        import time as t
+        svc.hits = {'person': [t.monotonic()]}
+        self.assertEqual(svc.stop_for(), [])
+        svc.hits['person'].append(t.monotonic())
+        self.assertEqual(svc.stop_for(), ['person'])
+        svc.hits = {'dog': [t.monotonic() - 5, t.monotonic() - 4]}
+        self.assertEqual(svc.stop_for(), [])          # old sightings expire
+
     def test_overlay_shape(self):
         disp = floor_scene()
         reading, mask, free = ds.analyse(disp)
