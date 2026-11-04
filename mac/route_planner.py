@@ -33,10 +33,11 @@ GOAL_M = 0.25
 class Grid:
     """Distance (m) from each cell centre to the nearest obstacle rectangle."""
 
-    def __init__(self, rects, size):
-        self.nx, self.ny = int(math.ceil(size[0] / CELL_M)), int(math.ceil(size[1] / CELL_M))
-        xs = (np.arange(self.nx) + 0.5) * CELL_M
-        ys = (np.arange(self.ny) + 0.5) * CELL_M
+    def __init__(self, rects, size, cell=CELL_M):
+        self.cell = cell
+        self.nx, self.ny = int(math.ceil(size[0] / cell)), int(math.ceil(size[1] / cell))
+        xs = (np.arange(self.nx) + 0.5) * cell
+        ys = (np.arange(self.ny) + 0.5) * cell
         X, Y = np.meshgrid(xs, ys, indexing='ij')
         d = np.full(X.shape, 9.0)
         for r in rects:
@@ -46,18 +47,35 @@ class Grid:
         self.dist = d
 
     def clearance(self, x, y):
-        i, j = int(x / CELL_M), int(y / CELL_M)
+        i, j = int(x / self.cell), int(y / self.cell)
         if not (0 <= i < self.nx and 0 <= j < self.ny):
             return 0.0
         return float(self.dist[i, j])
 
-    def body_free(self, x, y, h):
+    def body_free(self, x, y, h, margin=None):
         c, s = math.cos(h), math.sin(h)
-        return all(self.clearance(x + b * c, y + b * s) > BODY_R + CLEAR_M for b in BODY)
+        m = CLEAR_M if margin is None else margin
+        return all(self.clearance(x + b * c, y + b * s) > BODY_R + m for b in BODY)
 
-    def flood(self, goal):
+    def snap(self, x, y, h, margin, reach=0.30):
+        """The nearest pose (same heading, within `reach`) where the body fits with `margin`."""
+        if self.body_free(x, y, h, margin):
+            return x, y
+        for r in np.arange(0.025, reach + 1e-9, 0.025):
+            best = None
+            for a in np.linspace(0, 2 * math.pi, 24, endpoint=False):
+                px, py = x + r * math.cos(a), y + r * math.sin(a)
+                if self.body_free(px, py, h, margin):
+                    c = self.clearance(px, py)
+                    if best is None or c > best[0]:
+                        best = (c, px, py)
+            if best:
+                return best[1], best[2]
+        return None
+
+    def flood(self, goal, margin=CLEAR_M):
         """Obstacle-aware distance (m) from every cell to the goal, through cells the body fits in."""
-        ok = self.dist > BODY_R + CLEAR_M - CELL_M
+        ok = self.dist > BODY_R + margin - self.cell
         far = np.full(self.dist.shape, np.inf)
         gi, gj = int(goal[0] / CELL_M), int(goal[1] / CELL_M)
         far[gi, gj] = 0.0
@@ -101,14 +119,36 @@ def primitives():
 PRIMS = primitives()
 
 
-def plan(rects, size, start, goal, max_expand=200000):
-    """start (x, y, heading deg), goal (x, y). Returns (moves, poses) or (None, why)."""
+MARGINS = (0.12, 0.06, CLEAR_M)     # keep this much clear where there's room, less only where it's tight
+
+
+def plan(rects, size, start, goal, max_expand=200000, strict_start=True):
+    """start (x, y, heading deg), goal (x, y). Returns (moves, poses) or (None, why).
+    Tries the widest margin first (the position is only known to ~10-25 cm on the real rover).
+    strict_start=False: an estimated start that grazes something is snapped to the nearest clear spot
+    within 30 cm (the estimate is that far out; the rover is really somewhere clear)."""
     grid = Grid(rects, size)
-    if not grid.body_free(start[0], start[1], math.radians(start[2])):
-        return None, 'the start is inside or touching something'
-    if grid.clearance(*goal) < BODY_R + CLEAR_M:
+    why = 'no route'
+    for margin in (MARGINS if not strict_start else (CLEAR_M,)):
+        moves, info = _plan(grid, start, goal, max_expand, strict_start, margin)
+        if moves is not None:
+            return moves, info
+        why = info
+    return None, why
+
+
+def _plan(grid, start, goal, max_expand, strict_start, margin):
+    h0 = math.radians(start[2])
+    if not grid.body_free(start[0], start[1], h0, margin):
+        if strict_start:
+            return None, 'the start is inside or touching something'
+        snapped = grid.snap(start[0], start[1], h0, margin)
+        if snapped is None:
+            return None, 'no clear spot within 30 cm of the estimated start'
+        start = (snapped[0], snapped[1], start[2])
+    if grid.clearance(*goal) < BODY_R + margin:
         return None, 'the goal is inside or too close to something'
-    far = grid.flood(goal)
+    far = grid.flood(goal, margin)
     h_of = lambda x, y: far[min(grid.nx - 1, int(x / CELL_M)), min(grid.ny - 1, int(y / CELL_M))]
     if not np.isfinite(h_of(start[0], start[1])):
         return None, 'no way through (walls, furniture or virtual doors in the way)'
@@ -138,7 +178,7 @@ def plan(rects, size, start, goal, max_expand=200000):
             ok = True
             for dx, dy, dh in samples:
                 px, py = x + dx * c - dy * sn, y + dx * sn + dy * c
-                if not grid.body_free(px, py, h + dh):
+                if not grid.body_free(px, py, h + dh, margin):
                     ok = False
                     break
             if not ok:

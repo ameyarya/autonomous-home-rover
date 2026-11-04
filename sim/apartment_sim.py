@@ -260,6 +260,7 @@ class Sim:
         self.data = mujoco.MjData(self.model)
         self.frame, self.frame_seq, self.frame_t = None, 0, 0.0
         self.ray_data, self.ray_lock = mujoco.MjData(self.model), threading.Lock()
+        self.noise = random.Random(seed + 7)
         self.rover_body = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, 'rover')
 
     def physics(self):
@@ -283,8 +284,9 @@ class Sim:
             self.frame, self.frame_seq, self.frame_t = buf.getvalue(), self.frame_seq + 1, time.monotonic()
             time.sleep(1 / FPS)
 
-    def exact_depth(self):
-        """Forward distance (cm) to the first thing in each of RAY_COLUMNS directions, as sectors."""
+    def exact_depth(self, columns=RAY_COLUMNS, realistic=False):
+        """Forward distance (cm) to the first thing in each of `columns` directions, as sectors.
+        realistic: like a real sensor: virtual doors invisible, and noise (3 cm + 5%)."""
         with self.ray_lock:
             r = self.rover
             self.ray_data.mocap_pos[0] = [r.x, r.y, 0]
@@ -293,19 +295,22 @@ class Sim:
             cam = np.array([r.x + 0.125 * math.cos(r.yaw), r.y + 0.125 * math.sin(r.yaw), RAY_Z_M])
             f = 0.5 / math.tan(math.radians(HFOV_DEG) / 2)
             cols, geom = [], np.zeros(1, np.int32)
-            for u in (np.arange(RAY_COLUMNS) + 0.5) / RAY_COLUMNS - 0.5:
+            groups = np.array([1, 1, 1, 0, 1, 1], np.uint8) if realistic else None   # group 3 = virtual doors
+            for u in (np.arange(columns) + 0.5) / columns - 0.5:
                 bearing = -math.atan2(u, f)
                 a = r.yaw + bearing
                 d = mujoco.mj_ray(self.model, self.ray_data, cam, np.array([math.cos(a), math.sin(a), 0.0]),
-                                  None, 1, self.rover_body, geom)
+                                  groups, 1, self.rover_body, geom)
                 forward = d * math.cos(bearing) * 100 if d >= 0 else MAX_CM
+                if realistic and forward < MAX_CM:
+                    forward = max(5.0, forward + self.noise.gauss(0, 3 + 0.05 * forward))
                 cols.append(min(MAX_CM, forward))
         sectors = {}
         for name, part in zip(('left', 'centre', 'right'), np.array_split(np.array(cols), 3)):
             cm = float(np.percentile(part, 10))
             sectors[name] = {'cm': round(cm), 'state': 'blocked' if cm < 35 else 'near' if cm < 80 else 'clear'}
         return {'ready': True, 'ok': True, 'frame_age_ms': 0, 'error': None, 'stop_for': [], 'sectors': sectors,
-                'raw': sectors, 'map': None, 'source': 'exact (sim rays)'}
+                'raw': sectors, 'map': None, 'source': 'exact (sim rays)', 'columns': [round(c, 1) for c in cols]}
 
     def truth(self):
         r = self.rover
@@ -357,7 +362,10 @@ def camera_handler(sim):
 def exact_depth_handler(sim):
     class H(BaseHTTPRequestHandler):
         def do_GET(self):
-            body = json.dumps(sim.exact_depth() if self.path == '/status' else {}).encode()
+            path, _, query = self.path.partition('?')
+            q = dict(kv.split('=', 1) for kv in query.split('&') if '=' in kv)
+            body = json.dumps(sim.exact_depth(int(q.get('columns', RAY_COLUMNS)), q.get('realistic') == '1')
+                              if path == '/status' else {}).encode()
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Content-Length', str(len(body)))
