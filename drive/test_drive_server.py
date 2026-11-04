@@ -188,12 +188,12 @@ class DriveStateTest(unittest.TestCase):
         import calibration
         original = calibration.CAL_FILE.read_text()
         try:
-            self.s.installed = 'rover-drive-0.8+cabc123 c90 t40 s900|0'
-            self.tx.status = lambda: 'rover-drive-0.8+cabc123 c92 t38 s920*|0'
+            self.s.installed = 'rover-drive-0.9+cabc123 c90 t40 s900|0'
+            self.tx.status = lambda: 'rover-drive-0.9+cabc123 c92 t38 s920*|0'
             r = self.s.live_calibration({'steer_center': 92, 'steer_travel': 38, 'speed': 920})
             self.assertEqual(self.tx.calls[-1], 'CODES AAA AAA ADD ADD DAA DAA')
             self.assertTrue(r['live']['unsaved'])
-            self.tx.status = lambda: 'rover-drive-0.8+cabc123 c92 t38 s920|0'
+            self.tx.status = lambda: 'rover-drive-0.9+cabc123 c92 t38 s920|0'
             self.s.live_calibration(action='save')
             self.assertEqual(self.tx.calls[-1], 'CODES DDA')
             self.assertEqual(calibration.load()['steer_center'], 92)

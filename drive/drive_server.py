@@ -115,7 +115,6 @@ class DriveState:
         start = prev_yaw = g.yaw()
         started = prev_t = time.monotonic()
         sent, ended = key, 'done'
-        hold = heading.HeadingHold(throttle)
         moved_at, moved_yaw = started, start         # stall check for turns
         while True:
             if self.abort.is_set():
@@ -137,9 +136,9 @@ class DriveState:
                     break
                 sent = key
             elif seconds - (now - started) < heading.LEAD_S:     # finish straight, don't coast off-line
-                sent = 'W' if throttle > 0 else 'S'
+                sent = 'w' if throttle > 0 else 's'
             else:
-                sent = hold.key(start - yaw, rate)
+                sent = heading.steer_key(throttle, start - yaw, rate)
             if now - started >= limit:
                 ended = 'timeout' if turning else 'done'
                 break

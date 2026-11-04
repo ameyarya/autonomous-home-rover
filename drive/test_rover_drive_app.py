@@ -47,6 +47,29 @@ class AppTest(unittest.TestCase):
             clock[0] += gap
         return out
 
+    def test_ww_a_steers_gently(self):
+        self.keys('WWA', gap=5)
+        self.assertAlmostEqual(self.app.wanted, -self.ns['GENTLE'])
+        self.keys('WA', gap=5)                                  # plain W A: full lock again
+        self.assertEqual(self.app.wanted, -1)
+
+    def test_ww_centres_now(self):
+        self.keys('WA', gap=5)
+        clock[0] += 100
+        self.app.command(b'W')                                  # a lone W keeps the recent steer
+        self.assertTrue(self.app.fresh(self.app.wanted_at, clock[0]))
+        clock[0] += 5
+        self.app.command(b'W')                                  # W W: centred
+        self.assertFalse(self.app.fresh(self.app.wanted_at, clock[0]))
+
+    def test_remote_pace_never_matches_the_patterns(self):
+        self.keys('WWA', gap=50)                                # the handheld remote: 50+ ms apart
+        self.assertEqual(self.app.wanted, -1)
+
+    def test_reverse_gentle(self):
+        self.keys('SSD', gap=5)
+        self.assertAlmostEqual(self.app.wanted, self.ns['GENTLE'])
+
     def test_service_validation_sequence(self):
         self.assertEqual(self.keys('WASDX')[-1], (0, 0))
 

@@ -21,8 +21,12 @@ FIELDS = ('forward_cm_s', 'reverse_cm_s', 'turn_radius_cm', 'power', 'arc_forwar
 MAX_MOVE_S = 8.0
 TEST_S = {'forward': 2.0, 'reverse': 1.5, 'arc': 2.0}   # timed runs for measuring speed and turning
 # key -> (throttle: +1 forward / -1 reverse / 0, steer: +1 left / -1 right / 0)
+# lower case = the fine steering heading hold uses (rover app 0.9): w/s wheels centred now,
+# a/d/z/c steer GENTLE of full lock
+GENTLE = 0.3
 KEYS = {'W': (1, 0), 'A': (1, 1), 'D': (1, -1), 'S': (-1, 0), 'Z': (-1, 1), 'C': (-1, -1),
-        'L': (0, 1), 'R': (0, -1)}
+        'L': (0, 1), 'R': (0, -1),
+        'w': (1, 0), 's': (-1, 0), 'a': (1, GENTLE), 'd': (1, -GENTLE), 'z': (-1, GENTLE), 'c': (-1, -GENTLE)}
 
 
 def load():

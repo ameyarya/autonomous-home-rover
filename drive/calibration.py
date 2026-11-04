@@ -13,7 +13,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CAL_FILE = HERE / 'calibration.json'
 APP_FILE = HERE / 'rover_drive_app.py'
-BASE_VERSION = 'rover-drive-0.8'
+BASE_VERSION = 'rover-drive-0.9'
 
 LIMITS = {
     'speed': (200, 1600),          # of 2048

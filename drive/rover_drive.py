@@ -169,11 +169,14 @@ class Transmitter:
     def wire(self, key):
         # The receiver combines a throttle key with a steer key sent together (A/D alone only
         # steer). The Mac's A/D are forward arcs; L/R steer only; Z/C reverse while steering.
-        frames = {'A': 'WA', 'D': 'WD', 'L': 'A', 'R': 'D', 'Z': 'SA', 'C': 'SD'}.get(key, key)
+        # Lower case (rover app 0.9 patterns): w/s drive with the wheels centred now, a/d/z/c
+        # steer gently.
+        frames = {'A': 'WA', 'D': 'WD', 'L': 'A', 'R': 'D', 'Z': 'SA', 'C': 'SD',
+                  'w': 'WW', 's': 'SS', 'a': 'WWA', 'd': 'WWD', 'z': 'SSA', 'c': 'SSD'}.get(key, key)
         self.repl(';'.join('wire(%r)' % k for k in frames))
 
     def codes(self, codes):
-        """Send live calibration codes (rover app 0.8: X X X X + three A/D keys each; they never drive)."""
+        """Send live calibration codes (rover app 0.8+: X X X X + three A/D keys each; they never drive)."""
         for i in range(0, len(codes), 4):
             self.repl(';'.join('wire(%r)' % k for code in codes[i:i + 4] for k in 'XXXX' + code), timeout=1.0)
 

@@ -80,7 +80,7 @@ class Moves(unittest.TestCase):
         motion.MOTION_FILE = Path(self.tmp.name) / 'motion.json'
         self.tx = FakeTx()
         self.s = drive_server.DriveState(self.tx)
-        self.s.installed = 'rover-drive-0.8+cabc123 c90 t40 s1200|0'
+        self.s.installed = 'rover-drive-0.9+cabc123 c90 t40 s1200|0'
         self.s.save_motion(M)
 
     def tearDown(self):

@@ -12,6 +12,11 @@ Throttle and steering combine: a W/S and an A/D less than MIX_MS apart drive and
 (the sender repeats both), A/D alone only turn the servo, W/S alone drive with the wheels centred.
 The Mac sends W with A/D for its forward arcs.
 
+Fine steering (0.9), for the Mac's heading hold, built from the same five keys sent back-to-back
+(each under PATTERN_GAP_MS apart; the handheld remote sends 50+ ms apart, so it never matches):
+  W W      drive, wheels centred now (a lone W keeps a recent steer for MIX_MS)
+  W W A/D  drive and steer GENTLE of full lock (S S A/D the same reversing)
+
 Live calibration (0.8): the receiver only passes these five keys, so the Mac (Calibrate page,
 through the remote or transmitter) sends edits as a code: X X X X back-to-back (each under
 CODE_GAP_MS apart; a stop retries 120+ ms apart) and three code keys, all A/D: after X there's
@@ -25,7 +30,7 @@ import __main__ as receiver
 
 # Calibration: the drive server rewrites these lines from drive/calibration.json when you press
 # "Install on rover" on the dashboard's Calibrate page (http://rover.local:8010/calibrate).
-VERSION = 'rover-drive-0.8'
+VERSION = 'rover-drive-0.9'
 SPEED = 900                 # of 2048; indoor dog-following pace
 MOTOR_SIGNS = (1, 1)        # flip one if that axle drives backwards
 STEER_SIGN = 1              # -1 swaps left/right if A turns the wheels right
@@ -35,6 +40,8 @@ STEER_TRAVEL = 20           # degrees each way; raise only after checking the li
 STEER_HOLD_MS = 500         # steering re-centres if no A/D arrives
 MIX_MS = 400                # a throttle key and a steer key this close together combine
 CODE_GAP_MS = 80            # calibration code keys arrive back-to-back
+PATTERN_GAP_MS = 30         # fine-steering patterns arrive faster still
+GENTLE = 0.3                # share of full lock for W W A/D
 CAL_FILE = 'rover_cal.json'
 CODES = {b'AAA': ('center', 1), b'AAD': ('center', -1), b'ADA': ('travel', 1), b'ADD': ('travel', -1),
          b'DAA': ('speed', 10), b'DAD': ('speed', -10), b'DDA': ('save', 0), b'DDD': ('revert', 0)}
@@ -122,17 +129,31 @@ class TankApp:
             self.code = b''
         return False
 
+    def pattern(self, now, n):
+        """The last n keys before this one, if each arrived under PATTERN_GAP_MS after the previous."""
+        keys = self.recent[:-1][-n:]
+        if len(keys) < n:
+            return None
+        times = [t for _, t in keys] + [now]
+        if any(time.ticks_diff(b, a) >= PATTERN_GAP_MS for a, b in zip(times, times[1:])):
+            return None
+        return b''.join(k for k, _ in keys)
+
     def command(self, key):
         now = time.ticks_ms()
         coded = self.take_code_key(key, now)
         if coded:
             motors, steer = (0, 0), 0
         elif key in self.throttles:
+            if self.pattern(now, 1) == key:          # W W: centre now
+                self.wanted_at = None
             self.throttle, self.throttle_at = self.throttles[key], now
             motors = self.throttle
             steer = self.wanted if self.fresh(self.wanted_at, now) else 0
         elif key in self.steers:
-            self.wanted, self.wanted_at = self.steers[key], now
+            before = self.pattern(now, 2)
+            gentle = before in (b'WW', b'SS')
+            self.wanted, self.wanted_at = self.steers[key] * (GENTLE if gentle else 1), now
             motors = self.throttle if self.fresh(self.throttle_at, now) else (0, 0)
             steer = self.wanted
         else:
@@ -149,7 +170,7 @@ class TankApp:
 
     def set_steer(self, steer):
         self.steer = steer
-        self.servos.set_angle(STEER_CHANNEL, self.cal['center'] + STEER_SIGN * steer * self.cal['travel'])
+        self.servos.set_angle(STEER_CHANNEL, int(round(self.cal['center'] + STEER_SIGN * steer * self.cal['travel'])))
 
     def ensure_servo(self):
         if self.servos is not None:

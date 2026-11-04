@@ -137,7 +137,7 @@ class FakeTx:
     unsaved = False
 
     def status(self):
-        v = getattr(self, 'version', 'rover-drive-0.8+c000000')
+        v = getattr(self, 'version', 'rover-drive-0.9+c000000')
         return v + ' c%(c)d t%(t)d s%(s)d' % self.live + ('*' if self.unsaved else '') + '|0'
 
 
