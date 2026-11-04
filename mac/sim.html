@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sim Apartment</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0f15;--panel:#121822;--panel2:#1b2330;--line:#263142;--line2:#35445b;--fg:#eef3fa;--dim:#9aabc2;--dim2:#7d8ea8;
+  --accent:#60a5fa;--sel:#f59e0b;--ok:#4ade80;--warn:#fbbf24;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);height:100vh;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:12px;padding:12px 18px;flex:none;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;font-weight:650}.sub{font-size:12px;color:var(--dim2)}
+.sp{flex:1}
+a.linkbtn,button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:7px 12px;cursor:pointer;text-decoration:none;font-size:13px}
+button:hover{background:#243045}button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:#1d4ed8;border-color:#3b82f6}button.on{background:var(--accent);color:#06101f;border-color:#93c5fd}
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;padding:0 18px 14px}
+#stage{position:relative;background:#05070a;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+#plan,#three{position:absolute;inset:0;width:100%;height:100%}
+#three{display:none}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+h2{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim2);margin:0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim2)}
+input,select{font:inherit;color:inherit;background:#0d131c;border:1px solid var(--line2);border-radius:8px;padding:6px;min-width:0;width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hint{font-size:12px;line-height:1.55;color:var(--dim);margin:0}
+#status{font-size:12px;color:var(--dim);min-height:18px}#status.warn{color:var(--warn)}#status.ok{color:var(--ok)}
+.item{cursor:move}.item.sel{stroke:var(--sel);stroke-width:3}
+.handle{fill:var(--sel);cursor:nwse-resize}
+.list{display:flex;flex-direction:column;gap:2px;flex:1;min-height:120px;overflow:auto;font-size:12px}
+.list div{padding:4px 6px;border-radius:6px;cursor:pointer;color:var(--dim)}.list div.sel{background:var(--panel2);color:var(--fg)}
+@media(max-width:900px){main{grid-template-columns:1fr;grid-template-rows:60vh auto}}
+</style></head><body>
+<header>
+  <h1>Sim apartment</h1><span class="sub">the simulator's copy of home · drag to move, corner to resize</span>
+  <span class="sp"></span>
+  <button id="v2d" class="on">Plan</button><button id="v3d">3D</button>
+  <label style="flex-direction:row;align-items:center;gap:6px;color:var(--dim)"><input type="checkbox" id="showplan" checked style="width:auto">floor plan</label>
+  <button id="undo" title="Undo (Cmd/Ctrl+Z)">Undo</button>
+  <button id="save" class="primary">Save &amp; rebuild</button>
+  <a class="linkbtn" href="/">Dashboard</a>
+</header>
+<main>
+  <div id="stage"><svg id="plan"></svg><canvas id="three"></canvas></div>
+  <aside>
+    <div><h2>Selected</h2></div>
+    <div id="none" class="hint">Click a piece of furniture to edit it. Walls come from the floor plan.</div>
+    <div id="edit" hidden>
+      <div class="grid2">
+        <label>Name<input id="f-name"></label>
+        <label>Height (m)<input id="f-h" type="number" step="0.05" min="0.02" max="2.5"></label>
+        <label>x (m, centre)<input id="f-x" type="number" step="0.05"></label>
+        <label>y (m, centre)<input id="f-y" type="number" step="0.05"></label>
+        <label id="l-w">Width x (m)<input id="f-w" type="number" step="0.05" min="0.05"></label>
+        <label id="l-d">Depth y (m)<input id="f-d" type="number" step="0.05" min="0.05"></label>
+      </div>
+      <div class="row" style="margin-top:10px"><button id="rot">Rotate 90°</button><button id="dup">Duplicate</button><button id="del">Delete</button></div>
+    </div>
+    <div class="row"><button id="add-box">+ Box</button><button id="add-cyl">+ Round</button><button id="add-rug">+ Rug</button></div>
+    <div><h2>Furniture</h2></div>
+    <div class="list" id="list"></div>
+    <p class="hint">x runs east, y north, from the plan's bottom-left corner. Rugs and the bedroom carpet are flat (the rover drives over them); everything else blocks it. Save writes the layout on this Mac (not the public repo) and rebuilds the simulator's apartment.</p>
+    <div id="status"></div>
+  </aside>
+</main>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+let data = null, sel = null, history = [], dirty = false, view = '2d';
+const svg = $('plan');
+
+function status(t, cls = '') { $('status').textContent = t; $('status').className = cls; }
+function items() {
+  return [...data.furniture.boxes.map(o => ({kind: 'box', o})), ...data.furniture.cylinders.map(o => ({kind: 'cyl', o})),
+          ...data.furniture.rugs.map(o => ({kind: 'rug', o}))];
+}
+function snapshot() { history.push(JSON.stringify(data.furniture)); if (history.length > 100) history.shift(); dirty = true; }
+function round(v) { return Math.round(v * 100) / 100; }
+function geom(it) {        // centre, size
+  const o = it.o;
+  if (it.kind === 'cyl') return {x: o.x, y: o.y, w: 2 * o.r, d: 2 * o.r};
+  return {x: (o.x0 + o.x1) / 2, y: (o.y0 + o.y1) / 2, w: o.x1 - o.x0, d: o.y1 - o.y0};
+}
+function setGeom(it, g) {
+  const o = it.o;
+  if (it.kind === 'cyl') { o.x = round(g.x); o.y = round(g.y); o.r = round(Math.max(0.03, Math.min(g.w, g.d) / 2)); return; }
+  o.x0 = round(g.x - g.w / 2); o.x1 = round(g.x + g.w / 2); o.y0 = round(g.y - g.d / 2); o.y1 = round(g.y + g.d / 2);
+}
+
+// ---- top-down plan (SVG) ----
+let S = 60, OX = 20, OY = 20;   // px per metre, offsets
+function fit() {
+  const r = svg.getBoundingClientRect(), [W, H] = data.size;
+  S = Math.min((r.width - 40) / W, (r.height - 40) / H); OX = (r.width - W * S) / 2; OY = (r.height - H * S) / 2;
+}
+const px = (x, y) => [OX + x * S, OY + (data.size[1] - y) * S];
+const metres = (sx, sy) => [(sx - OX) / S, data.size[1] - (sy - OY) / S];
+function el(tag, attrs, parent = svg) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
+function color(rgb, a = 1) { return `rgba(${rgb.map(v => Math.round(v * 255)).join(',')},${a})`; }
+function draw() {
+  fit(); svg.innerHTML = '';
+  const [W, H] = data.size;
+  const [x0, y0] = px(0, H);
+  if ($('showplan').checked && data.floorplan) {
+    const b = data.floorplan;   // plan image placement: pixel bounds of the apartment in the image
+    el('image', {href: '/sim/floorplan.png', x: x0 - b.left * S * b.m_per_px, y: y0 - b.top * S * b.m_per_px,
+      width: b.width * S * b.m_per_px, height: b.height * S * b.m_per_px, opacity: .35, preserveAspectRatio: 'none'});
+  }
+  el('rect', {x: x0, y: y0, width: W * S, height: H * S, fill: 'rgba(168,145,111,.18)'});
+  for (const c of data.furniture.carpet || []) { const [a, b] = px(c.x0, c.y1); el('rect', {x: a, y: b, width: (c.x1 - c.x0) * S, height: (c.y1 - c.y0) * S, fill: 'rgba(185,176,163,.25)'}); }
+  for (const w of data.walls) {
+    const [a, b] = px(w.x0, w.y1);
+    el('rect', {x: a, y: b, width: Math.max(1, (w.x1 - w.x0) * S), height: Math.max(1, (w.y1 - w.y0) * S),
+      fill: w.kind === 'blinds' ? '#f59e0b' : '#cfd6e2', opacity: w.kind === 'blinds' ? .8 : .9});
+  }
+  for (const it of items()) {
+    const g = geom(it), isSel = sel && sel.o === it.o;
+    const [cx, cy] = px(g.x, g.y);
+    const fill = color(it.o.rgb || [.6, .6, .6], it.kind === 'rug' ? .45 : .85);
+    const node = it.kind === 'cyl'
+      ? el('circle', {cx, cy, r: g.w / 2 * S, fill, class: 'item' + (isSel ? ' sel' : '')})
+      : el('rect', {x: cx - g.w / 2 * S, y: cy - g.d / 2 * S, width: g.w * S, height: g.d * S, fill, class: 'item' + (isSel ? ' sel' : ''), rx: it.kind === 'rug' ? 6 : 2});
+    node.addEventListener('pointerdown', e => startDrag(e, it, 'move'));
+    const t = el('text', {x: cx, y: cy + 4, 'text-anchor': 'middle', 'font-size': 11, fill: '#0b0f15', 'pointer-events': 'none'});
+    t.textContent = it.o.name;
+    if (isSel) {
+      const [hx, hy] = px(g.x + g.w / 2, g.y - g.d / 2);
+      el('rect', {x: hx - 6, y: hy - 6, width: 12, height: 12, class: 'handle'}).addEventListener('pointerdown', e => startDrag(e, it, 'size'));
+    }
+  }
+  el('line', {x1: x0 + 10, y1: y0 + H * S - 12, x2: x0 + 10 + S, y2: y0 + H * S - 12, stroke: '#eef3fa', 'stroke-width': 2});
+  el('text', {x: x0 + 14 + S, y: y0 + H * S - 8, fill: '#eef3fa', 'font-size': 11}).textContent = '1 m';
+  panel(); list();
+}
+let drag = null;
+function startDrag(e, it, mode) {
+  e.stopPropagation(); e.preventDefault();
+  if (!sel || sel.o !== it.o) { sel = it; draw(); }
+  snapshot();
+  const [mx, my] = metres(e.clientX - svg.getBoundingClientRect().left, e.clientY - svg.getBoundingClientRect().top);
+  drag = {it, mode, start: [mx, my], g: geom(it)};
+  svg.setPointerCapture(e.pointerId);
+}
+svg.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const r = svg.getBoundingClientRect(), [mx, my] = metres(e.clientX - r.left, e.clientY - r.top);
+  const dx = mx - drag.start[0], dy = my - drag.start[1], g = {...drag.g};
+  if (drag.mode === 'move') { g.x += dx; g.y += dy; }
+  else { g.w = Math.max(0.05, g.w + dx); g.d = Math.max(0.05, g.d - dy); g.x += dx / 2; g.y += dy / 2;
+         if (drag.it.kind === 'cyl') { g.w = g.d = Math.max(g.w, g.d); } }
+  setGeom(drag.it, g); draw();
+});
+svg.addEventListener('pointerup', () => { drag = null; });
+svg.addEventListener('pointerdown', () => { sel = null; draw(); });
+
+// ---- side panel ----
+function panel() {
+  $('edit').hidden = !sel; $('none').hidden = !!sel;
+  if (!sel) return;
+  const g = geom(sel);
+  $('f-name').value = sel.o.name; $('f-h').value = sel.o.h ?? ''; $('f-h').disabled = sel.kind === 'rug';
+  $('f-x').value = round(g.x); $('f-y').value = round(g.y); $('f-w').value = round(g.w); $('f-d').value = round(g.d);
+  $('l-w').firstChild.textContent = sel.kind === 'cyl' ? 'Diameter (m)' : 'Width x (m)';
+  $('l-d').hidden = sel.kind === 'cyl'; $('rot').disabled = sel.kind === 'cyl';
+}
+for (const id of ['f-name', 'f-h', 'f-x', 'f-y', 'f-w', 'f-d']) $(id).addEventListener('change', () => {
+  if (!sel) return; snapshot();
+  sel.o.name = $('f-name').value.replace(/[^\w-]/g, '_') || 'item';
+  if (sel.kind !== 'rug') sel.o.h = Math.max(0.02, +$('f-h').value || 0.5);
+  const w = Math.max(0.05, +$('f-w').value), d = sel.kind === 'cyl' ? w : Math.max(0.05, +$('f-d').value);
+  setGeom(sel, {x: +$('f-x').value, y: +$('f-y').value, w, d}); draw();
+});
+function list() {
+  $('list').innerHTML = '';
+  for (const it of items()) {
+    const d = document.createElement('div'); d.textContent = `${it.o.name} · ${it.kind}`;
+    if (sel && sel.o === it.o) d.className = 'sel';
+    d.onclick = () => { sel = it; draw(); }; $('list').appendChild(d);
+  }
+}
+$('rot').onclick = () => { if (!sel || sel.kind === 'cyl') return; snapshot(); const g = geom(sel); setGeom(sel, {...g, w: g.d, d: g.w}); draw(); };
+$('del').onclick = () => {
+  if (!sel) return; snapshot();
+  for (const k of ['boxes', 'cylinders', 'rugs']) data.furniture[k] = data.furniture[k].filter(o => o !== sel.o);
+  sel = null; draw();
+};
+$('dup').onclick = () => {
+  if (!sel) return; snapshot();
+  const o = JSON.parse(JSON.stringify(sel.o)); o.name += '_2';
+  const it = {kind: sel.kind, o}; const g = geom(it); setGeom(it, {...g, x: g.x + 0.3, y: g.y - 0.3});
+  data.furniture[{box: 'boxes', cyl: 'cylinders', rug: 'rugs'}[sel.kind]].push(o); sel = it; draw();
+};
+function add(kind) {
+  snapshot();
+  const [W, H] = data.size, n = items().length + 1;
+  const o = kind === 'cyl' ? {name: `round${n}`, x: W / 2, y: H / 2, r: 0.25, h: 0.8, rgb: [.5, .5, .5]}
+        : kind === 'rug' ? {name: `rug${n}`, x0: W / 2 - .6, y0: H / 2 - .4, x1: W / 2 + .6, y1: H / 2 + .4, rgb: [.6, .6, .7]}
+        : {name: `box${n}`, x0: W / 2 - .3, y0: H / 2 - .3, x1: W / 2 + .3, y1: H / 2 + .3, h: 0.8, rgb: [.6, .55, .5]};
+  data.furniture[{box: 'boxes', cyl: 'cylinders', rug: 'rugs'}[kind]].push(o); sel = {kind, o}; draw();
+}
+$('add-box').onclick = () => add('box'); $('add-cyl').onclick = () => add('cyl'); $('add-rug').onclick = () => add('rug');
+function undo() { if (!history.length) return; data.furniture = JSON.parse(history.pop()); sel = null; draw(); }
+$('undo').onclick = undo;
+addEventListener('keydown', e => {
+  if (e.target.closest('input')) return;
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); undo(); }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { e.preventDefault(); $('del').onclick(); }
+  if (sel && e.key.startsWith('Arrow')) {        // nudge 5 cm
+    e.preventDefault(); snapshot(); const g = geom(sel), s = 0.05;
+    setGeom(sel, {...g, x: g.x + (e.key === 'ArrowRight' ? s : e.key === 'ArrowLeft' ? -s : 0), y: g.y + (e.key === 'ArrowUp' ? s : e.key === 'ArrowDown' ? -s : 0)}); draw();
+  }
+});
+$('showplan').onchange = draw;
+$('save').onclick = async () => {
+  $('save').disabled = true; status('Saving and rebuilding the simulator…');
+  try {
+    const r = await fetch('/sim/furniture', {method: 'POST', body: JSON.stringify(data.furniture)});
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+    data = j; dirty = false; history = []; status('Saved. The simulator uses it from its next start.', 'ok'); draw(); if (view === '3d') build3d();
+  } catch (e) { status('Not saved: ' + e.message, 'warn'); }
+  $('save').disabled = false;
+};
+addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+addEventListener('resize', () => view === '2d' ? draw() : resize3d());
+
+// ---- 3D view (three.js) ----
+let THREE, renderer, scene, camera, controls;
+async function build3d() {
+  if (!THREE) {
+    THREE = await import('three'); const {OrbitControls} = await import('three/addons/controls/OrbitControls.js');
+    renderer = new THREE.WebGLRenderer({canvas: $('three'), antialias: true}); renderer.setPixelRatio(devicePixelRatio);
+    camera = new THREE.PerspectiveCamera(45, 1, 0.05, 100); camera.up.set(0, 0, 1);
+    controls = new OrbitControls(camera, $('three'));
+    const [W, H] = data.size; camera.position.set(W / 2, -H * 0.55, 9.5); controls.target.set(W / 2, H / 2, 0);
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+  }
+  scene = new THREE.Scene(); scene.background = new THREE.Color('#0b0f15');
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x666655, 1.1));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(3, -2, 8); scene.add(sun);
+  const box = (x0, y0, x1, y1, h, c, z0 = 0, op = 1) => { const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, h), new THREE.MeshLambertMaterial({color: c, transparent: op < 1, opacity: op})); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, z0 + h / 2); scene.add(m); return m; };
+  const [W, H] = data.size; box(0, 0, W, H, 0.01, 0xa8916f, -0.01);
+  for (const c of data.furniture.carpet || []) box(c.x0, c.y0, c.x1, c.y1, 0.005, 0xb9b0a3);
+  for (const r of data.furniture.rugs) box(r.x0, r.y0, r.x1, r.y1, 0.008, new THREE.Color(...r.rgb));
+  for (const w of data.walls) {
+    if (w.kind === 'blinds') { for (let x = w.x0; x < w.x1; x += 0.09) box(x, w.y0, Math.min(x + 0.07, w.x1), w.y1, 2.2, 0xf2f2ee); }
+    else if (w.kind === 'wall') box(w.x0, w.y0, w.x1, w.y1, 2.4, 0xe9e4da, 0, 0.55);
+  }
+  for (const b of data.furniture.boxes) box(b.x0, b.y0, b.x1, b.y1, b.h, new THREE.Color(...b.rgb));
+  for (const c of data.furniture.cylinders) { const m = new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r, c.h, 24), new THREE.MeshLambertMaterial({color: new THREE.Color(...c.rgb)})); m.rotation.x = Math.PI / 2; m.position.set(c.x, c.y, c.h / 2); scene.add(m); }
+  resize3d();
+}
+function resize3d() { if (!renderer) return; const r = $('stage').getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); }
+function show(v) {
+  view = v; $('v2d').classList.toggle('on', v === '2d'); $('v3d').classList.toggle('on', v === '3d');
+  $('plan').style.display = v === '2d' ? 'block' : 'none'; $('three').style.display = v === '3d' ? 'block' : 'none';
+  if (v === '3d') build3d().catch(e => status('3D view needs the internet for three.js: ' + e.message, 'warn')); else draw();
+}
+$('v2d').onclick = () => show('2d'); $('v3d').onclick = () => show('3d');
+
+(async () => {
+  try { const r = await fetch('/sim/data', {cache: 'no-store'}); data = await r.json(); if (!r.ok) throw new Error(data.error);
+        for (const k of ['boxes', 'cylinders', 'rugs']) data.furniture[k] = data.furniture[k] || [];
+        draw(); status(`${items().length} pieces · apartment ${data.size.map(v => v.toFixed(1)).join(' × ')} m`); }
+  catch (e) { status('No sim apartment yet: ' + e.message, 'warn'); }
+})();
+</script>
+</body></html>

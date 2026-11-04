@@ -526,6 +526,33 @@ class DashboardUITest(unittest.TestCase):
         self.assertFalse(self.drive_state.armed)
         expect(self.page.locator('#arm')).to_contain_text('Arm to drive', timeout=5000)
 
+    def test_sim_page_edits_and_saves_the_layout(self):
+        import tempfile, shutil
+        tmp = Path(tempfile.mkdtemp())
+        (tmp / 'apartment.json').write_text(json.dumps({'size_m': [4, 3], 'walls': [
+            {'name': 'w', 'x0': 0, 'y0': 0, 'x1': 4, 'y1': 0.1, 'kind': 'wall'}]}))
+        (tmp / 'furniture.json').write_text(json.dumps({'boxes': [
+            {'name': 'table', 'x0': 1, 'y0': 1, 'x1': 2, 'y1': 1.5, 'h': 0.7, 'rgb': [0.5, 0.4, 0.3]}]}))
+        old = dashboard.SIM_DIR, dashboard.SIM_BUILD
+        dashboard.SIM_DIR, dashboard.SIM_BUILD = tmp, [sys.executable, '-c', 'pass']
+        try:
+            self.page.goto(self.url + 'sim')
+            expect(self.page.locator('#status')).to_contain_text('1 pieces')
+            self.page.locator('#list div').first.click()
+            self.page.fill('#f-x', '2.5')
+            self.page.dispatch_event('#f-x', 'change')
+            self.page.click('#save')
+            expect(self.page.locator('#status')).to_contain_text('Saved')
+            saved = json.loads((tmp / 'furniture.json').read_text())
+            self.assertAlmostEqual((saved['boxes'][0]['x0'] + saved['boxes'][0]['x1']) / 2, 2.5)
+            self.page.click('#add-box')
+            self.page.click('#save')
+            expect(self.page.locator('#status')).to_contain_text('Saved')
+            self.assertEqual(len(json.loads((tmp / 'furniture.json').read_text())['boxes']), 2)
+        finally:
+            dashboard.SIM_DIR, dashboard.SIM_BUILD = old
+            shutil.rmtree(tmp)
+
     def test_heading_card_offline(self):
         self.open()
         expect(self.page.locator('#imu-info')).to_contain_text('offline')

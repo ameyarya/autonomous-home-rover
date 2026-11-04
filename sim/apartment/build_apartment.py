@@ -141,8 +141,9 @@ def main():
     (HERE / 'apartment_assets.xml').write_text('<mujocoinclude>\n<asset>\n' + '\n'.join(textures)
                                                + '\n</asset>\n</mujocoinclude>\n')
     (HERE / 'apartment.xml').write_text(xml)
-    (HERE / 'apartment.json').write_text(json.dumps({'size_m': size, 'm_per_px': M_PER_PX, 'walls': rects},
-                                                    indent=1))
+    plan = {'left': int(x_min), 'top': float(y_max - size[1] / M_PER_PX), 'width': w, 'height': h, 'm_per_px': M_PER_PX}
+    (HERE / 'apartment.json').write_text(json.dumps({'size_m': size, 'm_per_px': M_PER_PX, 'walls': rects,
+                                                     'floorplan': plan}, indent=1))
     print(f'{len(rects)} wall boxes, apartment {size[0]:.2f} x {size[1]:.2f} m')
 
 

@@ -16,6 +16,14 @@ transmitter and heading stick) on :9769 and the rendered rover camera on :9010; 
   3.8° up, 62° wide: the floor-wall line at 0.5 / 1.1 / 2.3 m lands within 2 px of the real
   rover's fitted geometry.
 - `GET :9010/truth`: true pose, collisions, time pushing a wall, path length, closest approach.
+- **Edit it on the dashboard**: `http://rover.local:8010/sim` (Sim in the header). Top-down plan over
+  the floor plan: drag furniture to move, the corner handle to resize, arrow keys nudge 5 cm,
+  rotate / duplicate / delete / add, undo; 3D view to orbit. Save writes `apartment/furniture.json`
+  (local) and rebuilds the simulator's apartment.
+- Furniture and floor textures come from photos (`apartment/photos/`, local); exact ray depth on
+  :9775 for testing driving decisions; `batch_explore.py` runs many episodes in parallel and scores
+  them (first batch: 8 runs, 39 m, 1 collision during a reverse turn; most runs ended on arc turns
+  that timed out short of the angle).
 
 ```sh
 mac/.vision-venv/bin/python sim/apartment/build_apartment.py

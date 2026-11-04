@@ -42,6 +42,8 @@ from xiao_link import DEFAULT_HOST, MAX_FRAME_AGE_S, StaleFrame, XiaoLink
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
 PAGE_FILE = ROOT / 'dashboard.html'
+SIM_DIR = REPO / 'sim/apartment'     # the simulator's apartment: layout files are personal, local only
+SIM_BUILD = [str(ROOT / '.vision-venv/bin/python'), str(SIM_DIR / 'build_apartment.py')]
 PASSWORD_FILE = ROOT / '.dashboard-password'
 COOKIE = 'rover_session'
 LOGIN_PAGE = '''<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
@@ -121,6 +123,41 @@ def ensure_detector():
                 pass
             time.sleep(0.2)
         raise RuntimeError('Detector startup timed out')
+
+
+def sim_data():
+    apt = json.loads((SIM_DIR / 'apartment.json').read_text())
+    furn = json.loads((SIM_DIR / 'furniture.json').read_text()) if (SIM_DIR / 'furniture.json').exists() else {}
+    walls = [w for w in apt['walls'] if w['kind'] != 'furniture']
+    return {'size': apt['size_m'], 'walls': walls, 'floorplan': apt.get('floorplan'),
+            'furniture': {k: furn.get(k, []) for k in ('boxes', 'cylinders', 'rugs', 'carpet')}}
+
+
+def save_furniture(furn):
+    """Validate the editor's layout, write furniture.json and rebuild the simulator's apartment."""
+    def num(v, lo=-1.0, hi=20.0):
+        v = float(v)
+        if not lo <= v <= hi:
+            raise ValueError(f'{v} out of range')
+        return round(v, 3)
+    clean = {'note': 'Furniture for the simulator, edited on the dashboard Sim page. Local only.'}
+    for kind, fields in (('boxes', ('x0', 'y0', 'x1', 'y1', 'h')), ('cylinders', ('x', 'y', 'r', 'h')),
+                         ('rugs', ('x0', 'y0', 'x1', 'y1')), ('carpet', ('x0', 'y0', 'x1', 'y1'))):
+        out = []
+        for i, item in enumerate(furn.get(kind, [])):
+            row = {f: num(item[f]) for f in fields}
+            if 'x1' in row and (row['x1'] <= row['x0'] or row['y1'] <= row['y0']):
+                raise ValueError(f'{kind} {i}: zero or negative size')
+            name = ''.join(c if c.isalnum() or c in '_-' else '_' for c in str(item.get('name', f'{kind}{i}')))[:40]
+            rgb = [num(c, 0, 1) for c in item.get('rgb', [0.6, 0.6, 0.6])][:3]
+            out.append({'name': name or f'{kind}{i}', **row, **({'rgb': rgb} if kind != 'carpet' else {})})
+        clean[kind] = out
+    names = [o['name'] for k in ('boxes', 'cylinders', 'rugs') for o in clean[k]]
+    if len(names) != len(set(names)):
+        raise ValueError('two pieces have the same name')
+    (SIM_DIR / 'furniture.json').write_text(json.dumps(clean, indent=1))
+    subprocess.run(SIM_BUILD, check=True, capture_output=True, timeout=60)
+    return sim_data()
 
 
 def dashboard_password():
@@ -378,6 +415,18 @@ def make_handler(dashboard, password):
                         return self.reply(200, response.read(), response.headers.get('Content-Type'))
                 except OSError:
                     return self.reply(503, {'error': 'dog watcher not running'})
+            if path == '/sim':
+                return self.reply(200, (ROOT / 'sim.html').read_bytes(), 'text/html; charset=utf-8')
+            if path == '/sim/data':
+                try:
+                    return self.reply(200, sim_data())
+                except (OSError, ValueError) as error:
+                    return self.reply(404, {'error': f'build the sim apartment first ({error})'})
+            if path == '/sim/floorplan.png':
+                try:
+                    return self.reply(200, (SIM_DIR / 'floorplan.png').read_bytes(), 'image/png')
+                except OSError:
+                    return self.reply(404, {'error': 'no floor plan'})
             if path == '/calibrate':
                 return self.reply(200, (ROOT / 'calibrate.html').read_bytes(), 'text/html; charset=utf-8')
             if path in ('/drive/status', '/drive/calibration', '/drive/motion', '/drive/imu'):
@@ -418,6 +467,14 @@ def make_handler(dashboard, password):
                 size = int(self.headers.get('Content-Length', 0))
                 body = json.loads(self.rfile.read(size) or b'{}') if size else {}
                 return self.reply(200, dashboard.recorder.set(body.get('on')))
+            if self.path == '/sim/furniture':
+                size = int(self.headers.get('Content-Length', 0))
+                try:
+                    return self.reply(200, save_furniture(json.loads(self.rfile.read(size) or b'{}')))
+                except (ValueError, TypeError, KeyError) as error:
+                    return self.reply(400, {'error': str(error)})
+                except (OSError, subprocess.SubprocessError) as error:
+                    return self.reply(500, {'error': f'rebuild failed: {error}'})
             if self.path == '/restarts/ack':
                 dashboard.restarts.acked = dashboard.restarts.total
                 return self.reply(200, {'acked': dashboard.restarts.acked})
