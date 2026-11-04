@@ -212,6 +212,9 @@ class DashboardUITest(unittest.TestCase):
         dashboard.DRIVE_URL = f'http://127.0.0.1:{cls.drive.server_port}'
         dashboard.DOG_WATCHER_URL = f'http://127.0.0.1:{free_port()}'      # nothing there: watcher offline
         dashboard.DEPTH_URL = f'http://127.0.0.1:{free_port()}'            # nor a depth service
+        cls.real_sim_dir = dashboard.SIM_DIR
+        dashboard.SIM_DIR = Path(tempfile.mkdtemp())                       # never the real apartment layout
+        dashboard.SIM_BUILD = [sys.executable, '-c', 'pass']
         cls.link = FakeLink(f'127.0.0.1:{cls.camera.server_port}')
         cls.services = FakeServices()
         cls.dash = dashboard.Dashboard(cls.link, cls.services)
@@ -241,6 +244,7 @@ class DashboardUITest(unittest.TestCase):
     def tearDown(self):
         self.context.close()
         self.assertEqual(self.errors, [], 'JavaScript errors on the page')
+        assert dashboard.SIM_DIR != self.real_sim_dir, 'a test pointed the sim editor at the real layout'
 
     def open(self):
         self.page.goto(self.url)
@@ -533,8 +537,8 @@ class DashboardUITest(unittest.TestCase):
             {'name': 'w', 'x0': 0, 'y0': 0, 'x1': 4, 'y1': 0.1, 'kind': 'wall'}]}))
         (tmp / 'furniture.json').write_text(json.dumps({'boxes': [
             {'name': 'table', 'x0': 1, 'y0': 1, 'x1': 2, 'y1': 1.5, 'h': 0.7, 'rgb': [0.5, 0.4, 0.3]}]}))
-        old = dashboard.SIM_DIR, dashboard.SIM_BUILD
-        dashboard.SIM_DIR, dashboard.SIM_BUILD = tmp, [sys.executable, '-c', 'pass']
+        old = dashboard.SIM_DIR
+        dashboard.SIM_DIR = tmp
         try:
             self.page.goto(self.url + 'sim')
             expect(self.page.locator('#status')).to_contain_text('1 pieces')
@@ -570,7 +574,8 @@ class DashboardUITest(unittest.TestCase):
             self.assertEqual([b['name'] for b in boxes][0], 'dining_table')
             self.assertEqual(len({b['name'] for b in boxes}), 3)          # all distinct after saving
         finally:
-            dashboard.SIM_DIR, dashboard.SIM_BUILD = old
+            self.page.close()                    # its close-time autosave lands in tmp, not elsewhere
+            dashboard.SIM_DIR = old
             shutil.rmtree(tmp)
 
     def test_heading_card_offline(self):
