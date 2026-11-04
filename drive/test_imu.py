@@ -34,6 +34,10 @@ class FakeImu:
     def status(self):
         return {'online': self.alive}
 
+    def zero(self):
+        self.step()
+        self.y = 0.0
+
 
 class GyroTx(FakeTx):
     def __init__(self, g):
@@ -162,6 +166,39 @@ class GyroMoveTest(unittest.TestCase):
         self.assertEqual(out['ended'], 'heading stick lost')
         self.assertLess(out['ms'], 600)
         self.assertEqual(self.tx.calls[-1], 'X')
+
+    def test_arming_zeroes_the_heading_once(self):
+        zeroed = []
+        self.g.zero = lambda: zeroed.append(1)
+        self.s.stop('test')
+        self.s.arm(True)
+        self.s.arm(True)                                   # lease renewal: no zero
+        self.assertEqual(len(zeroed), 1)
+
+    def test_manual_straight_driving_holds_heading(self):
+        self.g.drift = -8.0
+        end = time.monotonic() + 1.5
+        while time.monotonic() < end:                      # the page renews the hold every 150 ms
+            self.s.hold('W')
+            time.sleep(0.15)
+        time.sleep(0.6)
+        self.assertIn('a', self.tx.calls)                  # steered back against the pull
+        self.assertLess(abs(self.g.y), 5.0)
+        self.assertEqual(self.tx.calls[-1], 'X')
+
+    def test_manual_steering_passes_through_then_locks_the_new_heading(self):
+        self.g.drift = 0.0
+        for key, t in (('A', 0.6), ('W', 0.8)):
+            end = time.monotonic() + t
+            while time.monotonic() < end:
+                self.s.hold(key)
+                time.sleep(0.1)
+        time.sleep(0.6)
+        turned = self.g.y
+        self.assertGreater(turned, 5.0)                    # the steer happened
+        straight = [k for k in self.tx.calls if k in ('w', 'a', 'd', 'A', 'D')]
+        self.assertIn('w', straight)                       # then straight on the new heading
+        self.assertNotIn('d', straight)                    # without steering back to the old one
 
     def test_odometer_uses_measured_heading(self):
         self.g.drift = 0

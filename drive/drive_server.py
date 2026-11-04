@@ -13,7 +13,8 @@ Run: python3 drive/drive_server.py        (HTTP on 127.0.0.1:8769)
                                    measured move (timed from drive/motion.json; refused unless armed);
                                    {"kind": "test_forward"|"test_reverse"|"test_arc"} = the timed run for measuring
                                    With the heading stick online (and hold on): forward/back steer to keep the
-                                   starting heading; left/right turn until the stick has turned that many degrees
+                                   starting heading; left/right turn until the stick has turned that many degrees.
+                                   Manual W/S holds do the same; arming zeroes the heading
   GET  /imu                        heading stick: online, heading, turn rate, bumps, battery; hold on/off
   POST /imu    {"hold": bool}      heading hold on/off;   POST /imu/zero   heading = 0 here
   GET  /motion                     measured speeds/turning circle, odometer (estimates)
@@ -75,6 +76,8 @@ class DriveState:
 
     def arm(self, on):
         if on:
+            if not self.armed and self.imu:          # arming (not a lease renewal): heading = 0 here
+                self.imu.zero()
             self.armed_until = time.monotonic() + LEASE_S
             self.abort.clear()
         else:
@@ -253,17 +256,31 @@ class DriveState:
             with self.lock:
                 self.busy = True
                 try:
-                    sent = None
+                    # Straight W/S with the heading stick online (and hold on): keep the heading the
+                    # straight run started with; steering keys pass through, and the next straight run
+                    # locks the new heading (where the turn is heading to settle).
+                    sent, prev_yaw, target, hold = None, None, None, None
                     while (self.armed and not self.abort.is_set()
                            and time.monotonic() < self.hold_until):
                         key = self.hold_key
-                        self.tx.wire(key)
+                        g = self.gyro()
                         now = time.monotonic()
+                        yaw = g.yaw() if g else None
+                        if g and key in ('W', 'S'):
+                            throttle = 1 if key == 'W' else -1
+                            if hold is None or hold.throttle != throttle:
+                                target, hold = yaw + g.rate() * heading.LEAD_S, heading.HeadingHold(throttle, motion.GENTLE)
+                            wire = hold.key(target - yaw, g.rate(), now - sent[1] if sent else TICK_S)
+                        else:
+                            target = hold = None
+                            wire = key
+                        self.tx.wire(wire)
                         if sent:                    # odometer: time since the previous frame
-                            self.count(sent[0], min(now - sent[1], 2 * REPEAT_S))
-                        sent = (key, now)
-                        self.last = {'key': key, 'manual': True, 't': time.time()}
-                        self.abort.wait(REPEAT_S)
+                            turned = yaw - prev_yaw if yaw is not None and prev_yaw is not None else None
+                            self.count(sent[0], min(now - sent[1], 2 * REPEAT_S), turned)
+                        sent, prev_yaw = (wire, now), yaw
+                        self.last = {'key': key, 'manual': True, 'heading_hold': hold is not None, 't': time.time()}
+                        self.abort.wait(TICK_S if hold else REPEAT_S)
                     if sent:
                         self.count(sent[0], min(time.monotonic() - sent[1], 2 * REPEAT_S))
                 finally:
