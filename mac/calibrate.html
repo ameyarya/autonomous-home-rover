@@ -77,10 +77,10 @@ input[type=checkbox]{width:18px;height:18px}
     <div class="step"><h3>2 · Reverse speed</h3>
       <div class="row"><button data-test="test_reverse">Drive back 1.5 s</button></div>
       <label class="check" style="margin-top:8px">It went <input id="m-rev" type="number" min="1" style="width:90px"> cm</label></div>
-    <div class="step"><h3>3 · Turning circle</h3>
-      <p class="muted">Hold until it has driven a full circle at full left lock, then measure the circle's width (outside wheel track, wall to wall of the circle).</p>
-      <div class="row"><button data-hold="A">Hold: forward + full left ↖</button></div>
-      <label class="check" style="margin-top:8px">Circle width <input id="m-circle" type="number" min="1" style="width:90px"> cm</label></div>
+    <div class="step"><h3>3 · Turning circle (short arc)</h3>
+      <p class="muted">Mark where the front wheels start and lay a tape straight ahead along the way the rover faces. It drives 2 s turning full left; then measure where the front wheels ended: how far <b>forward</b> along the tape, and how far <b>sideways</b> (left) of it.</p>
+      <div class="row"><button data-test="test_arc">Drive full-left arc 2 s ↖</button></div>
+      <label class="check" style="margin-top:8px">Forward <input id="m-arc-f" type="number" min="0" style="width:80px"> cm, sideways <input id="m-arc-s" type="number" min="1" style="width:80px"> cm</label></div>
     <button id="m-save" class="primary" style="width:100%">Save measurements</button>
     <p class="status" id="m-status">Loading…</p>
     <details style="margin-top:14px"><summary class="muted">Wiring (only after re-plugging motors or the servo)</summary>
@@ -149,10 +149,11 @@ document.querySelectorAll('[data-test]').forEach(b=>b.onclick=async()=>{if(!arme
 $('m-save').onclick=async()=>{const t=(mot&&mot.test_s)||{forward:2,reverse:1.5},values={};
   if(+$('m-fwd').value>0)values.forward_cm_s=+(+$('m-fwd').value/t.forward).toFixed(2);
   if(+$('m-rev').value>0)values.reverse_cm_s=+(+$('m-rev').value/t.reverse).toFixed(2);
-  if(+$('m-circle').value>0)values.turn_radius_cm=+(+$('m-circle').value/2).toFixed(1);
+  const af=+$('m-arc-f').value,as=+$('m-arc-s').value;
+  if(as>0)values.turn_radius_cm=+((af*af+as*as)/(2*as)).toFixed(1);
   if(!Object.keys(values).length){$('m-status').textContent='Enter at least one measurement.';return}
   values.power=mot?mot.power:null;
-  try{showMot(await postJSON('/drive/motion',{values}));['m-fwd','m-rev','m-circle'].forEach(id=>$(id).value='')}
+  try{showMot(await postJSON('/drive/motion',{values}));['m-fwd','m-rev','m-arc-f','m-arc-s'].forEach(id=>$(id).value='')}
   catch(e){$('m-status').textContent='Not saved: '+e.message;$('m-status').className='status bad'}};
 loadMot();
 

@@ -2,7 +2,8 @@
 heading sensors yet, so distances and turns come from drive time and measured motion:
 
   forward_cm_s, reverse_cm_s   how fast it goes at the calibrated power (timed run + tape measure)
-  turn_radius_cm               radius of the full-lock circle (drive a circle, measure its width)
+  turn_radius_cm               radius of the full-lock circle, from a short arc: R = (f² + s²) / 2s
+                               (f forward, s sideways of where it started; a full circle won't fit indoors)
   power                        the speed setting those were measured at (estimates scale with it)
 
 A turn is a forward arc at full lock (car steering can't turn on the spot): X degrees takes
@@ -17,7 +18,7 @@ HERE = Path(__file__).resolve().parent
 MOTION_FILE = HERE / 'motion.json'
 FIELDS = ('forward_cm_s', 'reverse_cm_s', 'turn_radius_cm', 'power')
 MAX_MOVE_S = 8.0
-TEST_S = {'forward': 2.0, 'reverse': 1.5}        # timed runs for measuring speed
+TEST_S = {'forward': 2.0, 'reverse': 1.5, 'arc': 2.0}   # timed runs for measuring speed and turning
 # key -> (throttle: +1 forward / -1 reverse / 0, steer: +1 left / -1 right / 0)
 KEYS = {'W': (1, 0), 'A': (1, 1), 'D': (1, -1), 'S': (-1, 0), 'Z': (-1, 1), 'C': (-1, -1),
         'L': (0, 1), 'R': (0, -1)}
@@ -48,6 +49,13 @@ def save(values):
     values = validate(dict(load(), **values))
     MOTION_FILE.write_text(json.dumps(values, indent=1) + '\n')
     return values
+
+
+def radius_from_arc(forward_cm, sideways_cm):
+    """Full-lock radius from where a timed arc ended: forward along the start heading, sideways off it."""
+    if sideways_cm <= 0 or forward_cm < 0:
+        raise ValueError('measure forward and sideways (both positive)')
+    return (forward_cm ** 2 + sideways_cm ** 2) / (2 * sideways_cm)
 
 
 def scaled(m, power):

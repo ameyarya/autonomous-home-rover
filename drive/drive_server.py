@@ -11,7 +11,7 @@ Run: python3 drive/drive_server.py        (HTTP on 127.0.0.1:8769)
   POST /stop                       abort any pulse or hold, disarm, stop with ACK
   POST /move   {"kind": "forward"|"back", "amount": cm}  or  {"kind": "left"|"right", "amount": deg}
                                    measured move (timed from drive/motion.json; refused unless armed);
-                                   {"kind": "test_forward"|"test_reverse"} = the timed run for measuring
+                                   {"kind": "test_forward"|"test_reverse"|"test_arc"} = the timed run for measuring
   GET  /motion                     measured speeds/turning circle, odometer (estimates)
   POST /motion {values}            save measurements;  POST /odometer/reset
   GET  /calibration                saved calibration, the app version it makes, the installed app
@@ -95,8 +95,9 @@ class DriveState:
             raise PermissionError('not armed')
         if time.monotonic() < self.manual_until or self.holding:
             raise RuntimeError('manual driving')
-        if kind in ('test_forward', 'test_reverse'):
-            key, seconds = ('W', motion.TEST_S['forward']) if kind == 'test_forward' else ('S', motion.TEST_S['reverse'])
+        tests = {'test_forward': ('W', 'forward'), 'test_reverse': ('S', 'reverse'), 'test_arc': ('A', 'arc')}
+        if kind in tests:
+            key, seconds = tests[kind][0], motion.TEST_S[tests[kind][1]]
         else:
             if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
                 raise ValueError('amount must be a positive number (cm or degrees)')

@@ -32,6 +32,14 @@ class Plan(unittest.TestCase):
             motion.plan('forward', 1000, M, 1200)                   # 25 s > the limit
 
 
+class Radius(unittest.TestCase):
+    def test_radius_from_a_short_arc(self):
+        self.assertAlmostEqual(motion.radius_from_arc(50, 50), 50)      # quarter circle
+        self.assertAlmostEqual(motion.radius_from_arc(40, 20), 50)
+        with self.assertRaises(ValueError):
+            motion.radius_from_arc(40, 0)
+
+
 class Odometer(unittest.TestCase):
     def test_straight_then_quarter_turn(self):
         o = motion.Odometer()

@@ -442,9 +442,10 @@ class DashboardUITest(unittest.TestCase):
         expect(self.page.locator('#m-status')).to_contain_text('Measure and enter', timeout=5000)
         self.page.fill('#m-fwd', '100')
         self.page.fill('#m-rev', '60')
-        self.page.fill('#m-circle', '120')
+        self.page.fill('#m-arc-f', '40')
+        self.page.fill('#m-arc-s', '20')                                          # R = (1600+400)/40 = 50
         self.page.click('#m-save')
-        expect(self.page.locator('#m-status')).to_contain_text('forward 50 cm/s, reverse 40 cm/s, turning radius 60 cm')
+        expect(self.page.locator('#m-status')).to_contain_text('forward 50 cm/s, reverse 40 cm/s, turning radius 50 cm')
 
     def test_phone_width_has_no_sideways_scroll(self):
         context = self.browser.new_context(viewport={'width': 390, 'height': 844})
