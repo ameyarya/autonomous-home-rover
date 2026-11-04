@@ -2,9 +2,9 @@
 
 Working list, one item at a time, simplest first (details and reasoning: [PLAN.md](PLAN.md#autonomy-roadmap-2026-11-03-replaces-the-dog-companion-goal)).
 
-- [ ] 1. **Measured moves** — "forward N cm", "turn X°" from timed drives calibrated with a tape measure; distance-travelled counter (estimate). *Built 2026-11-03 (dashboard Measured moves card, Calibrate → Measure motion); waiting on the floor measurements, then check how close 50 cm / 90° land.*
+- [ ] 1. **Measured moves** — "forward N cm", "turn X°" from timed drives calibrated with a tape measure; distance-travelled counter (estimate). *Built 2026-11-03 (dashboard Measured moves card, Calibrate → Measure motion); measured forward 25 cm/s, reverse 43 cm/s (reverse to re-check with ↑/↓ 50 cm); turning circle still to measure.*
 - [ ] 2. **Snapshot task v0** — "take a picture of my dog" when he's in view: find, centre, approach, save the best frame to a gallery.
-- [ ] 3. **Gyro heading** — IMU (~US$3) on the XIAO's I2C; turns by angle, straight driving.
+- [ ] 3. **Gyro heading** — IMU (~US$3) on the XIAO's I2C; turns by angle, straight driving. *Priority up 2026-11-03: the front wheels have play, so the rover drifts randomly on straight runs; centre trim only fixes the steady part, heading-hold steering fixes the rest. Order the IMU now.*
 - [ ] 4. **Front distance** — ToF sensor (VL53L1X, ~US$8); stop before obstacles, wall following.
 - [ ] 5. **Wheel odometry** — printed slotted disc + IR interrupter (~US$3); real distance travelled.
 - [ ] 6. **Dead-reckoning pose** — gyro + odometry → x, y, heading; live trail on the dashboard.
