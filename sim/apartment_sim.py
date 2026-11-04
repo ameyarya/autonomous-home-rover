@@ -43,8 +43,11 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 sys.path.insert(0, str(REPO / 'drive'))
 import drive_server  # noqa: E402
+import motion  # noqa: E402
 
-FWD_MS, REV_MS = 0.25, 0.4333
+_m = motion.scaled(motion.load(), motion.load().get('power'))
+FWD_MS, REV_MS = _m['forward'] / 100, _m['reverse'] / 100     # measured: 25 and 43 cm/s
+ARC_MS = _m['arc'] / 100       # measured full-lock arc speed (37 cm/s: faster than straight, as on the rover)
 RADIUS_M = 1.325
 WHEELBASE_M = 0.157
 LENGTH_M, WIDTH_M = 0.25, 0.17          # footprint for collisions
@@ -150,7 +153,7 @@ class SimRover:
             throttle, target = self.throttle, self.target
         self.steer += (target - self.steer) * min(1.0, dt / SERVO_TAU_S)
         self.play = max(-PLAY_RAD, min(PLAY_RAD, self.play + self.rng.gauss(0, math.radians(1.5)) * math.sqrt(dt)))
-        v = FWD_MS * throttle if throttle > 0 else REV_MS * throttle
+        v = (ARC_MS if abs(target) >= 1 else FWD_MS) * throttle if throttle > 0 else REV_MS * throttle
         full = math.atan(WHEELBASE_M / RADIUS_M)
         delta = self.steer * full + (self.play if throttle else 0.0)
         rate = v / WHEELBASE_M * math.tan(delta)

@@ -64,8 +64,14 @@ def choose(sec):
     return 'turn_' + ('left' if sec['left'] >= sec['right'] else 'right'), TURN_AROUND_DEG
 
 
-def finished(out):
-    return not out.get('error') and not out.get('aborted') and out.get('ended') in ('done', None)
+def finished(out, kind=None, amount=None):
+    """A move that completed. A turn that timed out having turned most of the way counts too
+    (the sim showed runs ending on arcs a few degrees short)."""
+    if out.get('error') or out.get('aborted'):
+        return False
+    if out.get('ended') == 'timeout' and kind in ('left', 'right', 'reverse_left', 'reverse_right'):
+        return abs(out.get('turned_deg') or 0) >= STUCK_SHARE * amount
+    return out.get('ended') in ('done', None)
 
 
 def multi_point_turn(guard, side, target):
@@ -90,7 +96,7 @@ def multi_point_turn(guard, side, target):
         moves.append((kind, out.get('turned_deg'), out.get('ended') or out.get('error')))
         if guard.why:
             return moves, f'guard: {guard.why}'
-        if not finished(out):
+        if not finished(out, kind, TURN_DEG if forward else REVERSE_DEG):
             return moves, f'{kind} did not finish ({out.get("error") or out.get("ended")})'
         turned += abs(out.get('turned_deg') or 0)
         if turned >= target:
@@ -233,7 +239,7 @@ def main():
                     abs(out.get('turned_deg') or 0) < STUCK_SHARE * amount:
                 why = f'steering looks stuck: turned {out.get("turned_deg")}° of {amount}°'
                 break
-            if out.get('error') or out.get('aborted') or out.get('ended') not in ('done', None):
+            if not finished(out, kind, amount):
                 why = f'move did not finish ({out.get("error") or out.get("ended") or "aborted"})'
                 break
             if kind == 'forward' and sec['centre'] < 250:
