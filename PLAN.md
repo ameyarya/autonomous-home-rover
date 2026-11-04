@@ -145,7 +145,7 @@ Add recovery behavior, battery-aware stopping, and scheduling if required. Treat
 
 Status 2026-11-03: chassis assembled; manual driving works from the dashboard (throttle and
 steering decoupled) and from the Mini-T handheld remote; live calibration page (centre 130°,
-range 45°, speed 900, saved on the rover); camera back on rover firmware (OTA), VGA q16 ≈ 15 fps /
+range 50°, speed 1200, saved on the rover); camera back on rover firmware (OTA), VGA q16 ≈ 15 fps /
 ~130 ms over this Wi-Fi. Done from the old list: chassis printed and assembled, electronics list
 and bearings, command interface (signed app on the stock receiver), XIAO housing (cam-dock),
 drive-and-see prototype.
@@ -154,7 +154,7 @@ drive-and-see prototype.
    start the dog watcher, arm, watch it follow / back off / search / park. The dashboard redesign
    dropped the watcher pane, so first add a compact "Follow dog" on/off and its current state to
    the new dashboard (or watch :8768 directly).
-2. **Measure the real rover:** speed at the calibrated power, turn radius at 45° range, stop
+2. **Measure the real rover:** speed at the calibrated power, turn radius at 50° range, stop
    latency; feed them into `sim/` `RoverParams` and rerun the scenarios.
 3. **Check stuck detection on the real camera:** watch the `blocked` timeline events; tune the
    `ViewChange` factors (simulator-tuned 2.6× / 2.4× noise) if moves are misread.
