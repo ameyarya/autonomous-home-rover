@@ -1,0 +1,6 @@
+{
+ "forward_cm_s": 25.0,
+ "reverse_cm_s": 43.33,
+ "turn_radius_cm": null,
+ "power": 1200.0
+}
