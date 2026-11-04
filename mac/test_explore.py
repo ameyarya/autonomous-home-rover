@@ -10,6 +10,13 @@ def sectors(left, centre, right):
 
 
 class ChooseTest(unittest.TestCase):
+    def setUp(self):                      # the built-in thresholds, not ones tuned locally in shadow mode
+        self.saved = explore.FORWARD_CM, explore.TURN_CM, explore.SIDE_CM
+        explore.FORWARD_CM, explore.TURN_CM, explore.SIDE_CM = 100, 60, 110
+
+    def tearDown(self):
+        explore.FORWARD_CM, explore.TURN_CM, explore.SIDE_CM = self.saved
+
     def test_choices(self):
         self.assertEqual(explore.choose({'left': 300, 'centre': 300, 'right': 300}), ('forward', 25))
         self.assertEqual(explore.choose({'left': 300, 'centre': 80, 'right': 40}), ('left', 15))
@@ -74,6 +81,18 @@ class GuardTest(unittest.TestCase):
             explore.Guard.move, explore.SETTLE_S = real_move, settle
         self.assertEqual(moves, ['back', 'right', 'back', 'right', 'back', 'right'])   # straight back, arc forward
         self.assertEqual(why, 'turned 60° in 6 moves')
+
+    def test_multi_point_turn_does_not_quit_before_turning(self):
+        moves = []
+        real_move = explore.Guard.move
+        explore.Guard.move = lambda g, kind, amount: (moves.append(kind), {'ended': 'done', 'turned_deg': 0 if kind == 'back' else 12})[1]
+        explore.SETTLE_S, settle = 0, explore.SETTLE_S
+        self.depth['sectors'] = sectors(80, 300, 80)          # clear ahead right after backing up
+        try:
+            explore.multi_point_turn(explore.Guard(), 'left', 75)
+        finally:
+            explore.Guard.move, explore.SETTLE_S = real_move, settle
+        self.assertIn('left', moves)                           # it arced before calling it done
 
     def test_multi_point_turn_only_reverses_when_blocked_ahead(self):
         moves = []

@@ -41,6 +41,9 @@ if _tuned.exists():
 TURN_DEG = 15
 GUARD_CM = 30
 TURN_AROUND_DEG = 75
+MIN_TURN_DEG = 20        # a multi-point turn turns at least this much before open floor can end it
+FORWARD_MARGIN_CM = 10   # after a turn, drive on only with this much more than FORWARD_CM: readings near
+                         # the threshold flicker (real run 2026-11-04 rocked back/forward 5 times)
 REVERSE_DEG = 20
 TURN_MOVES = 6
 REVERSE_ARCS = False     # multi-point turns back up straight (over the path it came in on) and turn with
@@ -95,7 +98,7 @@ def multi_point_turn(guard, side, target):
             sec = {n: v['cm'] for n, v in (d.get('sectors') or {}).items()}
             if not sec:
                 return moves, 'depth not usable'
-            if sec['centre'] >= FORWARD_CM:
+            if sec['centre'] >= FORWARD_CM + FORWARD_MARGIN_CM and turned >= MIN_TURN_DEG:
                 return moves, 'facing open floor'
             if sec['centre'] < TURN_CM:
                 continue                                # no room ahead: reverse again
