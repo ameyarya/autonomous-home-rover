@@ -28,3 +28,7 @@ sim/.venv/
 sim/out/
 remote/backup/
 drive/devices.json
+mac/.vision-venv/
+mac/gallery/
+mac/marker.json
+mac/depth-service.log

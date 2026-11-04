@@ -56,6 +56,7 @@ MINI_T = Path.home() / 'Documents/Projects/ai-driven-mini-t'
 DETECTOR_URL = 'http://127.0.0.1:8767'
 DOG_WATCHER_URL = 'http://127.0.0.1:8768'
 DRIVE_URL = 'http://127.0.0.1:8769'
+DEPTH_URL = 'http://127.0.0.1:8774'
 
 _detector_lock = threading.Lock()
 
@@ -63,6 +64,8 @@ _detector_lock = threading.Lock()
 SERVICES = {
     'drive': (DRIVE_URL + '/status', [sys.executable, '-u', str(REPO / 'drive/drive_server.py')], ROOT / 'drive-server.log'),
     'watcher': (DOG_WATCHER_URL + '/status', [sys.executable, '-u', str(ROOT / 'dog_watcher.py')], ROOT / 'dog-watcher.log'),
+    # camera depth model; runs in the detector Python (torch), see start()
+    'depth': (DEPTH_URL + '/status', [str(ROOT / 'depth_service.py')], ROOT / 'depth-service.log'),
 }
 
 
@@ -191,11 +194,15 @@ class Services:
                 return  # already running elsewhere
             except (OSError, ValueError):
                 pass
+            env = None
             if name == 'watcher':
                 command = command + ['--host', self.camera_host]
+            if name == 'depth':
+                python, extra_env = detector_python()
+                command, env = [str(python), '-u'] + command, dict(os.environ, **extra_env)
             with log.open('ab') as out:
                 out.write(f'\n--- started from dashboard {datetime.datetime.now():%Y-%m-%d %H:%M:%S}\n'.encode())
-                self.processes[name] = subprocess.Popen(command, cwd=REPO, stdout=out, stderr=out,
+                self.processes[name] = subprocess.Popen(command, cwd=REPO, stdout=out, stderr=out, env=env,
                                                         start_new_session=True)
 
     def stop(self, name):
@@ -374,6 +381,13 @@ def make_handler(dashboard, password):
                         return self.reply(200, response.read())
                 except OSError:
                     return self.reply(503, {'error': 'drive server not running'})
+            if path in ('/depth/status', '/depth.jpg'):
+                try:
+                    with urllib.request.urlopen(DEPTH_URL + ('/status' if path == '/depth/status' else path),
+                                                timeout=2) as response:
+                        return self.reply(200, response.read(), response.headers.get('Content-Type'))
+                except OSError:
+                    return self.reply(503, {'error': 'depth service not running'})
             if path == '/planner.jpg':
                 if dashboard.planner_image is None:
                     return self.reply(404, {'error': 'no observation yet'})

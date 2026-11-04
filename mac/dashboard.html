@@ -73,6 +73,11 @@ input[type=checkbox]{width:16px;height:16px}
 .compass .read span{font-size:12px;color:var(--dim)}
 .hrow{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:13px}
 .hrow label{display:flex;align-items:center;gap:8px}
+.sectors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.sectors div{border:1px solid var(--line2);border-radius:12px;padding:8px;text-align:center;font-size:11px;color:var(--dim2)}
+.sectors strong{display:block;font-size:18px;font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
+.sectors .clear{border-color:#16a34a}.sectors .near{border-color:var(--warn)}.sectors .blocked{border-color:#ef4444;background:#ef444422}
+#depth-img{display:block;width:100%;border-radius:10px;margin-top:10px}
 @media(max-width:640px){.wrap{padding:16px}.tele{grid-template-columns:1fr 1fr}.pad{grid-template-columns:repeat(3,64px)}}
 </style></head><body><div class="wrap">
 <header>
@@ -138,6 +143,16 @@ input[type=checkbox]{width:16px;height:16px}
       </div>
       <div class="hrow"><label><input type="checkbox" id="imu-hold" checked>Heading hold</label><span id="imu-rate" class="hint" style="margin:0"></span></div>
       <p class="hint">From the gyro stick on the rover (<code>rover-imu.local</code>). With hold on, straight moves steer back onto their heading and turns stop at the angle. + = left of zero.</p>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h2 style="margin:0">Obstacles · camera</h2><button id="depth-svc">Start</button></div>
+      <div class="sectors">
+        <div id="sec-left">Left<strong>—</strong></div><div id="sec-centre">Centre<strong>—</strong></div><div id="sec-right">Right<strong>—</strong></div>
+      </div>
+      <div class="hrow"><label><input type="checkbox" id="depth-show">Show depth view</label><span id="depth-rate" class="hint" style="margin:0"></span></div>
+      <img id="depth-img" alt="Camera picture beside its depth map: free floor green, obstacles red" hidden>
+      <p class="hint">Depth AI (Depth Anything V2) on the camera feed: free floor ahead in each third, from floor geometry. Experimental, nothing drives from it yet.</p>
+      <p class="status" id="depth-status">Depth service off</p>
     </div>
     <div class="card">
       <div class="cardhead"><h2 style="margin:0">Measured moves</h2><button id="odo-reset" title="Zero the distance and position">Reset</button></div>
@@ -290,6 +305,23 @@ async function imuPoll(){
 imuPoll();
 $('imu-zero').onclick=()=>postJSON('/drive/imu/zero').catch(()=>{});
 $('imu-hold').onchange=e=>postJSON('/drive/imu',{hold:e.target.checked}).catch(()=>{});
+
+// Camera depth / obstacles.
+let depthOn=false;
+async function depthPoll(){
+  try{const s=await getJSON('/depth/status');if(!('ready' in s))throw new Error(s.error);depthOn=true;$('depth-svc').textContent='Stop';
+    for(const n of ['left','centre','right']){const el=$('sec-'+n),v=s.ok&&s.sectors?s.sectors[n]:null;
+      el.className=v?v.state:'';el.querySelector('strong').textContent=v?(v.cm>=300?'clear':v.cm+' cm'):'—'}
+    $('depth-rate').textContent=s.fps?`${s.fps} fps · ${s.model_ms} ms`:'';
+    $('depth-status').className='status'+(s.error||!s.ok?' warn':'');
+    $('depth-status').textContent=!s.ready?'Loading the depth model…':s.error?s.error:!s.ok?(s.why||''):'Running'+(s.frame_age_ms!=null?` · frame ${s.frame_age_ms} ms old`:'');
+    if($('depth-show').checked)$('depth-img').src='/depth.jpg?t='+Date.now()}
+  catch(e){depthOn=false;$('depth-svc').textContent='Start';$('depth-status').className='status';$('depth-status').textContent='Depth service off';
+    for(const n of ['left','centre','right']){$('sec-'+n).className='';$('sec-'+n).querySelector('strong').textContent='—'}}
+  setTimeout(depthPoll,depthOn?250:2000)}
+depthPoll();
+$('depth-show').onchange=e=>{$('depth-img').hidden=!e.target.checked};
+$('depth-svc').onclick=async e=>{e.target.disabled=true;try{await postJSON(`/services/depth/${depthOn?'stop':'start'}`);$('depth-status').textContent=depthOn?'Stopping…':'Starting (the model takes a few seconds)…'}catch(err){$('depth-status').textContent=err.message}e.target.disabled=false};
 
 // Camera settings.
 async function loadCfg(){try{const c=await getJSON('/cam/config');

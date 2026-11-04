@@ -84,7 +84,7 @@ class FakeLink:
 class FakeServices:
     def __init__(self):
         self.state = {n: {'running': False, 'starting': False, 'managed': False, 'exited': None, 'log_tail': None}
-                      for n in ('drive', 'watcher')}
+                      for n in ('drive', 'watcher', 'depth')}
         self.calls = []
 
     def status(self):
@@ -211,6 +211,7 @@ class DashboardUITest(unittest.TestCase):
         cls.drive = serve(drive_server.make_handler(cls.drive_state))
         dashboard.DRIVE_URL = f'http://127.0.0.1:{cls.drive.server_port}'
         dashboard.DOG_WATCHER_URL = f'http://127.0.0.1:{free_port()}'      # nothing there: watcher offline
+        dashboard.DEPTH_URL = f'http://127.0.0.1:{free_port()}'            # nor a depth service
         cls.link = FakeLink(f'127.0.0.1:{cls.camera.server_port}')
         cls.services = FakeServices()
         cls.dash = dashboard.Dashboard(cls.link, cls.services)
@@ -464,6 +465,37 @@ class DashboardUITest(unittest.TestCase):
         finally:
             self.drive_state.imu = None
             self.drive_state.heading_hold = True
+
+    def test_depth_card_shows_sectors_and_starts_the_service(self):
+        reading = {'ready': True, 'ok': True, 'fps': 9.5, 'model_ms': 80, 'frame_age_ms': 60, 'error': None,
+                   'sectors': {'left': {'cm': 300, 'state': 'clear'}, 'centre': {'cm': 28, 'state': 'blocked'},
+                               'right': {'cm': 64, 'state': 'near'}}}
+
+        class Depth(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = json.dumps(reading).encode()
+                self.send_response(200)
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+        self.open()
+        expect(self.page.locator('#depth-status')).to_contain_text('off')
+        self.page.click('#depth-svc')
+        self.assertIn(('start', 'depth'), self.services.calls)
+        server = serve(Depth)
+        old = dashboard.DEPTH_URL
+        dashboard.DEPTH_URL = f'http://127.0.0.1:{server.server_port}'
+        try:
+            expect(self.page.locator('#sec-centre')).to_contain_text('28 cm', timeout=5000)
+            expect(self.page.locator('#sec-centre')).to_have_class('blocked')
+            expect(self.page.locator('#sec-left')).to_contain_text('clear')
+            expect(self.page.locator('#depth-rate')).to_contain_text('9.5 fps')
+        finally:
+            dashboard.DEPTH_URL = old
+            server.shutdown()
 
     def test_heading_card_offline(self):
         self.open()
