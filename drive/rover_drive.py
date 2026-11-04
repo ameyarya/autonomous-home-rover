@@ -141,12 +141,10 @@ class Transmitter:
         return out
 
     def wire(self, key):
-        # A/D only steer on the receiver; the Mac's A/D are forward arcs, so send W with them.
-        # L/R steer without driving (calibration).
-        if key in 'LR':
-            self.repl('wire(%r)' % {'L': 'A', 'R': 'D'}[key])
-        else:
-            self.repl('wire("W");wire(%r)' % key if key in 'AD' else 'wire(%r)' % key)
+        # The receiver combines a throttle key with a steer key sent together (A/D alone only
+        # steer). The Mac's A/D are forward arcs; L/R steer only; Z/C reverse while steering.
+        frames = {'A': 'WA', 'D': 'WD', 'L': 'A', 'R': 'D', 'Z': 'SA', 'C': 'SD'}.get(key, key)
+        self.repl(';'.join('wire(%r)' % k for k in frames))
 
     def codes(self, codes):
         """Send live calibration codes (rover app 0.8: X X X X + three A/D keys each; they never drive)."""
@@ -161,8 +159,8 @@ class Transmitter:
     def pulse(self, key, ms, abort=None):
         """Hold `key` for up to `ms` (capped), then stop with ACK. `abort` (threading.Event)
         ends the pulse early."""
-        if key not in 'WASDLR':
-            raise ValueError('key must be W, A, S, D, L or R')
+        if key not in 'WASDLRZC':
+            raise ValueError('key must be W, A, S, D, L, R, Z or C')
         ms = max(0, min(int(ms), MAX_PULSE_MS))
         end = time.monotonic() + ms / 1000
         try:

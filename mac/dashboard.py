@@ -1,4 +1,5 @@
-"""Rover dashboard: live camera, the dog watcher's exact input, drive controls, camera health.
+"""Rover dashboard: live camera, drive controls, camera health (page redesigned 2026-11-03; the
+dog watcher is no longer shown, its /dog proxy remains).
 
 Run: python3 mac/dashboard.py [--host rover-cam.local] [--port 8010]
 Then open http://rover.local:8010/ from any device on the home Wi-Fi (advertised over mDNS), or
@@ -8,12 +9,13 @@ without logging in. The page is mac/dashboard.html.
 
 - Services: start/stop the drive server (drive/drive_server.py) and dog watcher
   (mac/dog_watcher.py) from the header; ones started elsewhere show as running.
-- Drive: Arm (lease renewed by the page), STOP (Esc/Space), hold-to-drive with WASD/arrows.
+- Drive: Arm (lease renewed by the page), STOP (Esc/Space), hold-to-drive: W/S throttle and A/D
+  steering are independent (A/D alone only turn the wheels; held together: drive and steer).
 - Camera: health from XiaoLink, settings via the XIAO's /config, and an alert whenever the
   XIAO restarts (power drop on the magnetic cable, brownout, crash), with its reset reason.
 - Calibrate (/calibrate): centre, range and speed change live on the rover (no install) and are
   saved there; wiring (motor directions, servo port) is a signed install.
-- Detector check: "Observe" saves a fresh frame and runs the ported Mini-T detector on it.
+- Detector check: POST /observe still runs the ported Mini-T detector (no button on the page).
 """
 import argparse
 import collections

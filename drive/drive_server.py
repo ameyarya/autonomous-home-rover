@@ -30,7 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import calibration  # noqa: E402
 
 LEASE_S = 3.0
-PULSE_LIMITS_MS = {'W': 600, 'S': 400, 'A': 600, 'D': 600, 'L': 2000, 'R': 2000}   # L/R: steer only, wheels don't drive
+PULSE_LIMITS_MS = {'W': 600, 'S': 400, 'A': 600, 'D': 600, 'L': 2000, 'R': 2000, 'Z': 400, 'C': 400}
+# A/D: forward arcs; L/R: steer only (wheels don't drive); Z/C: reverse while steering left/right
 HOLD_S = 0.35                 # manual drive stops this long after the last /hold renewal
 MANUAL_QUIET_S = 2.0          # autonomous pulses refused this long after manual driving
 REPEAT_S = 0.15               # resend the key this often (receiver watchdog is 500 ms)
@@ -79,7 +80,7 @@ class DriveState:
         if time.monotonic() < self.manual_until:
             raise RuntimeError('manual driving')
         if key not in PULSE_LIMITS_MS:
-            raise ValueError('key must be W, A, S, D, L or R')
+            raise ValueError('key must be W, A, S, D, L, R, Z or C')
         ms = max(0, min(int(ms), PULSE_LIMITS_MS[key]))
         with self.lock:
             if not self.armed or self.abort.is_set():
@@ -100,7 +101,7 @@ class DriveState:
         if not self.armed:
             raise PermissionError('not armed')
         if key not in PULSE_LIMITS_MS:
-            raise ValueError('key must be W, A, S, D, L or R')
+            raise ValueError('key must be W, A, S, D, L, R, Z or C')
         now = time.monotonic()
         self.hold_key = key
         self.hold_until = now + HOLD_S

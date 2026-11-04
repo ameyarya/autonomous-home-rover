@@ -312,7 +312,7 @@ class DashboardUITest(unittest.TestCase):
         dashboard.DRIVE_URL = f'http://127.0.0.1:{free_port()}'
         try:
             self.open()
-            expect(self.page.locator('#drive-status')).to_contain_text('Start it in the header')
+            expect(self.page.locator('#drive-status')).to_contain_text('Start it above')
         finally:
             dashboard.DRIVE_URL = old
 
@@ -336,17 +336,44 @@ class DashboardUITest(unittest.TestCase):
         self.assertEqual(self.tx.calls[-1], 'X', 'release must end with a stop')
         self.assertFalse(self.drive_state.holding)
 
+    def hold_pad(self, *dirs, seconds=0.5):
+        for d in dirs:
+            self.page.dispatch_event(f'.pad button[data-dir={d}]', 'pointerdown', {'pointerId': hash(d) % 1000})
+        time.sleep(seconds)
+        for d in dirs:
+            self.page.dispatch_event(f'.pad button[data-dir={d}]', 'pointerup', {'pointerId': hash(d) % 1000})
+        time.sleep(drive_server.HOLD_S + 0.4)
+
     def test_button_hold_drives(self):
         self.open()
         self.page.click('#arm')
         expect(self.page.locator('#arm')).to_contain_text('Armed')
-        box = self.page.locator('.g button[data-key=D]').bounding_box()
-        self.page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
-        self.page.mouse.down()
+        self.hold_pad('up')
+        self.assertGreaterEqual(self.tx.calls.count('W'), 2)
+        self.assertEqual(self.tx.calls[-1], 'X')
+
+    def test_left_right_only_steer(self):
+        self.open()
+        self.page.click('#arm')
+        expect(self.page.locator('#arm')).to_contain_text('Armed')
+        self.hold_pad('right')
+        self.assertGreaterEqual(self.tx.calls.count('R'), 2)        # steer only: no W sent with it
+        self.assertNotIn('W', self.tx.calls)
+        self.assertNotIn('D', self.tx.calls)
+
+    def test_keys_combine_drive_and_steer(self):
+        self.open()
+        self.page.click('#arm')
+        expect(self.page.locator('#arm')).to_contain_text('Armed')
+        self.page.keyboard.down('ArrowDown')
+        self.page.keyboard.down('ArrowLeft')
         time.sleep(0.5)
-        self.page.mouse.up()
+        self.page.keyboard.up('ArrowLeft')
+        time.sleep(0.5)
+        self.page.keyboard.up('ArrowDown')
         time.sleep(drive_server.HOLD_S + 0.4)
-        self.assertGreaterEqual(self.tx.calls.count('D'), 2)
+        self.assertIn('Z', self.tx.calls)                           # reverse while steering left
+        self.assertIn('S', self.tx.calls)                           # then straight reverse
         self.assertEqual(self.tx.calls[-1], 'X')
 
     def test_escape_stops_and_disarms(self):
@@ -354,30 +381,8 @@ class DashboardUITest(unittest.TestCase):
         self.page.click('#arm')
         expect(self.page.locator('#arm')).to_contain_text('Armed')
         self.page.keyboard.press('Escape')
-        expect(self.page.locator('#arm')).to_have_text('Arm')
+        expect(self.page.locator('#arm')).to_have_text('Arm to drive')
         self.assertFalse(self.drive_state.armed)
-
-    # ---- dog watcher ----
-
-    def test_watcher_offline_placeholder(self):
-        self.open()
-        expect(self.page.locator('#dog-empty')).to_be_visible()
-        expect(self.page.locator('#activity')).to_have_text('Dog watcher not running')
-
-    def test_watcher_online_shows_frame_state_and_timeline(self):
-        watcher = serve(FakeWatcher)
-        old = dashboard.DOG_WATCHER_URL
-        dashboard.DOG_WATCHER_URL = f'http://127.0.0.1:{watcher.server_port}'
-        try:
-            self.open()
-            expect(self.page.locator('#dog-empty')).to_be_hidden(timeout=5000)
-            expect(self.page.locator('#dstate')).to_have_text('following')
-            expect(self.page.locator('#ddrive')).to_contain_text('would send A 300 ms')
-            expect(self.page.locator('#timeline li')).to_have_count(2)
-            expect(self.page.locator('#timeline')).to_contain_text('walking to the door (active)')
-        finally:
-            dashboard.DOG_WATCHER_URL = old
-            watcher.shutdown()
 
     # ---- calibrate page (live) ----
 

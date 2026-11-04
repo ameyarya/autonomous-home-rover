@@ -56,10 +56,10 @@ class DriveStateTest(unittest.TestCase):
         tx = rover_drive.Transmitter.__new__(rover_drive.Transmitter)
         sent = []
         tx.repl = sent.append
-        for key in 'WADSLR':
+        for key in 'WADSLRZC':
             tx.wire(key)
-        self.assertEqual(sent, ["wire('W')", 'wire("W");wire(\'A\')', 'wire("W");wire(\'D\')', "wire('S')",
-                                "wire('A')", "wire('D')"])
+        self.assertEqual(sent, ["wire('W')", "wire('W');wire('A')", "wire('W');wire('D')", "wire('S')",
+                                "wire('A')", "wire('D')", "wire('S');wire('A')", "wire('S');wire('D')"])
 
     def test_pulse_is_capped(self):
         self.s.arm(True)
