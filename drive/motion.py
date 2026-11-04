@@ -84,7 +84,10 @@ def scaled(m, power):
             'radius': m.get('turn_radius_cm') or 0, 'arc': arc[1] / TEST_S['arc'] * f if arc else forward}
 
 
-def plan(kind, amount, m, power):
+LONG_MOVE_S = 30.0       # straight runs holding a fixed gyro heading (calibration) may go this long
+
+
+def plan(kind, amount, m, power, long=False):
     """('forward'|'back', cm) or ('left'|'right'|'reverse_left'|'reverse_right', degrees) -> (key, seconds).
     reverse_left/right: back up while steering so the heading turns left/right (the front swings that
     way): reversing with the wheels steered right (C) turns the heading left. Timed from the reverse
@@ -105,8 +108,9 @@ def plan(kind, amount, m, power):
         key, seconds = ('C' if kind == 'reverse_left' else 'Z'), s['radius'] * math.radians(abs(amount)) / s['reverse']
     else:
         raise ValueError('kind must be forward, back, left, right, reverse_left or reverse_right')
-    if seconds > MAX_MOVE_S:
-        raise ValueError(f'that move would take {seconds:.1f} s; the limit is {MAX_MOVE_S:.0f} s')
+    limit = LONG_MOVE_S if long and kind in ('forward', 'back') else MAX_MOVE_S
+    if seconds > limit:
+        raise ValueError(f'that move would take {seconds:.1f} s; the limit is {limit:.0f} s')
     return key, seconds
 
 

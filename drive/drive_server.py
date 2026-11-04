@@ -15,7 +15,8 @@ Run: python3 drive/drive_server.py        (HTTP on 127.0.0.1:8769)
   POST /move   {"kind": "forward"|"back", "amount": cm}  or  {"kind": "left"|"right", "amount": deg}
                                    measured move (timed from drive/motion.json; refused unless armed);
                                    "heading": deg (forward/back): hold this gyro heading instead of the
-                                   heading the move starts at (straight runs over several moves)
+                                   heading the move starts at; such a straight run may last up to
+                                   motion.LONG_MOVE_S (30 s) instead of 8
                                    {"kind": "reverse_left"|"reverse_right", "amount": deg} backs up turning the
                                    heading that way (for multi-point turns);
                                    {"kind": "test_forward"|"test_reverse"|"test_arc"} = the timed run for measuring
@@ -177,7 +178,8 @@ class DriveState:
         else:
             if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
                 raise ValueError('amount must be a positive number (cm or degrees)')
-            key, seconds = motion.plan(kind, amount, self.motion, self.power())
+            key, seconds = motion.plan(kind, amount, self.motion, self.power(),
+                                       long=heading is not None and self.gyro() is not None)
         with self.lock:
             if not self.armed or self.abort.is_set():
                 raise PermissionError('not armed')
