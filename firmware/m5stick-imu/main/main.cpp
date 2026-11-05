@@ -8,11 +8,14 @@
 //   stick -> Mac  {"seq":..,"yaw":deg,"rate":deg/s,"still":0|1,"cal":0|1,"bumps":n,"bat":%,"up":ms}
 //                 50 per second. yaw is unwrapped (keeps counting past 360), + = turned left.
 // The gyro bias is re-learnt whenever the stick is still, so heading drift stays small.
-// Button A (the big front button) also zeroes the heading.
+// Button A (the big front button) also zeroes the heading. Holding button B (the side button) for
+// 2 s turns the stick off, and so does 10 minutes without the Mac asking for data; the power
+// button turns it back on. The screen dims while nobody is subscribed.
 #include <M5Unified.h>
 #include <cmath>
 #include <cstring>
 #include "esp_event.h"
+#include "esp_sleep.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
@@ -28,6 +31,8 @@ static constexpr float STILL_DPS = 1.5f;      // gyro below this (after bias) ..
 static constexpr float STILL_G = 0.04f;       // ... and |accel| within this of 1 g ...
 static constexpr int64_t STILL_US = 400000;   // ... for this long = standing still
 static constexpr float BUMP_G = 0.6f;         // jolt that counts as a bump
+static constexpr uint32_t OFF_HOLD_MS = 2000;  // hold button B this long to turn off
+static constexpr int64_t IDLE_OFF_US = 600000000;  // off after 10 min with no "sub" from the Mac
 
 struct State {
   float yaw = 0, rate = 0;
@@ -38,6 +43,8 @@ struct State {
 static State st;
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 static volatile bool wifi_up = false;
+static volatile int64_t last_sub = 0;          // when the Mac last asked for data
+static volatile bool going_off = false;
 static char ip_text[20] = "no wifi";
 
 static float dot(const float* a, const float* b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
@@ -54,6 +61,12 @@ static void imu_task(void*) {
   for (;;) {
     M5.update();
     if (M5.BtnA.wasPressed()) yaw = 0;
+    if (M5.BtnB.pressedFor(OFF_HOLD_MS) || esp_timer_get_time() - last_sub > IDLE_OFF_US) {
+      going_off = true;                                 // the screen says so, then power off
+      vTaskDelay(pdMS_TO_TICKS(1200));
+      M5.Power.powerOff();
+      esp_deep_sleep_start();                           // still on USB power: sleep until reset
+    }
     if (!M5.Imu.update()) {
       vTaskDelay(1);
       continue;
@@ -181,6 +194,7 @@ static void net_task(void*) {
       if (!strncmp(buf, "sub", 3)) {
         sub = from;
         sub_until = now + SUB_US;
+        last_sub = now;
       } else if (!strncmp(buf, "zero", 4)) {
         portENTER_CRITICAL(&mux);
         st.zero = true;
@@ -242,7 +256,20 @@ extern "C" void app_main() {
   xTaskCreatePinnedToCore(imu_task, "imu", 6144, nullptr, 10, nullptr, 1);
   xTaskCreatePinnedToCore(net_task, "net", 4096, nullptr, 5, nullptr, 0);
   char shown[64] = "";
+  int brightness = 80;
   for (;;) {
+    if (going_off) {
+      lcd.fillScreen(TFT_BLACK);
+      lcd.setTextDatum(middle_center);
+      lcd.setTextColor(TFT_WHITE);
+      lcd.setFont(&fonts::Font4);
+      lcd.drawString("Off", lcd.width() / 2, lcd.height() / 2);
+      lcd.pushSprite(0, 0);
+      M5.Display.setBrightness(80);
+      vTaskDelay(portMAX_DELAY);
+    }
+    int want = esp_timer_get_time() - last_sub < SUB_US ? 80 : 15;   // dim while unused
+    if (want != brightness) M5.Display.setBrightness(brightness = want);
     State s = snapshot();
     char now[64];                                       // redraw only when what's shown changes
     snprintf(now, sizeof now, "%.0f %d %d %d %d %s", s.yaw, s.cal, s.still, s.bat, (int)wifi_up, ip_text);

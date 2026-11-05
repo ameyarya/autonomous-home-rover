@@ -11,6 +11,10 @@ uses it for heading hold on straight moves and for turning by angle.
 - **Bumps:** jolts over 0.6 g are counted.
 - **Screen:** IP address, a compass needle, the heading, still/moving, and battery.
   Button A (the big front button) zeroes the heading.
+- **Turning off:** hold button B (the side button) for 2 s; the screen says "Off". It also turns
+  itself off after 10 minutes without the Mac asking for data, and dims its screen while unused.
+  The power button turns it back on. On USB power it can't cut power, so it sleeps instead until
+  the power button or a reset.
 
 ## Protocol (UDP port 8773, `rover-imu.local`)
 
