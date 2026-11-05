@@ -15,7 +15,6 @@
 #include <cmath>
 #include <cstring>
 #include "esp_event.h"
-#include "esp_sleep.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
@@ -58,15 +57,23 @@ static void imu_task(void*) {
   uint32_t bumps = 0;
   int64_t last = esp_timer_get_time(), calm_since = last, last_bump = 0, last_bat = 0;
   int bat = M5.Power.getBatteryLevel();
+  bool on_usb = true;                                   // until the first reading says otherwise
+  int64_t last_vbus = 0;
   for (;;) {
     M5.update();
     if (M5.BtnA.wasPressed()) yaw = 0;
-    if (M5.BtnB.pressedFor(OFF_HOLD_MS) || esp_timer_get_time() - last_sub > IDLE_OFF_US) {
+    // Off only on battery: on USB the power chip can't cut power, and a failed power-off leaves the
+    // stick stuck until it's unplugged.
+    if (esp_timer_get_time() - last_vbus > 1000000) {
+      on_usb = M5.Power.getVBUSVoltage() > 4000;
+      last_vbus = esp_timer_get_time();
+    }
+    if (!on_usb && (M5.BtnB.pressedFor(OFF_HOLD_MS) || esp_timer_get_time() - last_sub > IDLE_OFF_US)) {
       going_off = true;                                 // the screen says so, then power off
       vTaskDelay(pdMS_TO_TICKS(1200));
       M5.Power.powerOff();
-      esp_deep_sleep_start();                           // still on USB power: sleep until reset
     }
+    if (on_usb) last_sub = esp_timer_get_time();        // the idle timer starts when unplugged
     if (!M5.Imu.update()) {
       vTaskDelay(1);
       continue;
