@@ -48,3 +48,4 @@ sim/apartment/history/
 sim/apartment/*.json.tmp
 mac/shadow/
 mac/explore_params.json
+mac/dashboard.log

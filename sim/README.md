@@ -16,7 +16,7 @@ transmitter and heading stick) on :9769 and the rendered rover camera on :9010; 
   3.8° up, 62° wide: the floor-wall line at 0.5 / 1.1 / 2.3 m lands within 2 px of the real
   rover's fitted geometry.
 - `GET :9010/truth`: true pose, collisions, time pushing a wall, path length, closest approach.
-- **Edit it on the dashboard**: `http://rover.local:8010/sim` (Sim in the header). Top-down plan over
+- **Edit it on the dashboard**: `http://localhost:8010/sim` (Sim in the header). Top-down plan over
   the floor plan: drag furniture to move, the corner handle to resize, arrow keys nudge 5 cm,
   rotate / duplicate / delete / add, undo; 3D view to orbit. Save writes `apartment/furniture.json`
   (local) and rebuilds the simulator's apartment.

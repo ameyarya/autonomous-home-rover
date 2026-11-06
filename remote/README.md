@@ -11,7 +11,7 @@ program that takes that MAC and sends the same frames as the Mac. Nothing on the
 | Right stick left/right | Steer (servo only on its own; drive and steer together with both sticks) |
 | Top-left button | STOP (nothing drives while held) |
 
-Calibration (centre, range, speed) is on the Mac's Calibrate page, live: http://rover.local:8010/calibrate.
+Calibration (centre, range, speed) is on the Mac's Calibrate page, live: http://localhost:8010/calibrate.
 A remote calibration mode (switch picks drive/steering/speed, lever and button edit) was tried on
 2026-11-03 and removed the same day: hard to remember, and the left stick's direction was a guess.
 

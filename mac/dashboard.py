@@ -2,10 +2,9 @@
 dog watcher is no longer shown, its /dog proxy remains).
 
 Run: python3 mac/dashboard.py [--host rover-cam.local] [--port 8010]
-Then open http://rover.local:8010/ from any device on the home Wi-Fi (advertised over mDNS), or
-http://localhost:8010/ on this Mac. Other devices log in with the password in
-mac/.dashboard-password (created on first run, gitignored); this Mac needs no login. STOP works
-without logging in. The page is mac/dashboard.html.
+Then open http://localhost:8010/. It listens on this Mac only (127.0.0.1): no other device can reach
+it, so there's no login. mac/install_service.sh keeps it running as a login service (launchd).
+The page is mac/dashboard.html.
 
 - Services: start/stop the drive server (drive/drive_server.py) and dog watcher
   (mac/dog_watcher.py) from the header; ones started elsewhere show as running.
@@ -20,10 +19,6 @@ without logging in. The page is mac/dashboard.html.
 import argparse
 import collections
 import datetime
-import hashlib
-import hmac
-import secrets
-import socket
 import json
 import os
 import subprocess
@@ -45,16 +40,6 @@ REPO = ROOT.parent
 PAGE_FILE = ROOT / 'dashboard.html'
 SIM_DIR = REPO / 'sim/apartment'     # the simulator's apartment: layout files are personal, local only
 SIM_BUILD = [str(ROOT / '.vision-venv/bin/python'), str(SIM_DIR / 'build_apartment.py')]
-PASSWORD_FILE = ROOT / '.dashboard-password'
-COOKIE = 'rover_session'
-LOGIN_PAGE = '''<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
-<title>Home Rover</title><style>:root{color-scheme:dark}body{margin:0;min-height:100vh;display:grid;place-items:center;
-background:#10151d;color:#edf2fa;font-family:system-ui;padding:16px}form{background:#19212d;border:1px solid #2c3748;
-border-radius:12px;padding:20px;display:grid;gap:10px;width:min(320px,100%)}h1{font-size:20px;margin:0}
-input,button{font:inherit;color:inherit;background:#101722;border:1px solid #40516b;border-radius:8px;padding:10px}
-button{background:#277b58;border-color:#46a477;cursor:pointer}p{margin:0;font-size:12px;color:#ff8b80}</style>
-<form method=post action=/login><h1>Home Rover</h1><input type=password name=password placeholder=Password autofocus
-autocomplete=current-password>{message}<button>Log in</button></form>'''
 FRAMES = ROOT / 'vision-output'
 MINI_T = Path.home() / 'Documents/Projects/ai-driven-mini-t'
 DETECTOR_URL = 'http://127.0.0.1:8767'
@@ -203,36 +188,6 @@ def restore_version(stamp):
     if not stamp.replace('-', '').isdigit() or not path.exists():
         raise ValueError('no such version')
     return write_furniture(json.loads(path.read_text()))
-
-
-def dashboard_password():
-    """The LAN login password: mac/.dashboard-password, created with a random one if missing."""
-    if not PASSWORD_FILE.exists():
-        PASSWORD_FILE.write_text(secrets.token_urlsafe(9) + '\n')
-        PASSWORD_FILE.chmod(0o600)
-    return PASSWORD_FILE.read_text().strip()
-
-
-def session_token(password):
-    # Stateless: stays valid across restarts until the password changes.
-    return hmac.new(password.encode(), b'rover-dashboard-session', hashlib.sha256).hexdigest()
-
-
-def lan_ip(towards):
-    """This Mac's address on the network that reaches `towards` (no packets are sent)."""
-    try:
-        target = socket.gethostbyname(towards)
-    except OSError:
-        target = '192.168.1.1'
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.connect((target, 80))
-        return s.getsockname()[0]
-
-
-def advertise(name, port, ip):
-    """Publish <name>.local -> ip (and an _http._tcp service) over mDNS for this process's life."""
-    return subprocess.Popen(['dns-sd', '-P', 'Home Rover', '_http._tcp', 'local', str(port), f'{name}.local', ip],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 class Services:
@@ -387,32 +342,8 @@ class QuietServer(ThreadingHTTPServer):
             super().handle_error(request, client_address)
 
 
-def make_handler(dashboard, password):
-    token = session_token(password)
-
+def make_handler(dashboard):
     class Handler(BaseHTTPRequestHandler):
-        def authorized(self):
-            if self.client_address[0] in ('127.0.0.1', '::1'):
-                return True
-            for part in self.headers.get('Cookie', '').split(';'):
-                name, _, value = part.strip().partition('=')
-                if name == COOKIE and hmac.compare_digest(value, token):
-                    return True
-            return False
-
-        def login(self):
-            size = int(self.headers.get('Content-Length', 0))
-            fields = urllib.parse.parse_qs(self.rfile.read(size).decode(errors='replace'))
-            if hmac.compare_digest(fields.get('password', [''])[0].encode(), password.encode()):
-                self.send_response(303)
-                self.send_header('Location', '/')
-                self.send_header('Set-Cookie', f'{COOKIE}={token}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Strict')
-                self.send_header('Content-Length', '0')
-                self.end_headers()
-                return
-            time.sleep(1)  # slow down guessing
-            self.reply(401, LOGIN_PAGE.replace('{message}', '<p>Wrong password</p>').encode(), 'text/html; charset=utf-8')
-
         def reply(self, status, body, content_type='application/json', headers=None):
             if not isinstance(body, bytes):
                 body = json.dumps(body).encode()
@@ -427,10 +358,6 @@ def make_handler(dashboard, password):
 
         def do_GET(self):
             path = self.path.split('?')[0]
-            if not self.authorized():
-                if path == '/':
-                    return self.reply(200, LOGIN_PAGE.replace('{message}', '').encode(), 'text/html; charset=utf-8')
-                return self.reply(401, {'error': 'log in first'})
             if path == '/':
                 return self.reply(200, PAGE_FILE.read_bytes(), 'text/html; charset=utf-8')
             if path == '/status':
@@ -515,10 +442,6 @@ def make_handler(dashboard, password):
             self.reply(404, {'error': 'not found'})
 
         def do_POST(self):
-            if self.path == '/login':
-                return self.login()
-            if not self.authorized() and self.path != '/drive/stop':   # anyone may STOP
-                return self.reply(401, {'error': 'log in first'})
             parts = self.path.strip('/').split('/')
             if len(parts) == 3 and parts[0] == 'services' and parts[1] in SERVICES and parts[2] in ('start', 'stop'):
                 try:
@@ -604,33 +527,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--host', default=DEFAULT_HOST, help='XIAO host (default rover-cam.local)')
     parser.add_argument('--port', type=int, default=8010)
-    parser.add_argument('--bind', default='0.0.0.0', help='listen address (127.0.0.1 = this Mac only)')
-    parser.add_argument('--name', default='rover', help='mDNS name: http://<name>.local:<port>/')
     parser.add_argument('--max-frame-age', type=float, default=MAX_FRAME_AGE_S, help='seconds')
     args = parser.parse_args()
     link = XiaoLink(args.host, max_frame_age_s=args.max_frame_age).start()
     services = Services(args.host)
-    password = dashboard_password()
     dash = Dashboard(link, services)
     dash.recorder.start()
     dash.shadow.start()
-    server = QuietServer((args.bind, args.port), make_handler(dash, password))
-    mdns = None
-    if args.bind not in ('127.0.0.1', 'localhost'):
-        ip = lan_ip(args.host)
-        mdns = advertise(args.name, args.port, ip)
-        print(f'Rover dashboard on http://{args.name}.local:{args.port}/ ({ip}) and http://localhost:{args.port}/'
-              f'  (camera {args.host}; LAN login password in {PASSWORD_FILE.relative_to(REPO)})', flush=True)
-    else:
-        print(f'Rover dashboard on http://localhost:{args.port}/  (camera {args.host})', flush=True)
+    server = QuietServer(('127.0.0.1', args.port), make_handler(dash))
+    print(f'Rover dashboard on http://localhost:{args.port}/  (camera {args.host})', flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         services.stop_all()   # the drive server's stop-on-exit stops the motors
-        if mdns:
-            mdns.terminate()
 
 
 if __name__ == '__main__':

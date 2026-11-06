@@ -28,22 +28,12 @@ from playwright.sync_api import expect, sync_playwright  # noqa: E402
 
 JPEG = base64.b64decode(
     '/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAEKADAAQAAAABAAAADAAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgADAAQAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICAwICAwUDAwMFBgUFBQUGCAYGBgYGCAoICAgICAgKCgoKCgoKCgwMDAwMDA4ODg4ODw8PDw8PDw8PD//bAEMBAgICBAQEBwQEBxALCQsQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEP/dAAQAAf/aAAwDAQACEQMRAD8A87ooor+yD+bz/9k=')
-PASSWORD = 'test-password'
 
 
 def free_port():
     with socket.socket() as s:
         s.bind(('127.0.0.1', 0))
         return s.getsockname()[1]
-
-
-def lan_address():
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        try:
-            s.connect(('192.168.1.1', 80))
-            return s.getsockname()[0]
-        except OSError:
-            return None
 
 
 def serve(handler, host='127.0.0.1'):
@@ -221,8 +211,7 @@ class DashboardUITest(unittest.TestCase):
         import shadow
         cls.dash.shadow.folder = Path(tempfile.mkdtemp())                  # never the real recordings
         shadow.PARAMS_FILE = Path(tempfile.mkdtemp()) / 'explore_params.json'
-        cls.lan = lan_address()
-        cls.server = serve(dashboard.make_handler(cls.dash, PASSWORD), '0.0.0.0')
+        cls.server = serve(dashboard.make_handler(cls.dash))
         cls.url = f'http://127.0.0.1:{cls.server.server_port}/'
         cls.pw = sync_playwright().start()
         cls.browser = cls.pw.chromium.launch(channel='chrome', headless=True)
@@ -629,28 +618,6 @@ class DashboardUITest(unittest.TestCase):
         overflow = page.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
         context.close()
         self.assertLessEqual(overflow, 0)
-
-    # ---- login (other devices) ----
-
-    def test_lan_visitor_must_log_in_and_stop_needs_none(self):
-        if not self.lan:
-            self.skipTest('no LAN address')
-        lan_url = f'http://{self.lan}:{self.server.server_port}/'
-        self.page.goto(lan_url)
-        expect(self.page.locator('input[type=password]')).to_be_visible()
-        self.page.fill('input[type=password]', 'wrong')
-        self.page.click('button')
-        expect(self.page.locator('form p')).to_have_text('Wrong password')
-        self.page.fill('input[type=password]', PASSWORD)
-        self.page.click('button')
-        expect(self.page.locator('#live-empty')).to_be_hidden(timeout=5000)
-        stranger = self.pw.request.new_context()        # no session cookie
-        try:
-            self.assertEqual(stranger.post(lan_url + 'drive/stop').status, 200)
-            self.assertEqual(stranger.post(lan_url + 'drive/arm', data='{"armed": true}').status, 401)
-            self.assertEqual(stranger.get(lan_url + 'live.jpg').status, 401)
-        finally:
-            stranger.dispose()
 
 
 if __name__ == '__main__':
