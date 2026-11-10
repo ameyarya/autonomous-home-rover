@@ -2,31 +2,56 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Shadow Report</title>
 <style>
-:root{color-scheme:dark;--bg:#0b0f15;--panel:#121822;--panel2:#1b2330;--line:#263142;--line2:#35445b;--fg:#eef3fa;--dim:#9aabc2;--dim2:#7d8ea8;
-  --ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--accent:#60a5fa;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
+:root{color-scheme:dark;--bg:#090b0f;--panel:#11141a;--panel2:#181c24;--panel3:#20252f;--line:#232935;--line2:#323a49;--fg:#e9edf4;--dim:#9aa4b5;--dim2:#6f7a8c;
+  --ok:#3ddc97;--warn:#f5b942;--bad:#ff6b6b;--accent:#7c9cff;--arm:#ffb020;--stop:#e5383b;--sel:#ffb020;--r:14px;
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;background:var(--bg);color:var(--fg)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);padding:14px 18px}
-header{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
-h1{font-size:20px;margin:0;font-weight:650}.sub{font-size:12px;color:var(--dim2)}.sp{flex:1}
-a.linkbtn,button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:7px 12px;cursor:pointer;text-decoration:none;font-size:13px}
-button.primary{background:#1d4ed8;border-color:#3b82f6}button:disabled{opacity:.45;cursor:not-allowed}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
-h2{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim2);margin:0 0 10px}
-.big{font-size:30px;font-weight:650;font-variant-numeric:tabular-nums}
-.hint{font-size:12px;line-height:1.55;color:var(--dim);margin:8px 0 0}
+body{margin:0 auto;background:var(--bg);padding:14px 16px 24px;max-width:1800px}
+body{-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+button,a.linkbtn{font:inherit;font-size:13px;font-weight:550;color:inherit;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:8px 12px;cursor:pointer;text-decoration:none;user-select:none;-webkit-user-select:none;transition:background .12s,border-color .12s}
+button:hover,a.linkbtn:hover{background:var(--panel3);border-color:#414b5e}button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.primary,button.primary{background:#3b5bdb;border-color:#5c7cfa;color:#fff}.primary:hover,button.primary:hover{background:#4c6ef5;border-color:#748ffc}
+header.top{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;flex:none;min-height:34px}
+.brand{display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none}
+.brand svg{width:26px;height:26px;color:var(--accent);flex:none}
+.brand h1{font-size:17px;margin:0;font-weight:650;letter-spacing:-.2px}
+.brand .sub,.sub{font-size:12px;color:var(--dim2)}
+nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--panel);min-width:316px;margin-right:auto}
+nav a{font-size:12px;font-weight:550;color:var(--dim);text-decoration:none;padding:5px 8px;border-radius:999px;text-align:center;white-space:nowrap}
+nav a:hover,nav a.here{color:var(--fg);background:var(--panel3)}
+select,input[type=number],input[type=text],input:not([type]){font:inherit;font-size:13px;color:var(--fg);background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:7px 8px;min-width:0}
+input.sw{appearance:none;-webkit-appearance:none;width:30px!important;height:18px!important;border-radius:999px;background:var(--line2);border:0;padding:0;margin:0;position:relative;cursor:pointer;flex:none;transition:background .15s}
+input.sw::before{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .15s}
+input.sw:checked{background:var(--accent)}input.sw:checked::before{transform:translateX(12px)}
+input[type=range]{accent-color:var(--accent)}
+header.top{margin-bottom:14px}
+.title{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 12px}.title h1{font-size:20px;margin:0;font-weight:650;letter-spacing:-.3px}.title .sp{flex:1}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+h2{font-size:13px;font-weight:600;margin:0 0 10px}
+.big{font-size:30px;font-weight:650;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.hint{font-size:12px;line-height:1.55;color:var(--dim2);margin:8px 0 0}
 table{border-collapse:collapse;font-size:13px;width:100%;font-variant-numeric:tabular-nums}
 th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
 th{color:var(--dim2);font-weight:550}
 .diff{color:var(--warn);font-weight:600}
 .clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:14px}
 .clip{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:12px}
-.clip img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#05070a}
+.clip img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#04060a}
 .clip div{padding:8px;color:var(--dim)}.clip b{color:var(--fg)}
 #status{font-size:12px;color:var(--dim);margin-top:8px}#status.ok{color:var(--ok)}#status.warn{color:var(--warn)}
+.card{overflow-x:auto}
+@media(max-width:640px){nav{width:100%;min-width:0}}
+@media(max-width:640px){body{padding:12px 12px 24px}.grid{grid-template-columns:minmax(0,1fr)}th,td{padding:5px 4px}.clips{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}}
 </style></head><body>
-<header><h1>Shadow report</h1><span class="sub">your driving vs what the explorer would have done</span><span class="sp"></span>
-  <button id="refresh">Refresh</button><a class="linkbtn" href="/">Dashboard</a></header>
+<header class="top">
+  <a class="brand" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="9" width="18" height="8" rx="2.5"/><path d="M8 9V6h5l2 3"/><circle cx="7.5" cy="18" r="2.2" fill="var(--bg)"/><circle cx="16.5" cy="18" r="2.2" fill="var(--bg)"/></svg><h1>Home Rover</h1></a>
+  <nav><a href="/">Drive</a><a href="/sim">Sim</a><a href="/calibrate">Calibrate</a><a class="here" href="/shadow">Shadow</a></nav>
+  
+</header>
+<div class="title"><h1>Shadow report</h1><span class="sub">your driving vs what the explorer would have done</span><span class="sp"></span><button id="refresh">Refresh</button></div>
 <div class="grid">
   <div class="card"><h2>Recorded</h2><div class="big" id="samples">—</div><p class="hint" id="sessions">Turn on Shadow on the dashboard and drive with the arrow keys or pad.</p></div>
   <div class="card"><h2>Agreement now</h2><div class="big" id="agree">—</div><p class="hint">Share of moments where the explorer would have made the same move as you (forward, arc left, arc right, or back up).</p></div>
@@ -37,10 +62,10 @@ th{color:var(--dim2);font-weight:550}
     <p id="status"></p>
   </div>
 </div>
-<div class="card" style="margin-top:14px"><h2>You vs the explorer</h2>
+<div class="card" style="margin-top:12px"><h2>You vs the explorer</h2>
   <table id="confusion"></table>
   <p class="hint">Rows: what you did. Columns: what the explorer would have done. The diagonal is agreement; "forward" in a row where you didn't drive forward is the riskiest kind of disagreement.</p></div>
-<div class="card" style="margin-top:14px"><h2>Disagreements (riskiest first)</h2><div class="clips" id="clips"></div></div>
+<div class="card" style="margin-top:12px"><h2>Disagreements (riskiest first)</h2><div class="clips" id="clips"></div></div>
 <script>
 const $ = id => document.getElementById(id);
 const NAMES = {FORWARD_CM: 'Drive forward when the centre is clear for at least (cm)', TURN_CM: 'Arc-turn only with this much ahead (cm)', SIDE_CM: '…and this much on the open side (cm)'};

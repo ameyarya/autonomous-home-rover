@@ -2,52 +2,79 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sim Apartment</title>
 <style>
-:root{color-scheme:dark;--bg:#0b0f15;--panel:#121822;--panel2:#1b2330;--line:#263142;--line2:#35445b;--fg:#eef3fa;--dim:#9aabc2;--dim2:#7d8ea8;
-  --accent:#60a5fa;--sel:#f59e0b;--ok:#4ade80;--warn:#fbbf24;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
+:root{color-scheme:dark;--bg:#090b0f;--panel:#11141a;--panel2:#181c24;--panel3:#20252f;--line:#232935;--line2:#323a49;--fg:#e9edf4;--dim:#9aa4b5;--dim2:#6f7a8c;
+  --ok:#3ddc97;--warn:#f5b942;--bad:#ff6b6b;--accent:#7c9cff;--arm:#ffb020;--stop:#e5383b;--sel:#ffb020;--r:14px;
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;background:var(--bg);color:var(--fg)}
 *{box-sizing:border-box}[hidden]{display:none!important}
 body{margin:0;background:var(--bg);height:100vh;display:flex;flex-direction:column}
-header{display:flex;align-items:center;gap:12px;padding:12px 18px;flex:none;flex-wrap:wrap}
-header h1{font-size:20px;margin:0;font-weight:650}.sub{font-size:12px;color:var(--dim2)}
-.sp{flex:1}
-a.linkbtn,button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:7px 12px;cursor:pointer;text-decoration:none;font-size:13px}
-button:hover{background:#243045}button:disabled{opacity:.45;cursor:not-allowed}
-button.primary{background:#1d4ed8;border-color:#3b82f6}button.on{background:var(--accent);color:#06101f;border-color:#93c5fd}
-main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;padding:0 18px 14px}
-#stage{position:relative;background:#05070a;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+body{-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+button,a.linkbtn{font:inherit;font-size:13px;font-weight:550;color:inherit;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:8px 12px;cursor:pointer;text-decoration:none;user-select:none;-webkit-user-select:none;transition:background .12s,border-color .12s}
+button:hover,a.linkbtn:hover{background:var(--panel3);border-color:#414b5e}button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.primary,button.primary{background:#3b5bdb;border-color:#5c7cfa;color:#fff}.primary:hover,button.primary:hover{background:#4c6ef5;border-color:#748ffc}
+header.top{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;flex:none;min-height:34px}
+.brand{display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none}
+.brand svg{width:26px;height:26px;color:var(--accent);flex:none}
+.brand h1{font-size:17px;margin:0;font-weight:650;letter-spacing:-.2px}
+.brand .sub,.sub{font-size:12px;color:var(--dim2)}
+nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--panel);min-width:316px;margin-right:auto}
+nav a{font-size:12px;font-weight:550;color:var(--dim);text-decoration:none;padding:5px 8px;border-radius:999px;text-align:center;white-space:nowrap}
+nav a:hover,nav a.here{color:var(--fg);background:var(--panel3)}
+select,input[type=number],input[type=text],input:not([type]){font:inherit;font-size:13px;color:var(--fg);background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:7px 8px;min-width:0}
+input.sw{appearance:none;-webkit-appearance:none;width:30px!important;height:18px!important;border-radius:999px;background:var(--line2);border:0;padding:0;margin:0;position:relative;cursor:pointer;flex:none;transition:background .15s}
+input.sw::before{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .15s}
+input.sw:checked{background:var(--accent)}input.sw:checked::before{transform:translateX(12px)}
+input[type=range]{accent-color:var(--accent)}
+header.top{padding:14px 16px 0;width:100%;max-width:1800px;margin:0 auto;min-height:48px}
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:none;padding:12px 16px}
+.bar .sp{flex:1}.bar button,.bar select{height:32px;padding:0 12px;font-size:12px}
+.bar label{flex-direction:row;align-items:center;gap:8px;color:var(--dim);cursor:pointer}
+.seg{display:inline-flex;padding:2px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.seg button{border:0;background:none;height:26px;border-radius:8px;color:var(--dim)}
+.seg button.on{background:var(--panel3);color:var(--fg)}
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;padding:0 16px 16px}
+#stage{position:relative;background:#04060a;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 #plan,#three{position:absolute;inset:0;width:100%;height:100%}
 #three{display:none}
-aside{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;overflow:auto;display:flex;flex-direction:column;gap:14px}
-h2{font-size:11px;font-weight:650;letter-spacing:.8px;text-transform:uppercase;color:var(--dim2);margin:0}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;overflow:auto;display:flex;flex-direction:column;gap:14px}
+h2{font-size:13px;font-weight:600;margin:0}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim2)}
-input,select{font:inherit;color:inherit;background:#0d131c;border:1px solid var(--line2);border-radius:8px;padding:6px;min-width:0;width:100%}
+aside input,aside select{width:100%}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.hint{font-size:12px;line-height:1.55;color:var(--dim);margin:0}
+.hint{font-size:12px;line-height:1.55;color:var(--dim2);margin:0}
 #status{font-size:12px;color:var(--dim);min-height:18px}#status.warn{color:var(--warn)}#status.ok{color:var(--ok)}
 .item{cursor:move;transition:opacity .12s}.item:hover{opacity:.85}.item.sel{stroke:var(--sel);stroke-width:3}
-.lbl{pointer-events:none;paint-order:stroke;stroke:#0b0f15;stroke-width:3px;stroke-linejoin:round;font-weight:600}
-.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.lbl{pointer-events:none;paint-order:stroke;stroke:#090b0f;stroke-width:3px;stroke-linejoin:round;font-weight:600}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .btns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .btns button{padding:7px 4px;text-align:center;white-space:nowrap}
 .list div{display:flex;justify-content:space-between;gap:8px}.list div i{font-style:normal;color:var(--dim2);font-size:11px}
 details.help summary{cursor:pointer;font-size:12px;color:var(--dim2);padding:2px 0}details.help p{margin-top:8px}
-#stage{background:radial-gradient(circle at 50% 40%,#0e1520,#05070a)}
+#stage{background:radial-gradient(circle at 50% 40%,#0f131b,#04060a)}
 .handle{fill:var(--sel);cursor:nwse-resize}
 .list{display:flex;flex-direction:column;gap:2px;flex:1;min-height:120px;overflow:auto;font-size:12px}
 .list div{padding:4px 6px;border-radius:6px;cursor:pointer;color:var(--dim)}.list div.sel{background:var(--panel2);color:var(--fg)}
-@media(max-width:900px){main{grid-template-columns:1fr;grid-template-rows:60vh auto}}
+@media(max-width:900px){body{height:auto;min-height:100vh}main{flex:none;display:flex;flex-direction:column}#stage{height:62vh;min-height:300px;flex:none}aside{overflow:visible}.list{max-height:320px}.bar .sp{display:none}}
+@media(max-width:640px){nav{width:100%;min-width:0}}
+@media(max-width:640px){header.top{padding:12px 12px 0}.bar{padding:12px}main{padding:0 12px 12px}.bar #versions{flex:1;min-width:0}.btns{grid-template-columns:repeat(2,1fr)}}
 </style></head><body>
-<header>
-  <h1>Sim apartment</h1><span class="sub">the simulator's copy of home · drag to move, corner to resize</span>
-  <span class="sp"></span>
-  <button id="v2d" class="on">Plan</button><button id="v3d">3D</button>
-  <label style="flex-direction:row;align-items:center;gap:6px;color:var(--dim)"><input type="checkbox" id="showplan" checked style="width:auto">floor plan</label>
-  <button id="undo" title="Undo (Cmd/Ctrl+Z)">Undo</button>
-  <select id="versions" title="Saved versions (a copy is kept at most once a minute)" style="width:auto"><option value="">Versions…</option></select>
-  <span id="saved" class="sub">…</span>
-  <button id="save" class="primary" title="Changes save automatically; this also rebuilds the simulator's apartment">Rebuild sim</button>
-  <a class="linkbtn" href="/">Dashboard</a>
+<header class="top">
+  <a class="brand" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="9" width="18" height="8" rx="2.5"/><path d="M8 9V6h5l2 3"/><circle cx="7.5" cy="18" r="2.2" fill="var(--bg)"/><circle cx="16.5" cy="18" r="2.2" fill="var(--bg)"/></svg><h1>Home Rover</h1></a>
+  <nav><a href="/">Drive</a><a class="here" href="/sim">Sim</a><a href="/calibrate">Calibrate</a><a href="/shadow">Shadow</a></nav>
+  
 </header>
+<div class="bar">
+  <div class="seg"><button id="v2d" class="on">Plan</button><button id="v3d">3D</button></div>
+  <label><input type="checkbox" class="sw" id="showplan" checked>Floor plan</label>
+  <span class="sub">Drag to move, corner to resize</span>
+  <span class="sp"></span>
+  <span id="saved" class="sub">…</span>
+  <button id="undo" title="Undo (Cmd/Ctrl+Z)">Undo</button>
+  <select id="versions" title="Saved versions (a copy is kept at most once a minute)"><option value="">Versions…</option></select>
+  <button id="save" class="primary" title="Changes save automatically; this also rebuilds the simulator's apartment">Rebuild sim</button>
+</div>
 <main>
   <div id="stage"><svg id="plan"></svg><canvas id="three"></canvas></div>
   <aside>
