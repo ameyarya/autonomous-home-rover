@@ -4,7 +4,7 @@
 <style>
 :root{color-scheme:dark;--bg:#0b0f15;--panel:#121822;--panel2:#1b2330;--line:#263142;--line2:#35445b;--fg:#eef3fa;--dim:#9aabc2;--dim2:#7d8ea8;
   --accent:#60a5fa;--sel:#f59e0b;--ok:#4ade80;--warn:#fbbf24;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
-*{box-sizing:border-box}
+*{box-sizing:border-box}[hidden]{display:none!important}
 body{margin:0;background:var(--bg);height:100vh;display:flex;flex-direction:column}
 header{display:flex;align-items:center;gap:12px;padding:12px 18px;flex:none;flex-wrap:wrap}
 header h1{font-size:20px;margin:0;font-weight:650}.sub{font-size:12px;color:var(--dim2)}
@@ -16,15 +16,22 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px;
 #stage{position:relative;background:#05070a;border:1px solid var(--line);border-radius:16px;overflow:hidden}
 #plan,#three{position:absolute;inset:0;width:100%;height:100%}
 #three{display:none}
-aside{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;overflow:auto;display:flex;flex-direction:column;gap:12px}
-h2{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim2);margin:0}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;overflow:auto;display:flex;flex-direction:column;gap:14px}
+h2{font-size:11px;font-weight:650;letter-spacing:.8px;text-transform:uppercase;color:var(--dim2);margin:0}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim2)}
 input,select{font:inherit;color:inherit;background:#0d131c;border:1px solid var(--line2);border-radius:8px;padding:6px;min-width:0;width:100%}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .hint{font-size:12px;line-height:1.55;color:var(--dim);margin:0}
 #status{font-size:12px;color:var(--dim);min-height:18px}#status.warn{color:var(--warn)}#status.ok{color:var(--ok)}
-.item{cursor:move}.item.sel{stroke:var(--sel);stroke-width:3}
+.item{cursor:move;transition:opacity .12s}.item:hover{opacity:.85}.item.sel{stroke:var(--sel);stroke-width:3}
+.lbl{pointer-events:none;paint-order:stroke;stroke:#0b0f15;stroke-width:3px;stroke-linejoin:round;font-weight:600}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.btns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.btns button{padding:7px 4px;text-align:center;white-space:nowrap}
+.list div{display:flex;justify-content:space-between;gap:8px}.list div i{font-style:normal;color:var(--dim2);font-size:11px}
+details.help summary{cursor:pointer;font-size:12px;color:var(--dim2);padding:2px 0}details.help p{margin-top:8px}
+#stage{background:radial-gradient(circle at 50% 40%,#0e1520,#05070a)}
 .handle{fill:var(--sel);cursor:nwse-resize}
 .list{display:flex;flex-direction:column;gap:2px;flex:1;min-height:120px;overflow:auto;font-size:12px}
 .list div{padding:4px 6px;border-radius:6px;cursor:pointer;color:var(--dim)}.list div.sel{background:var(--panel2);color:var(--fg)}
@@ -45,8 +52,8 @@ input,select{font:inherit;color:inherit;background:#0d131c;border:1px solid var(
   <div id="stage"><svg id="plan"></svg><canvas id="three"></canvas></div>
   <aside>
     <div><h2>Selected</h2></div>
-    <div id="none" class="hint">Click a piece of furniture to edit it; double-click it (or its name in the list) to rename it. Walls come from the floor plan.</div>
-    <div id="edit" hidden>
+    <div id="none" class="hint card">Click a piece of furniture to edit it; double-click it (or its name in the list) to rename it. Walls come from the floor plan.</div>
+    <div id="edit" class="card" hidden>
       <div class="grid2">
         <label>Name<input id="f-name"></label>
         <label>Height (m)<input id="f-h" type="number" step="0.05" min="0.02" max="2.5"></label>
@@ -57,10 +64,11 @@ input,select{font:inherit;color:inherit;background:#0d131c;border:1px solid var(
       </div>
       <div class="row" style="margin-top:10px"><button id="rot">Rotate 90°</button><button id="dup">Duplicate</button><button id="del">Delete</button></div>
     </div>
-    <div class="row"><button id="add-box">+ Box</button><button id="add-cyl">+ Round</button><button id="add-rug">+ Rug</button><button id="add-door" title="A no-go line across a doorway: the simulated rover can't cross it and steers clear">+ Door</button></div>
-    <div><h2>Furniture</h2></div>
+    <div><h2>Add furniture</h2></div>
+    <div class="btns"><button id="add-box">+ Box</button><button id="add-cyl">+ Round</button><button id="add-rug">+ Rug</button><button id="add-door" title="A no-go line across a doorway: the simulated rover can't cross it and steers clear">+ Door</button></div>
+    <div><h2>Items</h2></div>
     <div class="list" id="list"></div>
-    <p class="hint">x runs east, y north, from the plan's bottom-left corner. Rugs and the bedroom carpet are flat (the rover drives over them); everything else blocks it. Doors (red dashed) are no-go lines: draw one across a doorway to keep the rover out; it's invisible to the simulated camera, like a robot vacuum's virtual wall. Every change saves itself to <code>sim/apartment/furniture.json</code> on this Mac (not the public repo) within a second, with a copy in <code>history/</code> at most once a minute; Rebuild sim makes the simulator use it.</p>
+    <details class="help"><summary>How this works</summary><p class="hint">x runs east, y north, from the plan's bottom-left corner. Rugs and the bedroom carpet are flat (the rover drives over them); everything else blocks it. Doors (red dashed) are no-go lines: draw one across a doorway to keep the rover out; it's invisible to the simulated camera, like a robot vacuum's virtual wall. Every change saves itself to <code>sim/apartment/furniture.json</code> on this Mac (not the public repo) within a second, with a copy in <code>history/</code> at most once a minute; Rebuild sim makes the simulator use it.</p></details>
     <div id="status"></div>
   </aside>
 </main>
@@ -87,7 +95,7 @@ async function autosave() {          // a second after the last change, not mid-
     const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
     fixNames(j.furniture);
     $('saved').textContent = `saved ${j.saved_at}`; $('saved').style.color = ''; loadVersions();
-  } catch (e) { dirty = true; $('saved').textContent = 'not saved: ' + e.message; $('saved').style.color = 'var(--warn)'; }
+  } catch (e) { dirty = true; changedAt = Date.now() + 6000; $('saved').textContent = 'not saved: ' + e.message; $('saved').style.color = 'var(--warn)'; }
   saving = false;
 }
 setInterval(autosave, 400);
@@ -129,22 +137,33 @@ function setGeom(it, g) {
 let S = 60, OX = 20, OY = 20;   // px per metre, offsets
 function fit() {
   const r = svg.getBoundingClientRect(), [W, H] = data.size;
+  if (r.width < 80 || r.height < 80) return false;
   S = Math.min((r.width - 40) / W, (r.height - 40) / H); OX = (r.width - W * S) / 2; OY = (r.height - H * S) / 2;
+  return true;
 }
 const px = (x, y) => [OX + x * S, OY + (data.size[1] - y) * S];
 const metres = (sx, sy) => [(sx - OX) / S, data.size[1] - (sy - OY) / S];
-function el(tag, attrs, parent = svg) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
+let bg = null, fg = null, bgImage = null;
+function layers() {
+  if (bg) return;
+  bg = document.createElementNS(NS, 'g'); fg = document.createElementNS(NS, 'g'); svg.append(bg, fg);
+  bgImage = document.createElementNS(NS, 'image'); bgImage.setAttribute('href', '/sim/floorplan.png'); bgImage.setAttribute('preserveAspectRatio', 'none'); bg.append(bgImage);
+}
+function el(tag, attrs, parent = fg) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
 function color(rgb, a = 1) { return `rgba(${rgb.map(v => Math.round(v * 255)).join(',')},${a})`; }
 function draw() {
-  fit(); svg.innerHTML = '';
+  if (!fit()) { panel(); list(); return; }              // pane not laid out yet: nothing sensible to draw
+  layers(); fg.replaceChildren();
   const [W, H] = data.size;
   const [x0, y0] = px(0, H);
-  if ($('showplan').checked && data.floorplan) {
+  if ($('showplan').checked && data.floorplan) {        // one persistent <image>, only moved, so it never reloads or blinks
     const b = data.floorplan;   // plan image placement: pixel bounds of the apartment in the image
-    el('image', {href: '/sim/floorplan.png', x: x0 - b.left * S * b.m_per_px, y: y0 - b.top * S * b.m_per_px,
-      width: b.width * S * b.m_per_px, height: b.height * S * b.m_per_px, opacity: .35, preserveAspectRatio: 'none'});
-  }
-  el('rect', {x: x0, y: y0, width: W * S, height: H * S, fill: 'rgba(168,145,111,.18)'});
+    for (const [k, v] of Object.entries({x: x0 - b.left * S * b.m_per_px, y: y0 - b.top * S * b.m_per_px,
+      width: b.width * S * b.m_per_px, height: b.height * S * b.m_per_px, opacity: .22, display: ''})) bgImage.setAttribute(k, v);
+  } else bgImage.setAttribute('display', 'none');
+  el('rect', {x: x0, y: y0, width: W * S, height: H * S, fill: 'rgba(168,145,111,.14)', rx: 4});
+  for (let m = 1; m < W; m++) el('line', {x1: x0 + m * S, y1: y0, x2: x0 + m * S, y2: y0 + H * S, stroke: 'rgba(255,255,255,.05)'});
+  for (let m = 1; m < H; m++) el('line', {x1: x0, y1: y0 + m * S, x2: x0 + W * S, y2: y0 + m * S, stroke: 'rgba(255,255,255,.05)'});
   for (const c of data.furniture.carpet || []) { const [a, b] = px(c.x0, c.y1); el('rect', {x: a, y: b, width: (c.x1 - c.x0) * S, height: (c.y1 - c.y0) * S, fill: 'rgba(185,176,163,.25)'}); }
   for (const w of data.walls) {
     const [a, b] = px(w.x0, w.y1);
@@ -158,11 +177,14 @@ function draw() {
     const extra = it.kind === 'door' ? {stroke: '#ef4444', 'stroke-width': 2, 'stroke-dasharray': '6 4'} : {};
     const node = it.kind === 'cyl'
       ? el('circle', {cx, cy, r: g.w / 2 * S, fill, class: 'item' + (isSel ? ' sel' : '')})
-      : el('rect', {x: cx - g.w / 2 * S, y: cy - g.d / 2 * S, width: Math.max(3, g.w * S), height: Math.max(3, g.d * S), fill, class: 'item' + (isSel ? ' sel' : ''), rx: it.kind === 'rug' ? 6 : 2, ...extra});
+      : el('rect', {x: cx - g.w / 2 * S, y: cy - g.d / 2 * S, width: Math.max(3, g.w * S), height: Math.max(3, g.d * S), fill, class: 'item' + (isSel ? ' sel' : ''), rx: it.kind === 'rug' ? 8 : 4, ...extra});
     node.addEventListener('pointerdown', e => startDrag(e, it, 'move'));
     node.addEventListener('dblclick', e => { e.stopPropagation(); rename(it); });
-    const t = el('text', {x: cx, y: it.kind === 'door' ? cy - 6 : cy + 4, 'text-anchor': 'middle', 'font-size': 11, fill: it.kind === 'door' ? '#fca5a5' : '#0b0f15', 'pointer-events': 'none'});
-    t.textContent = it.o.name;
+    const fits = Math.max(g.w, g.d) * S >= it.o.name.length * 6.2;
+    if (fits || isSel) {
+      const t = el('text', {x: cx, y: it.kind === 'door' ? cy - 6 : cy + 4, 'text-anchor': 'middle', 'font-size': 10.5, fill: it.kind === 'door' ? '#fca5a5' : '#eef3fa', class: 'lbl'});
+      t.textContent = it.o.name;
+    }
     if (isSel) {
       const [hx, hy] = px(g.x + g.w / 2, g.y - g.d / 2);
       el('rect', {x: hx - 6, y: hy - 6, width: 12, height: 12, class: 'handle'}).addEventListener('pointerdown', e => startDrag(e, it, 'size'));
@@ -181,6 +203,8 @@ function startDrag(e, it, mode) {
   drag = {it, mode, start: [mx, my], g: geom(it)};
   svg.setPointerCapture(e.pointerId);
 }
+let rafDraw = 0;
+function scheduleDraw() { if (!rafDraw) rafDraw = requestAnimationFrame(() => { rafDraw = 0; draw(); }); }
 svg.addEventListener('pointermove', e => {
   if (!drag) return;
   const r = svg.getBoundingClientRect(), [mx, my] = metres(e.clientX - r.left, e.clientY - r.top);
@@ -188,9 +212,9 @@ svg.addEventListener('pointermove', e => {
   if (drag.mode === 'move') { g.x += dx; g.y += dy; }
   else { g.w = Math.max(0.05, g.w + dx); g.d = Math.max(0.05, g.d - dy); g.x += dx / 2; g.y += dy / 2;
          if (drag.it.kind === 'cyl') { g.w = g.d = Math.max(g.w, g.d); } }
-  setGeom(drag.it, g); draw();
+  setGeom(drag.it, g); scheduleDraw();
 });
-svg.addEventListener('pointerup', () => { drag = null; });
+svg.addEventListener('pointerup', () => { drag = null; if (rafDraw) { cancelAnimationFrame(rafDraw); rafDraw = 0; draw(); } });
 svg.addEventListener('pointerdown', () => { sel = null; draw(); });
 
 // ---- side panel ----
@@ -219,11 +243,14 @@ function rename(it) {
   snapshot(); it.o.name = clean; sel = it; draw(); status(`Renamed to ${clean}. Save to keep it.`);
 }
 function list() {
+  const sig = items().map(it => it.o.name + it.kind + (sel && sel.o === it.o ? '*' : '')).join('|');
+  if (sig === list.sig) return; list.sig = sig;
   $('list').innerHTML = '';
   for (const it of items()) {
     const d = document.createElement('div');
     const dup = items().filter(x => x.o.name === it.o.name).length > 1;
-    d.textContent = `${it.o.name} · ${it.kind}${dup ? ' · same name as another' : ''}`;
+    const note = (it.kind === 'cyl' ? 'round' : it.kind === 'door' ? 'no-go line' : it.kind) + (dup ? ' · same name as another' : '');
+    d.innerHTML = '<span></span><i></i>'; d.firstChild.textContent = it.o.name; d.lastChild.textContent = note;
     if (dup) d.style.color = 'var(--warn)';
     if (sel && sel.o === it.o) d.className = 'sel';
     d.onclick = () => { sel = it; draw(); }; d.ondblclick = () => rename(it);
