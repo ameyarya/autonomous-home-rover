@@ -2,44 +2,71 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Calibrate Drive</title>
 <style>
-:root{color-scheme:dark;--bg:#10151d;--panel:#19212d;--line:#2c3748;--line2:#40516b;--fg:#edf2fa;--dim:#9caec5;--dim2:#8295af;--ok:#91dfb7;--warn:#f0c674;--bad:#ff8b80;font-family:system-ui;background:var(--bg);color:var(--fg)}
-*{box-sizing:border-box}body{max-width:1100px;margin:auto;padding:16px;background:var(--bg)}
-a{color:var(--dim)}
-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
-h1{font-size:22px;margin:0}h2{font-size:15px;margin:0 0 10px}h3{font-size:13px;margin:0 0 4px}
+:root{color-scheme:dark;--bg:#090b0f;--panel:#11141a;--panel2:#181c24;--panel3:#20252f;--line:#232935;--line2:#323a49;--fg:#e9edf4;--dim:#9aa4b5;--dim2:#6f7a8c;
+  --ok:#3ddc97;--warn:#f5b942;--bad:#ff6b6b;--accent:#7c9cff;--arm:#ffb020;--stop:#e5383b;--sel:#ffb020;--r:14px;
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;background:var(--bg);color:var(--fg)}
+*{box-sizing:border-box}[hidden]{display:none!important}body{max-width:1800px;margin:0 auto;padding:14px 16px 24px;background:var(--bg)}
+body{-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+button,a.linkbtn{font:inherit;font-size:13px;font-weight:550;color:inherit;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:8px 12px;cursor:pointer;text-decoration:none;user-select:none;-webkit-user-select:none;transition:background .12s,border-color .12s}
+button:hover,a.linkbtn:hover{background:var(--panel3);border-color:#414b5e}button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.primary,button.primary{background:#3b5bdb;border-color:#5c7cfa;color:#fff}.primary:hover,button.primary:hover{background:#4c6ef5;border-color:#748ffc}
+header.top{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;flex:none;min-height:34px}
+.brand{display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none}
+.brand svg{width:26px;height:26px;color:var(--accent);flex:none}
+.brand h1{font-size:17px;margin:0;font-weight:650;letter-spacing:-.2px}
+.brand .sub,.sub{font-size:12px;color:var(--dim2)}
+nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--panel);min-width:316px;margin-right:auto}
+nav a{font-size:12px;font-weight:550;color:var(--dim);text-decoration:none;padding:5px 8px;border-radius:999px;text-align:center;white-space:nowrap}
+nav a:hover,nav a.here{color:var(--fg);background:var(--panel3)}
+select,input[type=number],input[type=text],input:not([type]){font:inherit;font-size:13px;color:var(--fg);background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:7px 8px;min-width:0}
+input.sw{appearance:none;-webkit-appearance:none;width:30px!important;height:18px!important;border-radius:999px;background:var(--line2);border:0;padding:0;margin:0;position:relative;cursor:pointer;flex:none;transition:background .15s}
+input.sw::before{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .15s}
+input.sw:checked{background:var(--accent)}input.sw:checked::before{transform:translateX(12px)}
+input[type=range]{accent-color:var(--accent)}
+header.top{margin-bottom:14px}
+.title{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 12px}.title h1{font-size:20px;margin:0;font-weight:650;letter-spacing:-.3px}
+h2{font-size:15px;font-weight:650;margin:0 0 10px}h3{font-size:13px;font-weight:600;margin:0 0 4px}
 .muted{color:var(--dim);font-size:12px}
-.chip{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 10px;border:1px solid var(--line2);border-radius:999px;font-size:12px;background:var(--panel)}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--dim2)}.dot.ok{background:#3fb950}.dot.warn{background:var(--warn)}
-.chip button{font-size:11px;padding:3px 9px}
-.banner{margin-bottom:12px;padding:10px 12px;border:1px solid #9a6a12;background:#3a2a0b;border-radius:10px;font-size:13px}
-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:16px}
-@media(max-width:820px){main{grid-template-columns:minmax(0,1fr)}}
-.card{padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-width:0}
-button{font:inherit;color:inherit;background:#29364a;border:1px solid var(--line2);border-radius:8px;padding:9px 12px;cursor:pointer;touch-action:none;user-select:none}
-button:hover{background:#344662}button:active{background:#42648e}button:disabled{opacity:.45;cursor:not-allowed}
-.primary{background:#277b58;border-color:#46a477}.danger{background:#8e2a24;border-color:#d1554b;font-weight:700}.armed{background:#9a6a12;border-color:#e0a83a}
+.chip{display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--dim);background:var(--panel)}
+.chip b{color:var(--fg);font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;background:#4a5466}.dot.ok{background:var(--ok);box-shadow:0 0 0 3px #3ddc9722}.dot.warn{background:var(--warn);box-shadow:0 0 0 3px #f5b94222}
+.chip button{font-size:11px;padding:2px 9px;border-radius:999px;margin-right:-5px}
+.banner{margin-bottom:12px;padding:10px 14px;border:1px solid #6b4e12;background:#231a08;border-radius:var(--r);font-size:13px;line-height:1.5}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px}
+
+.card{padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+button{padding:9px 12px;touch-action:none}button:active{background:var(--panel3)}
+.danger,.danger:hover{background:var(--stop);border-color:#ff6b6e;color:#fff;font-weight:800;letter-spacing:1px}.armed,.armed:hover{background:var(--arm);border-color:#ffd166;color:#1d1300}
 .row{display:flex;gap:8px;align-items:center}.row>button{flex:1}
 .g{display:grid;grid-template-columns:repeat(3,64px);gap:6px;justify-content:center;margin:12px 0}
 .g button{height:48px;padding:0;font-size:15px;font-weight:600}
 label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim2)}
 input[type=range]{width:100%}
 .status{font-size:12px;color:var(--dim);line-height:1.5;min-height:18px;margin:8px 0 0}
-.step{border-top:1px solid #354154;padding:12px 0}.step:first-of-type{border-top:0;padding-top:0}
+.step{border-top:1px solid var(--line);padding:12px 0}.step:first-of-type{border-top:0;padding-top:0}
 .step p{font-size:12px;color:var(--dim);margin:0 0 8px;line-height:1.5}
-.check{flex-direction:row;align-items:center;gap:8px;color:var(--fg);font-size:13px}
-input[type=checkbox]{width:18px;height:18px}
+.check{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;color:var(--fg);font-size:13px}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
 .stepper{display:flex;align-items:center;gap:6px}.stepper button{width:48px;padding:6px}
 .stepper output{min-width:64px;text-align:center;font-size:16px;font-variant-numeric:tabular-nums}
-.row button.sel{background:#277b58;border-color:#46a477}
-.savebar{position:sticky;bottom:0;background:var(--panel);padding:12px 0 2px;border-top:1px solid #354154;margin-top:8px}
+.row button.sel{background:var(--accent);border-color:#aebfff;color:#081027}
+.savebar{position:sticky;bottom:0;background:var(--panel);padding:12px 0 2px;border-top:1px solid var(--line);margin-top:8px}
 .savebar .row button{font-size:15px;padding:12px}
 .slider{display:flex;align-items:center;gap:10px}.slider input{flex:1;height:28px}.slider output{font-size:22px;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+@media(max-width:820px){main{grid-template-columns:minmax(0,1fr)}.savebar{position:static}}
+@media(max-width:640px){nav{width:100%;min-width:0}}
+@media(max-width:640px){body{padding:12px 12px 24px}.card{padding:14px}.slider output{font-size:18px;min-width:44px}#ports{flex-wrap:wrap}}
 </style><body>
-<header>
-  <div><h1>Calibrate drive</h1><div class="muted"><a href="/">← Dashboard</a> · rover app <span id="installed">…</span></div></div>
+<header class="top">
+  <a class="brand" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="9" width="18" height="8" rx="2.5"/><path d="M8 9V6h5l2 3"/><circle cx="7.5" cy="18" r="2.2" fill="var(--bg)"/><circle cx="16.5" cy="18" r="2.2" fill="var(--bg)"/></svg><h1>Home Rover</h1></a>
+  <nav><a href="/">Drive</a><a href="/sim">Sim</a><a class="here" href="/calibrate">Calibrate</a><a href="/shadow">Shadow</a></nav>
   <div class="chip"><span class="dot" id="drive-dot"></span>Drive server <b id="drive-chip">…</b><button id="drive-svc" hidden></button></div>
+  
 </header>
+<div class="title"><h1>Calibrate drive</h1><span class="muted" title="Version of the drive app installed on the rover, read through the drive server">Rover app version: <span id="installed">not connected</span></span></div>
 <div class="banner"><b>Lift the rover</b> so the wheels are off the ground. Centre, range and speed change on the rover as you move the sliders — no install. <b>Save on rover</b> keeps them; <b>Undo</b> goes back to the last save.</div>
 <main>
   <section class="card">

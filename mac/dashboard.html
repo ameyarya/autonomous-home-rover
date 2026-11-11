@@ -2,190 +2,276 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Home Rover</title>
 <style>
-:root{color-scheme:dark;--bg:#0b0f15;--panel:#121822e6;--panel2:#1b2330;--line:#263142;--line2:#35445b;--fg:#eef3fa;--dim:#9aabc2;--dim2:#7d8ea8;
-  --ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--accent:#60a5fa;--arm:#f59e0b;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
+:root{color-scheme:dark;--bg:#090b0f;--panel:#11141a;--panel2:#181c24;--panel3:#20252f;--line:#232935;--line2:#323a49;--fg:#e9edf4;--dim:#9aa4b5;--dim2:#6f7a8c;
+  --ok:#3ddc97;--warn:#f5b942;--bad:#ff6b6b;--accent:#7c9cff;--arm:#ffb020;--stop:#e5383b;--r:14px;
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;background:var(--bg);color:var(--fg)}
 *{box-sizing:border-box}
-body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#16233a 0%,var(--bg) 60%) var(--bg);min-height:100vh}
-.wrap{padding:12px 18px;height:100vh;display:flex;flex-direction:column}
+body{margin:0;background:var(--bg);min-height:100vh;-webkit-font-smoothing:antialiased}
 [hidden]{display:none!important}
-button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line2);border-radius:12px;padding:10px 14px;cursor:pointer;touch-action:none;user-select:none;transition:background .12s,border-color .12s,transform .05s}
-button:hover{background:#243045}button:active{transform:scale(.98)}button:disabled{opacity:.45;cursor:not-allowed}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;flex:none}
-.brand{display:flex;align-items:baseline;gap:10px}
-.brand h1{font-size:20px;margin:0;font-weight:650}
-.brand .sub{font-size:12px;color:var(--dim2)}
-.pills{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.pill{display:flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:#121822cc;font-size:12px;color:var(--dim)}
-.pill b{color:var(--fg);font-weight:600}
-.pill button{padding:3px 10px;font-size:11px;border-radius:999px}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--dim2);flex:none}
-.dot.ok{background:var(--ok);box-shadow:0 0 8px #4ade8088}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
-.linkbtn{padding:7px 12px;border-radius:999px;font-size:12px;text-decoration:none;border:1px solid var(--line2);background:var(--panel2);color:var(--fg)}
-#alert{display:none;margin-bottom:12px;padding:10px 14px;border:1px solid #7f1d1d;background:#2a1215;border-radius:12px;font-size:13px;line-height:1.5}
-#alert button{float:right;font-size:12px;padding:4px 10px;margin-left:10px}
-main{flex:1;min-height:0;display:grid;grid-template-columns:300px minmax(0,1fr) 340px;gap:14px}
+a{color:var(--accent)}
+.wrap{padding:14px 16px 16px;height:100vh;display:flex;flex-direction:column;gap:12px;max-width:1800px;margin:0 auto}
+button,.btn{font:inherit;font-size:13px;font-weight:550;color:inherit;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:8px 12px;cursor:pointer;user-select:none;-webkit-user-select:none;text-decoration:none;transition:background .12s,border-color .12s,transform .05s,opacity .15s}
+button:hover,.btn:hover{background:var(--panel3);border-color:#414b5e}button:active{transform:scale(.98)}button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sm{padding:4px 10px;font-size:12px;border-radius:8px}
+.primary{background:#3b5bdb;border-color:#5c7cfa;color:#fff}.primary:hover{background:#4c6ef5;border-color:#748ffc}
+
+/* top bar */
+header{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;flex:none;min-height:34px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand svg{width:26px;height:26px;color:var(--accent);flex:none}
+.brand h1{font-size:17px;margin:0;font-weight:650;letter-spacing:-.2px}
+.brand .sub{font-size:12px;color:var(--dim2);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+.chip{display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-size:12px;color:var(--dim)}
+.chip b{color:var(--fg);font-weight:600}
+.chip button{padding:2px 9px;font-size:11px;border-radius:999px;margin-right:-5px}
+.dot{width:8px;height:8px;border-radius:50%;background:#4a5466;flex:none}
+.dot.ok{background:var(--ok);box-shadow:0 0 0 3px #3ddc9722}.dot.warn{background:var(--warn);box-shadow:0 0 0 3px #f5b94222}.dot.bad{background:var(--bad);box-shadow:0 0 0 3px #ff6b6b22}
+nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--panel);min-width:316px;margin-right:auto}
+nav a{font-size:12px;font-weight:550;color:var(--dim);text-decoration:none;padding:5px 8px;border-radius:999px;text-align:center;white-space:nowrap}
+nav a:hover{color:var(--fg);background:var(--panel3)}nav a.here{color:var(--fg);background:var(--panel3)}
+#alert{display:none;align-items:center;gap:12px;padding:10px 14px;border:1px solid #6b2226;background:#24100f;border-radius:var(--r);font-size:13px;line-height:1.5;flex:none}
+#alert p{margin:0;flex:1}
+
+/* layout */
+main{flex:1;min-height:0;display:grid;grid-template-columns:300px minmax(0,1fr) 340px;grid-template-areas:"a centre b";gap:12px}
 main>*{min-width:0;min-height:0}
-.col{display:flex;flex-direction:column;gap:12px;overflow:auto;scrollbar-width:thin}
-.centre{display:flex;flex-direction:column;gap:12px}
-@media(max-width:1250px){main{grid-template-columns:280px minmax(0,1fr) 300px}}
-@media(max-width:1050px){.wrap{height:auto}main{display:flex;flex-direction:column}.col{overflow:visible}.centre{order:-1}}
-.stage{position:relative;flex:1;min-height:0;border-radius:18px;overflow:hidden;background:#05070a;border:2px solid var(--line);transition:border-color .2s,box-shadow .2s}
-@media(max-width:1050px){.stage{flex:none;aspect-ratio:4/3}}
-.stage.armed{border-color:var(--arm);box-shadow:0 0 0 4px #f59e0b22,0 0 40px #f59e0b22}
-.stage img{display:block;width:100%;height:100%;object-fit:contain}.stage img.off{visibility:hidden}
-.badge{position:absolute;font-size:12px;padding:5px 9px;border-radius:8px;background:#0b0f15cc;border:1px solid #ffffff14}
-#live-age{right:12px;bottom:12px;font-variant-numeric:tabular-nums}
-#armed-badge{left:12px;top:12px;background:#f59e0bdd;color:#1b1206;font-weight:700;border:0}
-#key-badge{left:50%;bottom:12px;transform:translateX(-50%);font-weight:600}
-.empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--dim2);font-size:14px;text-align:center;padding:20px}
-.dock{display:flex;flex-direction:column;gap:14px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
-.card h2{font-size:12px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--dim2);margin:0 0 10px}
-#arm{width:100%;padding:14px;font-size:16px;font-weight:650;border-radius:14px}
-#arm.armed{background:var(--arm);border-color:#fbbf24;color:#1b1206}
-#stop{width:100%;margin-top:8px;padding:14px;font-size:20px;font-weight:800;letter-spacing:1px;border-radius:14px;background:#b91c1c;border-color:#ef4444}
-#stop:hover{background:#dc2626}
-#start-drive{width:100%;margin-top:10px}
-.pad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(2,56px);gap:8px;justify-content:center;margin:12px 0 4px}
-.pad button{font-size:24px;border-radius:16px;padding:0}
-.pad .up{grid-column:2}.pad .left{grid-column:1;grid-row:2}.pad .down{grid-column:2;grid-row:2}.pad .right{grid-column:3;grid-row:2}
-.pad button.on{background:var(--accent);border-color:#93c5fd;color:#06101f}
-.pad[aria-disabled=true] button{opacity:.4}
-.hint{font-size:12px;line-height:1.6;color:var(--dim);margin:8px 0 0}
-kbd{font:11px ui-monospace,monospace;padding:1px 5px;border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;color:var(--fg)}
+.centre,.col{display:flex;flex-direction:column;gap:12px}
+.centre{grid-area:centre}.col.a{grid-area:a}.col.b{grid-area:b}
+.col{overflow:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+@media(max-width:1240px){
+  .wrap{height:auto;min-height:100vh}
+  main{grid-template-columns:minmax(0,1fr) 340px;grid-template-rows:auto 1fr;grid-template-areas:"centre a" "centre b";align-items:start}
+  .col{overflow:visible}
+  .centre{position:sticky;top:12px}
+  .stage{flex:none;aspect-ratio:4/3;max-height:calc(100vh - 200px)}
+}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;flex:none}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+h2{font-size:13px;font-weight:600;margin:0;color:var(--fg)}
+h2 small{font-weight:500;color:var(--dim2);margin-left:6px}
+.hint{font-size:12px;line-height:1.55;color:var(--dim2);margin:10px 0 0}
 .status{font-size:12px;color:var(--dim);line-height:1.5;min-height:18px;margin:10px 0 0}
 .status.warn{color:var(--warn)}
-.tele{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px 12px;font-size:13px;flex:1}
-.strip{flex:none;display:flex;align-items:center;gap:10px 14px;padding:10px 14px;flex-wrap:wrap}
-.strip h2{margin:0;white-space:nowrap}
-.rec{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);white-space:nowrap}
-.rec.on b{color:#f87171}.rec.on .dot{background:#ef4444;box-shadow:0 0 8px #ef444488}
-.strip details{border:0;margin:0;padding:0;position:relative}
-.strip details[open] .form{position:absolute;right:0;bottom:36px;z-index:5;width:420px;background:var(--panel2);border:1px solid var(--line2);border-radius:14px;padding:14px;box-shadow:0 10px 40px #0008}
-.strip details[open] #cfg-status{position:absolute;right:0;bottom:-6px;width:420px}
-.tele span{display:block;color:var(--dim2);font-size:11px;margin-bottom:2px}.tele strong{font-weight:550;overflow-wrap:anywhere}
-details{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
-details summary{cursor:pointer;color:var(--dim);font-size:13px}
-.form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;font-size:12px}
-.form label{display:flex;flex-direction:column;gap:4px;color:var(--dim2)}
+kbd{font:600 10.5px ui-monospace,SFMono-Regular,Menlo,monospace;padding:1px 5px;border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;color:var(--dim);background:var(--panel2)}
+.num{font-variant-numeric:tabular-nums}
+
+/* live view */
+.stage{position:relative;flex:1;min-height:0;border-radius:var(--r);overflow:hidden;background:#04060a;border:1px solid var(--line);transition:border-color .2s,box-shadow .2s}
+.stage.armed{border-color:var(--arm);box-shadow:0 0 0 3px #ffb02026,0 0 48px #ffb0201f}
+.stage img{display:block;width:100%;height:100%;object-fit:contain}.stage img.off{visibility:hidden}
+.badge{position:absolute;font-size:12px;padding:5px 10px;border-radius:8px;background:#090b0fcc;border:1px solid #ffffff1a;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#live-age{right:12px;top:12px;font-variant-numeric:tabular-nums;color:var(--dim)}
+#armed-badge{left:12px;top:12px;background:var(--arm);color:#1d1300;font-weight:750;letter-spacing:.6px;border:0}
+#key-badge{left:50%;top:12px;transform:translateX(-50%);font-weight:600;background:var(--accent);color:#081027;border:0}
+#hud-sec{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:6px}
+#hud-sec .sec{min-width:78px;padding:5px 10px;background:#090b0fcc;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#hud-sec .sec strong{font-size:14px}
+.empty{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:8px;color:var(--dim);font-size:14px;text-align:center;padding:20px}
+.empty svg{width:40px;height:40px;color:var(--dim2);margin-bottom:4px}
+.empty small{color:var(--dim2);font-size:12px;max-width:340px;line-height:1.5}
+
+/* camera strip */
+.strip{display:flex;align-items:center;gap:12px 18px;flex-wrap:wrap;padding:12px 14px}
+.tele{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:10px 14px;flex:1 1 420px;min-width:0}
+.tele span,.stat span{display:block;color:var(--dim2);font-size:11px;margin-bottom:2px}
+.tele strong{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.toggle{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px 0 8px;border:1px solid var(--line);border-radius:10px;font-size:12px;color:var(--dim);cursor:pointer;white-space:nowrap}
+.toggle b{font-weight:550;color:var(--fg)}
+.toggle.on{border-color:#7a2a2c;background:#2a1213}.toggle.on b{color:#ff8f8f}
+.toggle a{font-size:11px;margin-left:2px}
+input.sw{appearance:none;-webkit-appearance:none;width:30px;height:18px;border-radius:999px;background:var(--line2);border:0;padding:0;margin:0;position:relative;cursor:pointer;flex:none;transition:background .15s}
+input.sw::before{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .15s}
+input.sw:checked{background:var(--accent)}input.sw:checked::before{transform:translateX(12px)}
+.toggle.on input.sw:checked{background:var(--bad)}
+details#settings{position:relative}
+details#settings summary{list-style:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 11px;border:1px solid var(--line2);border-radius:10px;background:var(--panel2);font-size:12px;font-weight:550;cursor:pointer;user-select:none}
+details#settings summary::-webkit-details-marker{display:none}
+details#settings summary:hover,details#settings[open] summary{background:var(--panel3)}
+details#settings summary svg{width:14px;height:14px}
+.pop{position:absolute;right:0;bottom:40px;z-index:10;width:min(400px,calc(100vw - 32px));background:var(--panel2);border:1px solid var(--line2);border-radius:var(--r);padding:14px;box-shadow:0 16px 48px #000a}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px}
+.form label{display:flex;flex-direction:column;gap:5px;color:var(--dim)}
 .form label.check{flex-direction:row;align-items:center;gap:8px;color:var(--fg)}
-select,input{font:inherit;color:inherit;background:#0d131c;border:1px solid var(--line2);border-radius:8px;padding:7px;min-width:0}
-input[type=checkbox]{width:16px;height:16px}
-.primary{background:#1d4ed8;border-color:#3b82f6}
-.moves{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.moves button{padding:10px 6px;font-size:13px}
-.odo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px;font-size:13px}
-.odo span{display:block;color:var(--dim2);font-size:11px}.odo strong{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
-.cardhead{display:flex;justify-content:space-between;align-items:center}.cardhead button{padding:4px 10px;font-size:11px}
-.compass{display:flex;align-items:center;gap:16px;margin-top:12px}
-.compass svg{width:96px;height:96px;flex:none}
+.form .full{grid-column:1/-1}
+select,input[type=number]{font:inherit;font-size:13px;color:var(--fg);background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:7px 8px;min-width:0}
+
+/* drive */
+#arm{width:100%;height:46px;font-size:15px;font-weight:650;border-radius:12px}
+#arm.armed{background:var(--arm);border-color:#ffd166;color:#1d1300}
+#stop{width:100%;height:56px;margin-top:8px;font-size:19px;font-weight:800;letter-spacing:1.5px;border-radius:12px;background:var(--stop);border-color:#ff6b6e;color:#fff;display:flex;align-items:center;justify-content:center;gap:10px}
+#stop:hover{background:#f04a4d;border-color:#ff8587}
+#stop kbd{background:#0003;border-color:#fff5;color:#fff;letter-spacing:0}
+#start-drive{width:100%;margin-top:8px}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,52px);gap:8px;margin:14px auto 0;max-width:252px;transition:opacity .15s}
+.pad button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:20px;line-height:1;border-radius:12px;padding:0;touch-action:none}
+.pad button *{pointer-events:none}
+.pad small{font:600 10px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--dim2)}
+.pad .up{grid-column:2}.pad .left{grid-column:1;grid-row:2}.pad .down{grid-column:2;grid-row:2}.pad .right{grid-column:3;grid-row:2}
+.pad button.on{background:var(--accent);border-color:#aebfff;color:#081027}.pad button.on small{color:#081027}
+.pad[aria-disabled=true],body:not(.armed) .moves{opacity:.45}
+
+/* heading */
+.compass{display:flex;align-items:center;gap:14px}
+.compass svg{width:76px;height:76px;flex:none}
 #needle{transition:transform .2s linear;transform-origin:50px 50px}
-.compass .read strong{display:block;font-size:30px;font-weight:650;font-variant-numeric:tabular-nums}
+.compass .read{flex:1;min-width:0}
+.compass .read strong{display:block;font-size:28px;font-weight:650;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
 .compass .read span{font-size:12px;color:var(--dim)}
-.hrow{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:13px}
-.hrow label{display:flex;align-items:center;gap:8px}
-.sectors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
-.sectors div{border:1px solid var(--line2);border-radius:12px;padding:8px;text-align:center;font-size:11px;color:var(--dim2)}
-.sectors strong{display:block;font-size:18px;font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
-.sectors .clear{border-color:#16a34a}.sectors .near{border-color:var(--warn)}.sectors .blocked{border-color:#ef4444;background:#ef444422}
-#depth-img{display:block;width:100%;max-height:min(30vh,240px);object-fit:contain;background:#05070a;border-radius:10px;margin-top:10px}
-@media(max-width:640px){.wrap{padding:16px}.tele{grid-template-columns:1fr 1fr}.pad{grid-template-columns:repeat(3,64px)}}
+.hrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;font-size:13px}
+.hrow label{display:flex;align-items:center;gap:8px;cursor:pointer}
+
+/* measured moves */
+.moves{display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));gap:6px;align-items:center;transition:opacity .15s}
+.moves i{font-style:normal;font-size:11px;color:var(--dim2);padding-right:4px}
+.moves button{padding:8px 4px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.stat{background:var(--panel2);border-radius:10px;padding:8px 10px}
+.stat strong{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* obstacles */
+.sectors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sectors>div,.sec{border:1px solid var(--line2);border-radius:10px;padding:8px;text-align:center;font-size:11px;color:var(--dim2);background:var(--panel2)}
+.sectors strong,.sec strong{display:block;font-size:17px;font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
+.sectors .clear,.sec.clear{border-color:#1f8f5f}.sectors .clear strong,.sec.clear strong{color:var(--ok)}
+.sectors .near,.sec.near{border-color:var(--warn)}.sectors .near strong,.sec.near strong{color:var(--warn)}
+.sectors .blocked,.sec.blocked{border-color:var(--bad);background:#3a1416}.sectors .blocked strong,.sec.blocked strong{color:var(--bad)}
+.seg{display:inline-flex;padding:2px;border:1px solid var(--line);border-radius:9px;background:var(--bg)}
+.seg button{border:0;background:none;padding:4px 11px;font-size:12px;border-radius:7px;color:var(--dim)}
+.seg button.on{background:var(--panel3);color:var(--fg)}
+#depth-img{display:block;width:100%;max-height:240px;object-fit:contain;background:#04060a;border-radius:10px;margin-top:10px}
+
+@media(max-width:860px){
+  .wrap{padding:12px 12px 92px}
+  main{display:flex;flex-direction:column;align-items:stretch}
+  .centre{position:static}
+  .stage{max-height:none}
+  .chips{width:100%}.chip{flex:1 1 auto;justify-content:center}
+  #key-badge{top:auto;bottom:12px}
+  #hud-sec{bottom:48px;width:calc(100% - 24px)}#hud-sec .sec{flex:1;min-width:0}
+  .tele{flex-basis:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .tools{width:100%}.toggle{flex:1 1 auto}
+  details#settings{position:static;flex:1 1 100%}details#settings summary{justify-content:center}
+  .pop{position:fixed;left:12px;right:12px;bottom:84px;width:auto;max-height:calc(100vh - 110px);overflow:auto}
+  #stop{position:fixed;left:12px;right:12px;bottom:12px;width:auto;margin:0;z-index:20;box-shadow:0 8px 32px #000c}
+  #stop kbd{display:none}
+  .pad{max-width:320px;grid-template-rows:repeat(2,60px)}
+}
+@media(max-width:640px){nav{width:100%;min-width:0}}
+@media(max-width:380px){.moves{grid-template-columns:repeat(3,minmax(0,1fr))}.moves i{grid-column:1/-1;margin-top:4px}.moves span{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style></head><body><div class="wrap">
 <header>
-  <div class="brand"><h1>Home Rover</h1><span class="sub">camera <span id="host">…</span></span></div>
-  <div class="pills">
-    <div class="pill"><span class="dot" id="cam-dot"></span>Camera <b id="cam-chip">…</b></div>
-    <div class="pill"><span class="dot" id="drive-dot"></span>Drive <b id="drive-chip">…</b><button id="drive-svc" hidden></button></div>
-    <a class="linkbtn" href="/sim">Sim</a>
-    <a class="linkbtn" href="/calibrate">Calibrate</a>
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="9" width="18" height="8" rx="2.5"/><path d="M8 9V6h5l2 3"/><circle cx="7.5" cy="18" r="2.2" fill="var(--bg)"/><circle cx="16.5" cy="18" r="2.2" fill="var(--bg)"/></svg>
+    <h1>Home Rover</h1>
   </div>
+  <nav><a class="here" href="/">Drive</a><a href="/sim">Sim</a><a href="/calibrate">Calibrate</a><a href="/shadow">Shadow</a></nav>
+  <div class="chips">
+    <div class="chip"><span class="dot" id="cam-dot"></span>Camera <b id="cam-chip">…</b></div>
+    <div class="chip"><span class="dot" id="drive-dot"></span>Drive <b id="drive-chip">…</b><button id="drive-svc" hidden></button></div>
+    <div class="chip" title="Gyro stick on the rover (rover-imu.local)"><span class="dot" id="imu-dot"></span>Heading <b id="imu-chip">…</b></div>
+    <div class="chip" title="Depth AI on the camera feed"><span class="dot" id="depth-dot"></span>Depth <b id="depth-chip">off</b></div>
+  </div>
+  
 </header>
-<div id="alert"><button id="alert-ok">Dismiss</button><b>Camera restarted.</b> <span id="alert-text"></span></div>
+<div id="alert"><p><b>Camera restarted.</b> <span id="alert-text"></span></p><button id="alert-ok" class="sm">Dismiss</button></div>
 <main>
-  <aside class="col">
-    <div class="card">
-      <h2>Drive</h2>
-      <button id="arm">Arm to drive</button>
-      <button id="stop">STOP</button>
-      <button id="start-drive" class="primary" hidden>Start drive server</button>
-      <div class="pad" id="pad" aria-disabled="true">
-        <button class="up" data-dir="up" aria-label="Forward">↑</button>
-        <button class="left" data-dir="left" aria-label="Steer left">←</button>
-        <button class="down" data-dir="down" aria-label="Reverse">↓</button>
-        <button class="right" data-dir="right" aria-label="Steer right">→</button>
-      </div>
-      <p class="hint"><kbd>W</kbd><kbd>S</kbd> drive, <kbd>A</kbd><kbd>D</kbd> steer, hold both for both; let go to stop. <kbd>Esc</kbd>/<kbd>Space</kbd> = STOP.</p>
-      <p class="status" id="drive-status">Drive server offline</p>
-    </div>
-    <div class="card">
-      <div class="cardhead"><h2 style="margin:0" title="From the gyro stick on the rover (rover-imu.local). Arming sets it to 0°. With hold on, driving straight (measured moves and holding ↑/↓) steers back onto its heading, a steer locks the new heading when you let go, and turns stop at the angle. + = left of zero.">Heading</h2><button id="imu-zero" title="Call the way the rover faces now 0°">Zero</button></div>
-      <div class="compass">
-        <svg viewBox="0 0 100 100" aria-hidden="true">
-          <circle cx="50" cy="50" r="44" fill="none" stroke="var(--line2)" stroke-width="2"/>
-          <text x="50" y="16" text-anchor="middle" font-size="9" fill="var(--dim2)">0°</text>
-          <g id="needle"><path d="M50 14 L57 52 L50 46 L43 52 Z" fill="var(--accent)"/><circle cx="50" cy="50" r="4" fill="var(--accent)"/></g>
-        </svg>
-        <div class="read"><strong id="imu-head">—</strong><span id="imu-info">Heading stick offline</span></div>
-      </div>
-      <div class="hrow"><label><input type="checkbox" id="imu-hold" checked>Heading hold</label><span id="imu-rate" class="hint" style="margin:0"></span></div>
-    </div>
-  </aside>
   <section class="centre">
     <div class="stage" id="stage">
       <img id="live" class="off" alt="Live camera">
       <span class="badge" id="armed-badge" hidden>ARMED</span>
       <span class="badge" id="key-badge" hidden></span>
       <span class="badge" id="live-age">—</span>
-      <div class="empty" id="live-empty">Waiting for the camera…</div>
+      <div id="hud-sec" hidden title="Free floor ahead in each third of the view">
+        <div class="sec" data-sec="left">Left<strong>—</strong></div><div class="sec" data-sec="centre">Centre<strong>—</strong></div><div class="sec" data-sec="right">Right<strong>—</strong></div>
+      </div>
+      <div class="empty" id="live-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h8A2.5 2.5 0 0 1 16 8.5v7a2.5 2.5 0 0 1-2.5 2.5h-8A2.5 2.5 0 0 1 3 15.5z"/><path d="m16 10.5 5-3v9l-5-3"/><path d="m2 3 20 18"/></svg>
+        <span>Waiting for the camera…</span>
+        <small id="live-why">Check the rover has power and is on Wi-Fi. The picture comes back by itself.</small>
+      </div>
     </div>
     <div class="card strip">
-      <h2>Camera</h2>
       <div class="tele" id="tele"></div>
-      <label class="rec" id="shadow" title="Shadow mode: while you drive from this page, record what the camera saw, what you did and what the explorer would have done; the report tunes the explorer to drive like you"><input type="checkbox" id="shadow-on"><span class="dot"></span><b id="shadow-text">Shadow</b></label>
-      <a class="linkbtn" href="/shadow" style="padding:4px 10px">Report</a>
-      <label class="rec" id="rec" title="While the rover drives, save 2 photos a second with position, heading and depth to mac/captures/ (for rebuilding the apartment later)"><input type="checkbox" id="rec-on"><span class="dot"></span><b id="rec-text">Record</b></label>
-      <details id="settings"><summary>Camera settings</summary>
-        <div class="form">
-          <label>Resolution<select data-k="framesize"><option>qvga</option><option>cif</option><option>hvga</option><option>vga</option><option>svga</option><option>xga</option><option>hd</option></select></label>
-          <label>JPEG quality (10 sharp – 63 small)<input data-k="quality" type="number" min="10" max="63"></label>
-          <label>Exposure<select data-k="ae_level"><option>-2</option><option>-1</option><option>0</option><option>1</option><option>2</option></select></label>
-          <label>Brightness<select data-k="brightness"><option>-2</option><option>-1</option><option>0</option><option>1</option><option>2</option></select></label>
-          <label class="check"><input data-k="hmirror" type="checkbox">Mirror</label>
-          <label class="check"><input data-k="vflip" type="checkbox">Flip</label>
-          <label class="check"><input data-k="led" type="checkbox">Status LED</label>
-          <button id="cfg-apply" class="primary">Apply</button>
-        </div>
-        <p class="status" id="cfg-status">Saved on the camera across reboots. VGA at quality 16 keeps video smooth over this Wi-Fi.</p>
-      </details>
+      <div class="tools">
+        <label class="toggle" id="shadow" title="Shadow mode: while you drive from this page, record what the camera saw, what you did and what the explorer would have done; the report tunes the explorer to drive like you"><input type="checkbox" class="sw" id="shadow-on"><b id="shadow-text">Shadow</b><a href="/shadow">Report</a></label>
+        <label class="toggle" id="rec" title="While the rover drives, save 2 photos a second with position, heading and depth to mac/captures/ (for rebuilding the apartment later)"><input type="checkbox" class="sw" id="rec-on"><b id="rec-text">Record</b></label>
+        <details id="settings"><summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Camera settings</summary>
+          <div class="pop">
+            <div class="form">
+              <label>Resolution<select data-k="framesize"><option>qvga</option><option>cif</option><option>hvga</option><option>vga</option><option>svga</option><option>xga</option><option>hd</option></select></label>
+              <label>JPEG quality (10 sharp – 63 small)<input data-k="quality" type="number" min="10" max="63"></label>
+              <label>Exposure<select data-k="ae_level"><option>-2</option><option>-1</option><option>0</option><option>1</option><option>2</option></select></label>
+              <label>Brightness<select data-k="brightness"><option>-2</option><option>-1</option><option>0</option><option>1</option><option>2</option></select></label>
+              <label class="check"><input data-k="hmirror" type="checkbox" class="sw">Mirror</label>
+              <label class="check"><input data-k="vflip" type="checkbox" class="sw">Flip</label>
+              <label class="check"><input data-k="led" type="checkbox" class="sw">Status LED</label>
+              <button id="cfg-apply" class="primary">Apply</button>
+            </div>
+            <p class="status" id="cfg-status">Saved on the camera across reboots. VGA at quality 16 keeps video smooth over this Wi-Fi.</p>
+          </div>
+        </details>
+      </div>
     </div>
   </section>
-  <aside class="col">
+  <aside class="col a">
     <div class="card">
-      <div class="cardhead"><h2 style="margin:0" title="Depth AI (Depth Anything V2) on the camera feed: free floor ahead in each third, from floor geometry. Experimental; nothing drives from it yet.">Obstacles · camera</h2><button id="depth-svc">Start</button></div>
-      <div class="sectors">
-        <div id="sec-left">Left<strong>—</strong></div><div id="sec-centre">Centre<strong>—</strong></div><div id="sec-right">Right<strong>—</strong></div>
+      <button id="arm">Arm to drive</button>
+      <button id="stop">STOP <kbd>Esc</kbd><kbd>Space</kbd></button>
+      <button id="start-drive" class="primary" hidden>Start drive server</button>
+      <div class="pad" id="pad" aria-disabled="true">
+        <button class="up" data-dir="up" aria-label="Forward"><span>↑</span><small>W</small></button>
+        <button class="left" data-dir="left" aria-label="Steer left"><span>←</span><small>A</small></button>
+        <button class="down" data-dir="down" aria-label="Reverse"><span>↓</span><small>S</small></button>
+        <button class="right" data-dir="right" aria-label="Steer right"><span>→</span><small>D</small></button>
       </div>
-      <div class="hrow"><label>View <select id="depth-view"><option value="">none</option><option value="depth">depth</option><option value="map" selected>map</option></select></label><span id="depth-rate" class="hint" style="margin:0"></span></div>
-      <img id="depth-img" alt="Depth view (free floor green, obstacles red) or the floor map (free blue-grey, obstacles red, rover orange)">
-      <p class="hint" id="view-empty" hidden></p>
-      <p class="hint" id="map-info"></p>
-      <p class="status" id="depth-status">Depth service off</p>
+      <p class="hint">Hold to drive, let go to stop. Arrow keys work too; hold two to drive and steer together.</p>
+      <p class="status" id="drive-status">Drive server offline</p>
     </div>
-    <div class="card">
-      <div class="cardhead"><h2 style="margin:0">Measured moves</h2><button id="odo-reset" title="Zero the distance and position">Reset</button></div>
-      <div class="moves" style="margin-top:12px">
-        <button data-move="forward" data-amount="25">↑ 25 cm</button><button data-move="forward" data-amount="50">↑ 50 cm</button><button data-move="forward" data-amount="100">↑ 1 m</button>
-        <button data-move="left" data-amount="45">↶ 45°</button><button data-move="left" data-amount="90">↶ 90°</button><button data-move="back" data-amount="25">↓ 25 cm</button>
-        <button data-move="right" data-amount="45">↷ 45°</button><button data-move="right" data-amount="90">↷ 90°</button><button data-move="back" data-amount="50">↓ 50 cm</button>
+      <div class="card">
+        <div class="cardhead"><h2 title="From the gyro stick on the rover (rover-imu.local). Arming sets it to 0°. With hold on, driving straight (measured moves and holding ↑/↓) steers back onto its heading, a steer locks the new heading when you let go, and turns stop at the angle. + = left of zero.">Heading</h2><button id="imu-zero" class="sm" title="Call the way the rover faces now 0°">Set as 0°</button></div>
+        <div class="compass">
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="45" fill="var(--panel2)" stroke="var(--line2)" stroke-width="1.5"/>
+            <g stroke="var(--dim2)" stroke-width="2" stroke-linecap="round"><path d="M50 8v8M92 50h-8M50 92v-8M8 50h8"/></g>
+            <g id="needle"><path d="M50 18 L57 53 L50 47 L43 53 Z" fill="var(--accent)"/><circle cx="50" cy="50" r="4" fill="var(--accent)"/></g>
+          </svg>
+          <div class="read"><strong id="imu-head">—</strong><span id="imu-info">Heading stick offline</span></div>
+        </div>
+        <div class="hrow"><label title="Steer back onto the heading while driving straight"><input type="checkbox" class="sw" id="imu-hold" checked>Heading hold</label><span id="imu-rate" class="hint num" style="margin:0"></span></div>
       </div>
-      <div class="odo">
-        <div><span>Travelled</span><strong id="odo-dist">—</strong></div>
-        <div><span>Heading</span><strong id="odo-head">—</strong></div>
-        <div><span>Position</span><strong id="odo-pos">—</strong></div>
+  </aside>
+  <aside class="col b">
+      <div class="card">
+        <div class="cardhead"><h2>Measured moves</h2><button id="odo-reset" class="sm" title="Zero the distance and position">Reset</button></div>
+        <div class="moves">
+          <i>Forward</i><button data-move="forward" data-amount="25">↑ 25 cm</button><button data-move="forward" data-amount="50">↑ 50 cm</button><button data-move="forward" data-amount="100">↑ 1 m</button>
+          <i>Back</i><button data-move="back" data-amount="25">↓ 25 cm</button><button data-move="back" data-amount="50">↓ 50 cm</button><span></span>
+          <i>Left</i><button data-move="left" data-amount="45">↶ 45°</button><button data-move="left" data-amount="90">↶ 90°</button><span></span>
+          <i>Right</i><button data-move="right" data-amount="45">↷ 45°</button><button data-move="right" data-amount="90">↷ 90°</button><span></span>
+        </div>
+        <div class="stats">
+          <div class="stat"><span>Travelled</span><strong id="odo-dist">—</strong></div>
+          <div class="stat"><span>Heading</span><strong id="odo-head">—</strong></div>
+          <div class="stat"><span>Position</span><strong id="odo-pos">—</strong></div>
+        </div>
+        <p class="status" id="move-status"></p>
+        <p class="hint" style="margin-top:4px">Turns are forward arcs (no turning on the spot). Distance from drive time, heading from the gyro. Tune on <a href="/calibrate">Calibrate</a>.</p>
       </div>
-      <p class="hint">Turns are forward arcs (no turning on the spot). Distance from drive time, heading from the gyro. Measured on <a href="/calibrate">Calibrate</a>.</p>
-      <p class="status" id="move-status"></p>
-    </div>
+      <div class="card">
+        <div class="cardhead"><h2 title="Depth AI (Depth Anything V2) on the camera feed: free floor ahead in each third, from floor geometry. Experimental; nothing drives from it yet.">Obstacles<small>experimental</small></h2><button id="depth-svc" class="sm">Start</button></div>
+        <div class="sectors">
+          <div id="sec-left">Left<strong>—</strong></div><div id="sec-centre">Centre<strong>—</strong></div><div id="sec-right">Right<strong>—</strong></div>
+        </div>
+        <div class="hrow"><div class="seg" id="depth-view" role="group" aria-label="Picture"><button data-view="">Off</button><button data-view="depth">Depth</button><button data-view="map">Map</button></div><span id="depth-rate" class="hint num" style="margin:0"></span></div>
+        <img id="depth-img" hidden alt="Depth view (free floor green, obstacles red) or the floor map (free blue-grey, obstacles red, rover orange)">
+        <p class="hint" id="view-empty" hidden></p>
+        <p class="hint" id="map-info"></p>
+        <p class="status" id="depth-status">Depth service off</p>
+      </div>
   </aside>
 </main>
 </div>
@@ -209,11 +295,12 @@ $('alert-ok').onclick=async()=>{$('alert').style.display='none';try{await postJS
 async function camPoll(){
   try{
     const h=await getJSON('/status'),t=h.telemetry||{};
-    $('host').textContent=h.host;
+    $('cam-chip').parentNode.title='Camera at '+h.host;
     const ok=h.state==='ok';
     dot('cam-dot',ok?'ok':(h.stream_connected?'warn':'bad'));
     $('cam-chip').textContent=ok?'ok':(h.stream_connected?'stale':'offline');
-    $('live-age').textContent=h.frame_age_ms!=null?`${h.frame_age_ms} ms old · ${h.fps} fps`:(h.problems||[]).join('; ');
+    $('live-age').textContent=h.frame_age_ms!=null?`${h.frame_age_ms} ms old · ${h.fps} fps`:'no picture';
+    if((h.problems||[]).length)$('live-why').textContent=h.problems.join('; ')+'. Check the rover has power and is on Wi-Fi.';
     const up=t.t_us?Math.round(t.t_us/1e6):null;
     const upText=up==null?'—':(up>=3600?`${(up/3600).toFixed(1)} h`:up>=60?`${Math.floor(up/60)} min`:`${up} s`);
     const cells=[['Wi-Fi',fmt(t.rssi,' dBm')],['Camera fps',fmt(t.fps)],['Received fps',fmt(h.fps)],
@@ -224,7 +311,7 @@ async function camPoll(){
     const unacked=h.restarts_unacked||0;
     if(unacked>0&&r.length){const last=r[r.length-1];
       $('alert-text').textContent=`${unacked} new restart(s); last at ${last.at}, reason: ${last.reason}. A power drop (cable/magnet) shows as poweron or brownout.`;
-      $('alert').style.display='block'}else{$('alert').style.display='none'}
+      $('alert').style.display='flex'}else{$('alert').style.display='none'}
   }catch(e){dot('cam-dot','bad');$('cam-chip').textContent='dashboard offline'}
   setTimeout(camPoll,1000)}
 camPoll();
@@ -257,7 +344,7 @@ function keyFor(){
   return s==='left'?'L':s==='right'?'R':null}
 function showArmed(){
   $('arm').textContent=armed?'Armed · tap to disarm':'Arm to drive';$('arm').className=armed?'armed':'';
-  $('stage').classList.toggle('armed',armed);$('armed-badge').hidden=!armed;$('pad').setAttribute('aria-disabled',String(!armed))}
+  $('stage').classList.toggle('armed',armed);document.body.classList.toggle('armed',armed);$('armed-badge').hidden=!armed;$('pad').setAttribute('aria-disabled',String(!armed))}
 function showDrive(s){
   if(s.error&&s.armed===undefined){$('drive-status').textContent='Drive server off. Start it above (remote or transmitter on USB).';return}
   armed=!!s.armed;if(!armed)mine=false;showArmed();showOdo(s.odometer);
@@ -315,12 +402,13 @@ $('odo-reset').onclick=async()=>{try{showOdo((await postJSON('/drive/odometer/re
 async function imuPoll(){
   try{const h=await getJSON('/drive/imu');
     $('imu-hold').checked=!!h.hold;
+    const cal=!h.online&&h.calibrated===false&&h.age_ms!=null;dot('imu-dot',h.online?'ok':cal?'warn':'');$('imu-chip').textContent=h.online?'online':cal?'calibrating':'offline';
     if(h.online){$('imu-head').textContent=(h.heading_deg>0?'+':'')+Math.round(h.heading_deg)+'°';
       $('needle').style.transform=`rotate(${-h.yaw_deg}deg)`;
       $('imu-info').textContent=(h.still?'still':'moving')+` · battery ${h.battery}% · bumps ${h.bumps}`;
       $('imu-rate').textContent=`${(h.rate_dps||0).toFixed(1)}°/s`}
     else{$('imu-head').textContent='—';$('imu-info').textContent=h.calibrated===false&&h.age_ms!=null?'Keep the rover still: calibrating':'Heading stick offline';$('imu-rate').textContent=''}}
-  catch(e){$('imu-head').textContent='—';$('imu-info').textContent='Drive server offline'}
+  catch(e){$('imu-head').textContent='—';$('imu-info').textContent='Drive server offline';dot('imu-dot','');$('imu-chip').textContent='offline'}
   setTimeout(imuPoll,200)}
 imuPoll();
 $('imu-zero').onclick=()=>postJSON('/drive/imu/zero').catch(()=>{});
@@ -343,27 +431,32 @@ recPoll();
 $('rec-on').onchange=e=>postJSON('/capture',{on:e.target.checked}).then(recPoll).catch(()=>{});
 
 // Camera depth / obstacles.
-let depthOn=false;
+let depthOn=false,depthView='map';
+try{const v=localStorage.getItem('depthView');if(v!==null)depthView=v}catch(e){}
+function setSec(n,v){const card=$('sec-'+n),hud=document.querySelector(`#hud-sec [data-sec=${n}]`);card.className=v?v.state:'';hud.className='sec'+(v?' '+v.state:'');
+  for(const el of [card,hud])el.querySelector('strong').textContent=v?(v.cm>=300?'clear':v.cm+' cm'):'—'}
+function showSeg(){document.querySelectorAll('#depth-view button').forEach(b=>b.classList.toggle('on',b.dataset.view===depthView))}
+showSeg();
 async function depthPoll(){
   try{const s=await getJSON('/depth/status');if(!('ready' in s))throw new Error(s.error);depthOn=true;$('depth-svc').textContent='Stop';
-    for(const n of ['left','centre','right']){const el=$('sec-'+n),v=s.ok&&s.sectors?s.sectors[n]:null;
-      el.className=v?v.state:'';el.querySelector('strong').textContent=v?(v.cm>=300?'clear':v.cm+' cm'):'—'}
+    for(const n of ['left','centre','right'])setSec(n,s.ok&&s.sectors?s.sectors[n]:null);
+    $('hud-sec').hidden=!(s.ok&&s.sectors);
     $('depth-rate').textContent=s.fps?`${s.fps} fps · ${s.model_ms} ms`:'';
-    $('depth-status').className='status'+(s.error||!s.ok?' warn':'');
     const living=(s.stop_for||[]).length?`${s.stop_for.join(', ')} in view: no driving · `:'';
     $('depth-status').className='status'+(s.error||!s.ok||living?' warn':'');
+    dot('depth-dot',s.ready&&s.ok&&!s.error&&!living?'ok':'warn');$('depth-chip').textContent=!s.ready?'loading':living?'paused':s.ok&&!s.error?'running':'waiting';
     $('depth-status').textContent=living+(!s.ready?'Loading the depth model…':s.error?s.error:!s.ok?(s.why||''):'Running'+(s.frame_age_ms!=null?` · frame ${s.frame_age_ms} ms old`:''));
     showView();
     $('map-info').textContent=s.map?`Map: ${s.map.views} views · ${s.map.free_m2} m² free floor seen`:''}
   catch(e){depthOn=false;$('depth-svc').textContent='Start';$('depth-status').className='status';$('depth-status').textContent='Depth service off';
-    for(const n of ['left','centre','right']){$('sec-'+n).className='';$('sec-'+n).querySelector('strong').textContent='—'}}
+    for(const n of ['left','centre','right'])setSec(n,null);$('hud-sec').hidden=true;dot('depth-dot','');$('depth-chip').textContent='off'}
   setTimeout(depthPoll,depthOn?250:2000)}
 depthPoll();
 // Depth / map picture: load off-screen and swap in only when it arrived, so nothing flickers or
 // shows a broken image; one request at a time.
 let viewLoading=false;
 function showView(){
-  const view=$('depth-view').value;
+  const view=depthView;
   if(!view){$('depth-img').hidden=true;$('view-empty').hidden=true;return}
   if(viewLoading)return;viewLoading=true;
   const img=new Image();
@@ -371,7 +464,7 @@ function showView(){
   img.onerror=()=>{viewLoading=false;$('depth-img').hidden=true;$('view-empty').hidden=false;
     $('view-empty').textContent=view==='map'?'No map yet: it fills in while the rover stands still with the heading stick online.':'No depth picture yet.'};
   img.src=(view==='map'?'/depth/map.png':'/depth.jpg')+'?t='+Date.now()}
-$('depth-view').onchange=()=>{viewLoading=false;showView()};
+document.querySelectorAll('#depth-view button').forEach(b=>b.onclick=()=>{depthView=b.dataset.view;try{localStorage.setItem('depthView',depthView)}catch(e){}showSeg();viewLoading=false;showView()});
 $('depth-svc').onclick=async e=>{e.target.disabled=true;try{await postJSON(`/services/depth/${depthOn?'stop':'start'}`);$('depth-status').textContent=depthOn?'Stopping…':'Starting (the model takes a few seconds)…'}catch(err){$('depth-status').textContent=err.message}e.target.disabled=false};
 
 // Camera settings.
@@ -380,6 +473,7 @@ async function loadCfg(){try{const c=await getJSON('/cam/config');
     if(el.type==='checkbox')el.checked=!!v;else el.value=v});$('cfg-status').textContent='Saved on the camera across reboots.'}
   catch(e){$('cfg-status').textContent='Camera settings unavailable'}}
 $('settings').ontoggle=()=>{if($('settings').open)loadCfg()};
+addEventListener('click',e=>{if($('settings').open&&!$('settings').contains(e.target))$('settings').open=false});
 $('cfg-apply').onclick=async()=>{const b={};
   document.querySelectorAll('#settings [data-k]').forEach(el=>b[el.dataset.k]=el.type==='checkbox'?(el.checked?1:0):el.value);
   try{await postJSON('/cam/config',b);$('cfg-status').textContent='Applied.';loadCfg()}catch(e){$('cfg-status').textContent='Failed: '+e.message}};
